@@ -148,10 +148,11 @@
       <div id="alertas-vencimento"></div>
       
       <!-- View Selector -->
-      <div class="flex gap-3 mb-6">
+      <div class="flex gap-3 mb-6 flex-wrap">
         <button class="btn btn-dark view-btn" data-view="DASHBOARD">📊 Dashboard</button>
         <button class="btn btn-soft view-btn" data-view="LANCAMENTOS">💰 Lançamentos</button>
         <button class="btn btn-soft view-btn" data-view="RATEIOS">⚖️ Rateios</button>
+        <button class="btn btn-soft view-btn" data-view="RECEBIMENTOS">💵 Recebimentos</button>
         <button class="btn btn-soft view-btn" data-view="ACERTOS">🤝 Acertos Sócios</button>
         <button class="btn btn-soft view-btn" data-view="CONFIG">⚙️ Config</button>
       </div>
@@ -397,6 +398,65 @@
         </div>
       </div>
 
+      <!-- RECEBIMENTOS VIEW -->
+      <div id="view-RECEBIMENTOS" class="view-content hidden">
+        <div class="card p-6 mb-6">
+          <div class="font-black text-lg mb-4">💵 Novo Recebimento</div>
+          <form id="receb-form">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div>
+                <div class="text-xs muted mb-1">Data *</div>
+                <input id="receb-data" type="date" class="input" required />
+              </div>
+              <div>
+                <div class="text-xs muted mb-1">Unidade *</div>
+                <select id="receb-unidade" class="select" required>
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div>
+                <div class="text-xs muted mb-1">Tipo *</div>
+                <select id="receb-tipo" class="select" required>
+                  <option value="sinal">Sinal</option>
+                  <option value="parcela">Parcela</option>
+                  <option value="quitacao">Quitação</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <div class="text-xs muted mb-1">Valor (R$) *</div>
+                <input id="receb-valor" type="number" step="0.01" class="input" required />
+              </div>
+              <div>
+                <div class="text-xs muted mb-1">Forma de Pagamento *</div>
+                <select id="receb-forma" class="select" required>
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="pix">PIX</option>
+                  <option value="transferencia">Transferência</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="financiamento">Financiamento</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="mb-4">
+              <div class="text-xs muted mb-1">Observações</div>
+              <textarea id="receb-obs" class="input" rows="2" placeholder="Ex: Sinal da venda, abater dívida do Gustavo..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-dark w-full">Adicionar Recebimento</button>
+          </form>
+        </div>
+
+        <div class="card p-6">
+          <div class="font-black text-lg mb-4">📋 Lista de Recebimentos</div>
+          <div id="receb-list"></div>
+        </div>
+      </div>
+
       <!-- ACERTOS VIEW -->
       <div id="view-ACERTOS" class="view-content hidden">
         <div class="card p-6 mb-6">
@@ -531,18 +591,38 @@
         <button data-close="modal-unidades" class="btn btn-soft">Fechar</button>
       </div>
 
-      <div class="grid grid-cols-12 gap-3 mb-4">
-        <div class="col-span-5">
-          <div class="text-xs muted mb-1">Nome</div>
-          <input id="unid-new-nome" class="input" placeholder="Ex: Casa A" />
+      <div class="space-y-3 mb-4">
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-6">
+            <div class="text-xs muted mb-1">Nome</div>
+            <input id="unid-new-nome" class="input" placeholder="Ex: Casa A" />
+          </div>
+          <div class="col-span-3">
+            <div class="text-xs muted mb-1">Área (m²)</div>
+            <input id="unid-new-area" type="number" step="0.01" class="input" placeholder="120.00" />
+          </div>
+          <div class="col-span-3">
+            <div class="text-xs muted mb-1">Status</div>
+            <select id="unid-new-status" class="input">
+              <option value="disponivel">Disponível</option>
+              <option value="reservada">Reservada</option>
+              <option value="vendida">Vendida</option>
+            </select>
+          </div>
         </div>
-        <div class="col-span-4">
-          <div class="text-xs muted mb-1">VGV Previsto (R$)</div>
-          <input id="unid-new-vgv" type="number" step="0.01" class="input" placeholder="450000.00" />
+        
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-6">
+            <div class="text-xs muted mb-1">VGV Previsto (R$)</div>
+            <input id="unid-new-vgv" type="number" step="0.01" class="input" placeholder="450000.00" />
+          </div>
+          <div class="col-span-6">
+            <div class="text-xs muted mb-1">Valor de Venda Real (R$)</div>
+            <input id="unid-new-venda" type="number" step="0.01" class="input" placeholder="Deixe vazio se não vendida" />
+          </div>
         </div>
-        <div class="col-span-3 flex items-end">
-          <button id="unid-create" class="btn btn-dark w-full">Criar</button>
-        </div>
+        
+        <button id="unid-create" class="btn btn-dark w-full">Criar Unidade</button>
       </div>
 
       <div>
@@ -698,6 +778,7 @@
       deducoes: [],
       lancamentos: [],
       rateios: [],
+      recebimentos: [],
       acertos: [],
       config: {}
     };
@@ -715,6 +796,7 @@
         deducoesCol: collection(db, "obras", obraId, "deducoes"),
         lancamentosCol: collection(db, "obras", obraId, "lancamentos"),
         rateiosCol: collection(db, "obras", obraId, "rateios"),
+        recebimentosCol: collection(db, "obras", obraId, "recebimentos"),
         acertosCol: collection(db, "obras", obraId, "acertos"),
         configDoc: doc(db, "obras", obraId, "config", "main")
       };
@@ -821,6 +903,8 @@
       $("rat-add-dest").onclick = rateioAddDest;
       $("rat-save").onclick = addRateio;
       $("rat-igual-btn").onclick = ratearIgualmente;
+
+      $("receb-form").onsubmit = addRecebimento;
 
       $("acerto-form").onsubmit = addAcerto;
       $("acerto-sugerir").onclick = () => {
@@ -969,6 +1053,11 @@
         rerender();
       }));
 
+      listeners.push(onSnapshot(r.recebimentosCol, (snap) => {
+        state.recebimentos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        rerender();
+      }));
+
       listeners.push(onSnapshot(r.acertosCol, (snap) => {
         state.acertos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         rerender();
@@ -1025,6 +1114,8 @@
         renderLancamentosView();
       } else if (VIEW === "RATEIOS") {
         renderRateiosView();
+      } else if (VIEW === "RECEBIMENTOS") {
+        renderRecebimentosView();
       } else if (VIEW === "ACERTOS") {
         renderAcertosView();
       } else if (VIEW === "CONFIG") {
@@ -1599,6 +1690,76 @@
       container.innerHTML = html;
     }
 
+    // RECEBIMENTOS VIEW
+    function renderRecebimentosView() {
+      // Hydrate unidade select
+      const unidSel = $("receb-unidade");
+      unidSel.innerHTML = '<option value="">Selecione...</option>' +
+        state.unidades.map(u => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`).join('');
+
+      renderRecebimentosList();
+    }
+
+    function renderRecebimentosList() {
+      const container = $("receb-list");
+      if (state.recebimentos.length === 0) {
+        container.innerHTML = '<p class="text-center muted py-8">Nenhum recebimento cadastrado</p>';
+        return;
+      }
+
+      const sorted = [...state.recebimentos].sort((a, b) => 
+        new Date(b.data || 0) - new Date(a.data || 0)
+      );
+
+      const html = `
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Unidade</th>
+              <th>Tipo</th>
+              <th>Valor</th>
+              <th>Forma</th>
+              <th>Obs</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(r => {
+              const unid = state.unidades.find(u => u.id === r.unidadeId);
+              const tipoLabels = {
+                sinal: '🤝 Sinal',
+                parcela: '📅 Parcela',
+                quitacao: '✅ Quitação',
+                outro: '📝 Outro'
+              };
+              return `
+                <tr>
+                  <td>${new Date(r.data).toLocaleDateString('pt-BR')}</td>
+                  <td><span class="badge">${escapeHtml(unid?.nome || 'N/A')}</span></td>
+                  <td>${tipoLabels[r.tipo] || r.tipo}</td>
+                  <td class="font-bold ok">R$ ${r.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td>${escapeHtml(r.formaPagamento || 'N/A')}</td>
+                  <td class="text-xs muted">${escapeHtml(r.observacoes || '-')}</td>
+                  <td>
+                    <button onclick="window.deleteRecebimento('${r.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        <div class="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+          <div class="font-bold text-green-800">Total Recebido:</div>
+          <div class="text-2xl font-black text-green-600">
+            R$ ${state.recebimentos.reduce((sum, r) => sum + (r.valor || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
     // ACERTOS VIEW
     function renderAcertosView() {
       const socioA = state.config.socioA || "Sócio A";
@@ -1731,11 +1892,24 @@
         return;
       }
 
+      const statusLabels = {
+        disponivel: '🟢 Disponível',
+        reservada: '🟡 Reservada',
+        vendida: '🔴 Vendida'
+      };
+
       const html = state.unidades.map(u => `
         <div class="flex justify-between items-center p-3 border rounded">
-          <div>
-            <div class="font-bold">${escapeHtml(u.nome)}</div>
-            <div class="text-xs muted">VGV: R$ ${(u.vgvPrevisto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <div class="font-bold">${escapeHtml(u.nome)}</div>
+              <span class="text-xs badge">${statusLabels[u.status || 'disponivel'] || u.status}</span>
+            </div>
+            <div class="text-xs muted">
+              VGV: R$ ${(u.vgvPrevisto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              ${u.valorVenda ? ` | Vendida por: R$ ${u.valorVenda.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : ''}
+              ${u.areaConstruida ? ` | ${u.areaConstruida}m²` : ''}
+            </div>
           </div>
           <button onclick="window.deleteUnidade('${u.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
         </div>
@@ -1811,7 +1985,10 @@
 
     async function createUnidade() {
       const nome = $("unid-new-nome").value.trim();
+      const area = parseFloat($("unid-new-area").value) || 0;
+      const status = $("unid-new-status").value;
       const vgv = parseFloat($("unid-new-vgv").value) || 0;
+      const valorVenda = parseFloat($("unid-new-venda").value) || null;
 
       if (!nome) {
         showToast('Digite o nome da unidade', 'warning');
@@ -1821,12 +1998,17 @@
       try {
         await addDoc(refs(OBRA_ID).unidadesCol, {
           nome,
+          areaConstruida: area,
+          status,
           vgvPrevisto: vgv,
+          valorVenda,
           createdAt: serverTimestamp(),
           createdBy: state.user.email
         });
         $("unid-new-nome").value = "";
+        $("unid-new-area").value = "";
         $("unid-new-vgv").value = "";
+        $("unid-new-venda").value = "";
         showToast('Unidade criada com sucesso!', 'success');
       } catch (err) {
         console.error(err);
@@ -2129,6 +2311,40 @@
       }
     }
 
+    async function addRecebimento(e) {
+      e.preventDefault();
+
+      const data = $("receb-data").value;
+      const unidadeId = $("receb-unidade").value;
+      const tipo = $("receb-tipo").value;
+      const valor = parseFloat($("receb-valor").value);
+      const formaPagamento = $("receb-forma").value;
+      const observacoes = $("receb-obs").value.trim();
+
+      if (!data || !unidadeId || !valor) {
+        showToast('Preencha todos os campos obrigatórios', 'warning');
+        return;
+      }
+
+      try {
+        await addDoc(refs(OBRA_ID).recebimentosCol, {
+          data,
+          unidadeId,
+          tipo,
+          valor,
+          formaPagamento,
+          observacoes,
+          createdAt: serverTimestamp(),
+          createdBy: state.user.email
+        });
+        $("receb-form").reset();
+        showToast('Recebimento registrado com sucesso!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao registrar recebimento', 'error');
+      }
+    }
+
     async function addAcerto(e) {
       e.preventDefault();
 
@@ -2247,6 +2463,17 @@
       } catch (err) {
         console.error(err);
         showToast('Erro ao deletar acerto', 'error');
+      }
+    };
+
+    window.deleteRecebimento = async (id) => {
+      if (!confirm('Deletar recebimento?')) return;
+      try {
+        await deleteDoc(doc(db, "obras", OBRA_ID, "recebimentos", id));
+        showToast('Recebimento deletado', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao deletar recebimento', 'error');
       }
     };
 
