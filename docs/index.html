@@ -1405,7 +1405,10 @@
         }
       };
 
-      $("criar-obra-btn").onclick = () => openModal("modal-obra");
+      $("criar-obra-btn").onclick = () => {
+        resetarModalObra(); // Resetar para modo criação
+        openModal("modal-obra");
+      };
 
       $("acerto-form").onsubmit = addAcerto;
       $("acerto-sugerir").onclick = () => {
@@ -4373,7 +4376,7 @@
         console.log("  📋 Chamando renderObrasModal...");
         try {
           renderObrasModal();
-          resetarModalObra();
+          // NÃO resetar aqui - deixa editarObra() ou criar-obra-btn fazer isso
           console.log("  ✅ Modal renderizado com sucesso");
         } catch (err) {
           console.error("  ❌ Erro ao renderizar modal:", err);
