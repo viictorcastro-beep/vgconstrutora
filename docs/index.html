@@ -1195,6 +1195,10 @@
         }
         
         state.user = user;
+        console.log("🔐 User logged in:", user.email);
+        console.log("👑 Is Admin?", user.email === ADMIN_EMAIL);
+        console.log("📧 Expected admin:", ADMIN_EMAIL);
+        
         $("user-email").textContent = user.email;
         $("login-screen").classList.add("hidden");
         $("app").classList.remove("hidden");
@@ -1437,21 +1441,32 @@
     function subscribeObrasList() {
       const r = refs("dummy").obrasCol;
       listeners.push(onSnapshot(r, (snap) => {
-        console.log("📊 Obras carregadas:", snap.size);
+        console.log("📊 Total de obras no Firestore:", snap.size);
         const todasObras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        console.log("🔍 Todas as obras:", todasObras.map(o => ({
+          id: o.id,
+          nome: o.nome,
+          temUsuarios: !!(o.usuarios && o.usuarios.length > 0)
+        })));
         
         // Filtrar obras baseado em permissões
         if (isAdmin()) {
           state.obras = todasObras;
-          console.log("👑 ADMIN: acesso a todas as", todasObras.length, "obras");
+          console.log("👑 ADMIN (" + state.user.email + "): acesso a todas as", todasObras.length, "obras");
         } else {
           state.obras = todasObras.filter(obra => {
             const usuarios = obra.usuarios || [];
-            return usuarios.some(u => u.email === state.user.email);
+            const hasAccess = usuarios.some(u => u.email === state.user.email);
+            if (!hasAccess) {
+              console.log("🚫 Sem acesso à obra:", obra.nome);
+            }
+            return hasAccess;
           });
-          console.log("👤 Sócio: acesso a", state.obras.length, "obras");
+          console.log("👤 Sócio (" + state.user.email + "): acesso a", state.obras.length, "obras");
         }
         
+        console.log("✅ Obras disponíveis:", state.obras.map(o => o.nome));
         hydrateObrasSelect();
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
