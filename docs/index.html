@@ -10,6 +10,12 @@
   <!-- PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  
+  <!-- Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  
+  <!-- Excel Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body { background:#f1f5f9; }
@@ -82,10 +88,30 @@
     
     .empty-state { text-align:center; padding:60px 20px; color:#94a3b8; }
     .empty-state svg { width:80px; height:80px; margin:0 auto 20px; opacity:0.3; }
+    
+    /* Dark Mode Support */
+    [data-theme="dark"] { background:#0f172a; color:#f1f5f9; }
+    [data-theme="dark"] .card { background:#1e293b; box-shadow: 0 10px 24px rgba(0,0,0,.3); }
+    [data-theme="dark"] .input, [data-theme="dark"] .select { background:#334155; border-color:#475569; color:#f1f5f9; }
+    [data-theme="dark"] .table th { background:#1e293b; }
+    [data-theme="dark"] .muted { color:#94a3b8; }
+    
+    /* Loading Skeleton */
+    .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: loading 1.5s infinite; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    
+    /* Chart Containers */
+    .chart-container { position: relative; height: 300px; width: 100%; }
+    
+    /* Hover Effects */
+    .hover-card:hover { transform: translateY(-4px); transition: all 0.3s ease; box-shadow: 0 20px 40px rgba(15,23,42,.15); }
+    
+    /* Transitions */
+    * { transition: background-color 0.2s ease, border-color 0.2s ease; }
   </style>
 </head>
 
-<body class="text-slate-800">
+<body class="text-slate-800" data-theme="light">
 
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
@@ -136,6 +162,8 @@
         <button id="menu-unidades" class="btn btn-soft text-sm">Unidades</button>
         <button id="menu-fornecedores" class="btn btn-soft text-sm">Fornecedores</button>
         <button id="menu-categorias" class="btn btn-soft text-sm">Categorias</button>
+        <button id="theme-toggle" class="btn btn-soft text-sm" title="Alternar tema">🌙</button>
+        <button id="export-excel-btn" class="btn btn-green text-sm" title="Exportar Excel">📊 Excel</button>
         <div id="user-email" class="text-sm muted"></div>
         <button id="logout-btn" class="btn btn-danger text-sm">Sair</button>
       </div>
@@ -207,6 +235,37 @@
         
         <!-- Métricas de Rentabilidade -->
         <div id="roi-section" class="mb-6"></div>
+        
+        <!-- Gráficos Interativos -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="card p-6">
+            <div class="font-black text-lg mb-4">📈 Evolução de Custos</div>
+            <div class="chart-container">
+              <canvas id="chart-custos-tempo"></canvas>
+            </div>
+          </div>
+          <div class="card p-6">
+            <div class="font-black text-lg mb-4">🥧 Distribuição por Categoria</div>
+            <div class="chart-container">
+              <canvas id="chart-categorias-pie"></canvas>
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="card p-6">
+            <div class="font-black text-lg mb-4">💰 Fluxo de Caixa Projetado</div>
+            <div class="chart-container">
+              <canvas id="chart-fluxo-caixa"></canvas>
+            </div>
+          </div>
+          <div class="card p-6">
+            <div class="font-black text-lg mb-4">📊 ROI Comparativo</div>
+            <div class="chart-container">
+              <canvas id="chart-roi-bar"></canvas>
+            </div>
+          </div>
+        </div>
         
         <!-- Custo por m² -->
         <div id="custo-m2-section"></div>
@@ -797,6 +856,93 @@
       }
     }
 
+    // Theme Toggle
+    function toggleTheme() {
+      const body = document.body;
+      const currentTheme = body.getAttribute('data-theme') || 'light';
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      body.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      
+      const btn = $("theme-toggle");
+      btn.textContent = newTheme === 'light' ? '🌙' : '☀️';
+      
+      // Recriar gráficos com tema novo
+      if (VIEW === "DASHBOARD") {
+        renderCharts();
+      }
+    }
+
+    // Export to Excel
+    async function exportToExcel() {
+      if (typeof XLSX === 'undefined') {
+        showToast('Biblioteca Excel não carregada', 'error');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      
+      // Lançamentos
+      const lancData = state.lancamentos.map(l => ({
+        'Data': l.data,
+        'Descrição': l.descricao,
+        'Categoria': state.categorias.find(c => c.id === l.categoriaId)?.nome || '',
+        'Fornecedor': state.fornecedores.find(f => f.id === l.fornecedorId)?.nome || '',
+        'Unidade': state.unidades.find(u => u.id === l.unidadeId)?.nome || '',
+        'Valor': l.valor,
+        'Status': l.status || 'pendente'
+      }));
+      const wsLanc = XLSX.utils.json_to_sheet(lancData);
+      XLSX.utils.book_append_sheet(wb, wsLanc, 'Lançamentos');
+      
+      // Rateios
+      const ratData = state.rateios.map(r => ({
+        'Data': r.data,
+        'Descrição': r.descricao,
+        'Categoria': state.categorias.find(c => c.id === r.categoriaId)?.nome || '',
+        'Fornecedor': state.fornecedores.find(f => f.id === r.fornecedorId)?.nome || '',
+        'Valor Total': r.valorTotal,
+        'Status': r.status || 'pendente'
+      }));
+      const wsRat = XLSX.utils.json_to_sheet(ratData);
+      XLSX.utils.book_append_sheet(wb, wsRat, 'Rateios');
+      
+      // Recebimentos
+      const recData = state.recebimentos.map(r => ({
+        'Data': r.data,
+        'Unidade': state.unidades.find(u => u.id === r.unidadeId)?.nome || '',
+        'Tipo': r.tipo,
+        'Forma Pagamento': r.formaPagamento,
+        'Valor': r.valor,
+        'Observação': r.observacao || ''
+      }));
+      const wsRec = XLSX.utils.json_to_sheet(recData);
+      XLSX.utils.book_append_sheet(wb, wsRec, 'Recebimentos');
+      
+      // Dashboard Summary
+      const lucroData = computeLucro();
+      const summary = [{
+        'Indicador': 'Custo Total',
+        'Valor': lucroData.custoTotal
+      }, {
+        'Indicador': 'VGV',
+        'Valor': lucroData.vgvTotal
+      }, {
+        'Indicador': 'Lucro Bruto',
+        'Valor': lucroData.lucroBruto
+      }, {
+        'Indicador': 'Lucro Líquido',
+        'Valor': lucroData.lucroLiquido
+      }];
+      const wsSummary = XLSX.utils.json_to_sheet(summary);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Dashboard');
+      
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      const filename = `VG_${obra?.nome || 'Obra'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      showToast('Excel exportado com sucesso!', 'success');
+    }
+
     // Global state
     let VIEW = "DASHBOARD";
     let OBRA_ID = null;
@@ -861,6 +1007,11 @@
         
         // Inicializar estado do formulário de deduções
         toggleDeducaoBase();
+        
+        // Restaurar tema salvo
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        $("theme-toggle").textContent = savedTheme === 'light' ? '🌙' : '☀️';
         
         showToast(`Bem-vindo, ${user.email}!`, 'success');
       } else {
@@ -962,6 +1113,12 @@
       };
 
       $("export-pdf-btn").onclick = exportPDF;
+
+      // Theme toggle
+      $("theme-toggle").onclick = toggleTheme;
+      
+      // Excel export
+      $("export-excel-btn").onclick = exportToExcel;
 
       // Modal close
       document.querySelectorAll("[data-close]").forEach(btn => {
@@ -1308,6 +1465,9 @@
       // Métricas de Rentabilidade
       renderROISection(custoTotal, lucroData, totalRecebido);
 
+      // Gráficos Interativos
+      renderCharts();
+
       // Custo por m²
       renderCustoM2(lancs, rats);
 
@@ -1589,6 +1749,302 @@
       `;
 
       $("roi-section").innerHTML = html;
+    }
+
+    // Gráficos Interativos com Chart.js
+    let chartInstances = {};
+
+    function renderCharts() {
+      if (typeof Chart === 'undefined') return;
+
+      // Destruir gráficos existentes
+      Object.values(chartInstances).forEach(chart => chart?.destroy());
+      chartInstances = {};
+
+      const theme = document.body.getAttribute('data-theme') || 'light';
+      const isDark = theme === 'dark';
+      const textColor = isDark ? '#f1f5f9' : '#0f172a';
+      const gridColor = isDark ? '#475569' : '#e2e8f0';
+
+      // 1. Evolução de Custos no Tempo
+      renderCustosTempoChart(textColor, gridColor);
+      
+      // 2. Distribuição por Categoria (Pie)
+      renderCategoriasPieChart(textColor);
+      
+      // 3. Fluxo de Caixa Projetado
+      renderFluxoCaixaChart(textColor, gridColor);
+      
+      // 4. ROI Comparativo (Bar)
+      renderROIBarChart(textColor, gridColor);
+    }
+
+    function renderCustosTempoChart(textColor, gridColor) {
+      const canvas = document.getElementById('chart-custos-tempo');
+      if (!canvas) return;
+
+      // Agrupar lançamentos por mês
+      const custosPorMes = {};
+      state.lancamentos.forEach(l => {
+        const mes = l.data.substring(0, 7); // YYYY-MM
+        custosPorMes[mes] = (custosPorMes[mes] || 0) + l.valor;
+      });
+      
+      state.rateios.forEach(r => {
+        const mes = r.data.substring(0, 7);
+        custosPorMes[mes] = (custosPorMes[mes] || 0) + r.valorTotal;
+      });
+
+      const meses = Object.keys(custosPorMes).sort();
+      const valores = meses.map(m => custosPorMes[m]);
+      
+      // Acumulado
+      const acumulado = [];
+      let soma = 0;
+      valores.forEach(v => {
+        soma += v;
+        acumulado.push(soma);
+      });
+
+      chartInstances.custosTempo = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: meses.map(m => {
+            const [y, mo] = m.split('-');
+            return `${mo}/${y}`;
+          }),
+          datasets: [{
+            label: 'Custos Mensais',
+            data: valores,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.4
+          }, {
+            label: 'Acumulado',
+            data: acumulado,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: textColor } }
+          },
+          scales: {
+            y: {
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            },
+            x: {
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    function renderCategoriasPieChart(textColor) {
+      const canvas = document.getElementById('chart-categorias-pie');
+      if (!canvas) return;
+
+      const custoPorCategoria = {};
+      state.lancamentos.forEach(l => {
+        const cat = state.categorias.find(c => c.id === l.categoriaId);
+        const nome = cat?.nome || 'Sem categoria';
+        custoPorCategoria[nome] = (custoPorCategoria[nome] || 0) + l.valor;
+      });
+
+      state.rateios.forEach(r => {
+        const cat = state.categorias.find(c => c.id === r.categoriaId);
+        const nome = cat?.nome || 'Sem categoria';
+        custoPorCategoria[nome] = (custoPorCategoria[nome] || 0) + r.valorTotal;
+      });
+
+      const sorted = Object.entries(custoPorCategoria)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+
+      const labels = sorted.map(([nome]) => nome);
+      const data = sorted.map(([, valor]) => valor);
+      const colors = [
+        '#3b82f6', '#ef4444', '#10b981', '#f59e0b', 
+        '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
+      ];
+
+      chartInstances.categoriasPie = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: colors,
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: textColor }
+            }
+          }
+        }
+      });
+    }
+
+    function renderFluxoCaixaChart(textColor, gridColor) {
+      const canvas = document.getElementById('chart-fluxo-caixa');
+      if (!canvas) return;
+
+      // Projetar próximos 6 meses
+      const hoje = new Date();
+      const meses = [];
+      const entradas = [];
+      const saidas = [];
+      const saldo = [];
+
+      const totalRecebido = state.recebimentos.reduce((sum, r) => sum + r.valor, 0);
+      const custoTotal = computeCustoTotal(state.lancamentos, state.rateios);
+      const lucroData = computeLucro();
+      const aReceber = lucroData.vgvTotal - totalRecebido;
+
+      let saldoAcumulado = totalRecebido - custoTotal;
+
+      for (let i = 0; i < 6; i++) {
+        const mes = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+        const mesStr = `${String(mes.getMonth() + 1).padStart(2, '0')}/${mes.getFullYear()}`;
+        meses.push(mesStr);
+
+        // Simular entrada gradual do valor a receber
+        const entradaMes = i === 0 ? totalRecebido : (aReceber / 6);
+        entradas.push(entradaMes);
+
+        // Custos projetados (média histórica)
+        const custoMedio = custoTotal / Math.max(1, state.lancamentos.length / 10);
+        saidas.push(i === 0 ? custoTotal : custoMedio);
+
+        saldoAcumulado += (i === 0 ? 0 : (entradaMes - custoMedio));
+        saldo.push(saldoAcumulado);
+      }
+
+      chartInstances.fluxoCaixa = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: meses,
+          datasets: [{
+            label: 'Entradas',
+            data: entradas,
+            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+            borderColor: '#10b981',
+            borderWidth: 2
+          }, {
+            label: 'Saídas',
+            data: saidas,
+            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+            borderColor: '#ef4444',
+            borderWidth: 2
+          }, {
+            label: 'Saldo Acumulado',
+            data: saldo,
+            type: 'line',
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.4,
+            yAxisID: 'y1'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: textColor } }
+          },
+          scales: {
+            y: {
+              type: 'linear',
+              position: 'left',
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            },
+            y1: {
+              type: 'linear',
+              position: 'right',
+              ticks: { color: textColor },
+              grid: { display: false }
+            },
+            x: {
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    function renderROIBarChart(textColor, gridColor) {
+      const canvas = document.getElementById('chart-roi-bar');
+      if (!canvas) return;
+
+      const lucroData = computeLucro();
+      const custoTotal = computeCustoTotal(state.lancamentos, state.rateios);
+      const totalRecebido = state.recebimentos.reduce((sum, r) => sum + r.valor, 0);
+
+      const roi = custoTotal > 0 ? ((lucroData.lucroLiquido / custoTotal) * 100) : 0;
+      const margemBruta = lucroData.vgvTotal > 0 ? ((lucroData.lucroBruto / lucroData.vgvTotal) * 100) : 0;
+      const margemLiquida = lucroData.vgvTotal > 0 ? ((lucroData.lucroLiquido / lucroData.vgvTotal) * 100) : 0;
+      const percRecebido = lucroData.vgvTotal > 0 ? ((totalRecebido / lucroData.vgvTotal) * 100) : 0;
+
+      chartInstances.roiBar = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: ['ROI (%)', 'Margem Bruta (%)', 'Margem Líquida (%)', '% Recebido'],
+          datasets: [{
+            label: 'Indicadores (%)',
+            data: [roi, margemBruta, margemLiquida, percRecebido],
+            backgroundColor: [
+              'rgba(59, 130, 246, 0.7)',
+              'rgba(16, 185, 129, 0.7)',
+              'rgba(139, 92, 246, 0.7)',
+              'rgba(245, 158, 11, 0.7)'
+            ],
+            borderColor: [
+              '#3b82f6',
+              '#10b981',
+              '#8b5cf6',
+              '#f59e0b'
+            ],
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { 
+                color: textColor,
+                callback: (value) => value + '%'
+              },
+              grid: { color: gridColor }
+            },
+            x: {
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            }
+          }
+        }
+      });
     }
 
     function renderCustoM2(lancs, rats) {
@@ -3016,38 +3472,196 @@
     // PDF EXPORT
     function exportPDF() {
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF();
+      const pdf = new jsPDF('p', 'mm', 'a4');
 
-      pdf.setFontSize(18);
-      pdf.text("VG CONSTRUTORA - Dashboard", 14, 20);
+      // Header com logo e título
+      pdf.setFillColor(15, 23, 42);
+      pdf.rect(0, 0, 210, 35, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(24);
+      pdf.setFont(undefined, 'bold');
+      pdf.text("🏗️ VG CONSTRUTORA", 105, 15, { align: 'center' });
+      pdf.setFontSize(14);
+      pdf.text("RELATÓRIO GERENCIAL COMPLETO", 105, 25, { align: 'center' });
 
       const obra = state.obras.find(o => o.id === OBRA_ID);
-      pdf.setFontSize(12);
-      pdf.text(`Obra: ${obra?.nome || "N/A"}`, 14, 30);
-      pdf.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, 36);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(11);
+      pdf.text(`Obra: ${obra?.nome || "N/A"}`, 14, 45);
+      pdf.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 14, 50);
+      pdf.text(`Gerado por: ${state.user.email}`, 14, 55);
+
+      // Linha separadora
+      pdf.setDrawColor(203, 213, 225);
+      pdf.line(14, 60, 196, 60);
 
       const lancs = getLancamentosFiltrados();
       const rats = getRateiosFiltrados();
       const custoTotal = computeCustoTotal(lancs, rats);
       const lucroData = computeLucro(lancs, rats);
+      const totalRecebido = state.recebimentos.reduce((sum, r) => sum + r.valor, 0);
+      const aReceber = lucroData.vgvTotal - totalRecebido;
+      const fluxoCaixa = totalRecebido - custoTotal;
 
+      // KPIs Principais
+      let y = 70;
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(14, y, 182, 8, 'F');
+      pdf.setFontSize(13);
+      pdf.setFont(undefined, 'bold');
+      pdf.text("📊 INDICADORES FINANCEIROS", 105, y + 6, { align: 'center' });
+
+      y += 15;
       pdf.setFontSize(10);
-      let y = 50;
-      pdf.text(`Custo Total: R$ ${custoTotal.toFixed(2)}`, 14, y);
-      y += 6;
-      pdf.text(`VGV Previsto: R$ ${lucroData.vgvTotal.toFixed(2)}`, 14, y);
-      y += 6;
-      pdf.text(`Lucro Bruto: R$ ${lucroData.lucroBruto.toFixed(2)}`, 14, y);
-      y += 6;
-      pdf.text(`Lucro Líquido: R$ ${lucroData.lucroLiquido.toFixed(2)}`, 14, y);
-      y += 10;
+      pdf.setFont(undefined, 'normal');
+      
+      const kpis = [
+        { label: '💰 Custo Total', value: custoTotal },
+        { label: '💎 VGV Previsto', value: lucroData.vgvTotal },
+        { label: '💵 Recebido', value: totalRecebido },
+        { label: '📊 A Receber', value: aReceber },
+        { label: '🏦 Fluxo de Caixa', value: fluxoCaixa },
+        { label: '📈 Lucro Bruto', value: lucroData.lucroBruto },
+        { label: '💵 Lucro Líquido', value: lucroData.lucroLiquido }
+      ];
 
-      pdf.text(`${state.config.socioA || 'Sócio A'}: R$ ${lucroData.lucroLiquidoA.toFixed(2)}`, 14, y);
-      y += 6;
-      pdf.text(`${state.config.socioB || 'Sócio B'}: R$ ${lucroData.lucroLiquidoB.toFixed(2)}`, 14, y);
+      kpis.forEach((kpi, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const x = 14 + (col * 95);
+        const yPos = y + (row * 8);
+        
+        pdf.text(kpi.label, x, yPos);
+        pdf.setFont(undefined, 'bold');
+        const color = kpi.value >= 0 ? [5, 150, 105] : [220, 38, 38];
+        pdf.setTextColor(...color);
+        pdf.text(`R$ ${kpi.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, x + 85, yPos, { align: 'right' });
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont(undefined, 'normal');
+      });
 
-      pdf.save(`VG_CONSTRUTORA_${new Date().toISOString().split('T')[0]}.pdf`);
-      showToast('PDF exportado com sucesso!', 'success');
+      y += 40;
+
+      // ROI e Métricas Avançadas
+      if (obra?.dataInicio) {
+        const inicio = new Date(obra.dataInicio);
+        const fim = obra.dataRecebimento ? new Date(obra.dataRecebimento) : new Date();
+        const diasOperacao = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24));
+        const mesesOperacao = diasOperacao / 30;
+        const roi = custoTotal > 0 ? ((lucroData.lucroLiquido / custoTotal) * 100) : 0;
+        const roiMensal = mesesOperacao > 0 ? (roi / mesesOperacao) : 0;
+
+        pdf.setFillColor(241, 245, 249);
+        pdf.rect(14, y, 182, 8, 'F');
+        pdf.setFont(undefined, 'bold');
+        pdf.setFontSize(13);
+        pdf.text("📈 ANÁLISE DE RENTABILIDADE", 105, y + 6, { align: 'center' });
+
+        y += 15;
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, 'normal');
+
+        pdf.text(`📅 Início da Construção: ${inicio.toLocaleDateString('pt-BR')}`, 14, y);
+        y += 6;
+        pdf.text(`⏱️ Tempo de Operação: ${diasOperacao} dias (${mesesOperacao.toFixed(1)} meses)`, 14, y);
+        y += 6;
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(59, 130, 246);
+        pdf.text(`📊 ROI Total: ${roi.toFixed(2)}%`, 14, y);
+        pdf.setTextColor(99, 102, 241);
+        pdf.text(`📈 ROI Mensal: ${roiMensal.toFixed(2)}%/mês`, 110, y);
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont(undefined, 'normal');
+        y += 10;
+      }
+
+      // Lucro por Sócio
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(14, y, 182, 8, 'F');
+      pdf.setFont(undefined, 'bold');
+      pdf.setFontSize(13);
+      pdf.text("👥 DISTRIBUIÇÃO POR SÓCIO (50/50)", 105, y + 6, { align: 'center' });
+
+      y += 15;
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'normal');
+
+      const investimentoPorSocio = custoTotal / 2;
+      const lucroPorSocio = lucroData.lucroLiquido / 2;
+
+      pdf.text(`👤 ${state.config.socioA || 'Sócio A'}`, 14, y);
+      pdf.text(`Investimento: R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 6);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(5, 150, 105);
+      pdf.text(`Lucro: R$ ${lucroPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 12);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont(undefined, 'normal');
+
+      y += 22;
+      pdf.text(`👤 ${state.config.socioB || 'Sócio B'}`, 14, y);
+      pdf.text(`Investimento: R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 6);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(5, 150, 105);
+      pdf.text(`Lucro: R$ ${lucroPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 12);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont(undefined, 'normal');
+
+      y += 20;
+
+      // Top 5 Categorias
+      if (y > 240) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(14, y, 182, 8, 'F');
+      pdf.setFont(undefined, 'bold');
+      pdf.setFontSize(13);
+      pdf.text("🏆 TOP 5 CATEGORIAS", 105, y + 6, { align: 'center' });
+
+      y += 15;
+      pdf.setFontSize(9);
+      pdf.setFont(undefined, 'normal');
+
+      const custoPorCategoria = {};
+      lancs.forEach(l => {
+        const cat = state.categorias.find(c => c.id === l.categoriaId);
+        const nome = cat?.nome || 'Sem categoria';
+        custoPorCategoria[nome] = (custoPorCategoria[nome] || 0) + l.valor;
+      });
+      rats.forEach(r => {
+        const cat = state.categorias.find(c => c.id === r.categoriaId);
+        const nome = cat?.nome || 'Sem categoria';
+        custoPorCategoria[nome] = (custoPorCategoria[nome] || 0) + r.valorTotal;
+      });
+
+      const topCategorias = Object.entries(custoPorCategoria)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+
+      topCategorias.forEach(([nome, valor], i) => {
+        const perc = custoTotal > 0 ? (valor / custoTotal * 100) : 0;
+        pdf.text(`${i + 1}. ${nome}`, 14, y);
+        pdf.text(`R$ ${valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${perc.toFixed(1)}%)`, 160, y, { align: 'right' });
+        y += 6;
+      });
+
+      // Footer
+      const pageCount = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFillColor(241, 245, 249);
+        pdf.rect(0, 287, 210, 10, 'F');
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`VG CONSTRUTORA - Sistema de Gestão de Obras`, 105, 293, { align: 'center' });
+        pdf.text(`Página ${i} de ${pageCount}`, 196, 293, { align: 'right' });
+      }
+
+      const filename = `VG_${obra?.nome || 'Obra'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(filename);
+      showToast('Relatório PDF gerado com sucesso!', 'success');
     }
 
   </script>
