@@ -2274,7 +2274,14 @@
         await salvarEdicaoObra(obraId);
       };
 
-      // Modal já está aberto, não precisa chamar openModal()
+      // Verificar se modal está aberto, se não estiver, abrir
+      const modal = $("modal-obra");
+      const isOpen = modal.classList.contains("flex");
+      if (!isOpen) {
+        console.log("🔓 Modal fechado, abrindo...");
+        openModal("modal-obra");
+      }
+      
       console.log("✏️ Modo edição ativado para:", obra.nome);
       
       // Resetar flag após 100ms
