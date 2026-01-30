@@ -524,15 +524,16 @@
   <script type="module">
     console.log("🔥 SCRIPT CARREGOU - VG CONSTRUTORA v1");
     
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-    import {
+    // Import com await (igual ao teste que funcionou)
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js");
+    const {
       getFirestore, collection, doc, addDoc, setDoc, deleteDoc, updateDoc,
       onSnapshot, query, orderBy, serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-    import {
+    } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js");
+    const {
       getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, 
       getRedirectResult, onAuthStateChanged, signOut
-    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js");
 
     console.log("✓ Firebase imports OK");
 
