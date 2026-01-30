@@ -210,8 +210,28 @@
       <!-- BALANÇO GLOBAL VIEW -->
       <div id="view-BALANCO_GLOBAL" class="view-content hidden">
         <div class="card p-6 mb-6">
-          <h2 class="font-black text-2xl mb-4">💼 Balanço Global por Sócio</h2>
-          <p class="text-sm text-gray-600 mb-4">Consolidação de todas as obras, casas e transações</p>
+          <h2 class="font-black text-3xl mb-2">💼 Balanço Global por Sócio</h2>
+          <p class="text-gray-600 mb-6">Consolidação de investimentos, custos e receitas de todas as obras</p>
+          
+          <!-- Filtros de Período -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <div class="font-bold text-gray-800 mb-3">📅 Filtro de Período</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <div class="text-xs muted mb-1">Data Início</div>
+                <input id="balanco-data-inicio" type="date" class="input" onchange="renderBalancoGlobal()" />
+              </div>
+              <div>
+                <div class="text-xs muted mb-1">Data Fim</div>
+                <input id="balanco-data-fim" type="date" class="input" onchange="renderBalancoGlobal()" />
+              </div>
+              <div class="flex items-end">
+                <button onclick="limparFiltrosBalanco()" class="btn btn-soft w-full">🔄 Limpar Filtros</button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Conteúdo dinâmico -->
           <div id="balanco-global-content"></div>
         </div>
       </div>
@@ -757,24 +777,8 @@
               </select>
             </div>
           </div>
-        </div>
-
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div class="font-bold text-blue-900 mb-3">💰 Investimentos Iniciais dos Sócios</div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div class="text-xs muted mb-1">Total Investido por Sócio A (R$)</div>
-              <input id="obra-investimento-a" type="number" step="0.01" class="input" placeholder="0.00" />
-              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes gerais</div>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Total Investido por Sócio B (R$)</div>
-              <input id="obra-investimento-b" type="number" step="0.01" class="input" placeholder="0.00" />
-              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes gerais</div>
-            </div>
-          </div>
-          <div class="text-xs text-gray-600 mt-2">
-            💡 Investimentos iniciais (não vinculados a unidades específicas)
+          <div class="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded p-2 mt-3">
+            💡 <strong>Investimentos:</strong> Lance pagamentos como "Terreno", "Sinal", etc. usando o sistema de lançamentos. Evita duplicação e permite rastreamento correto.
           </div>
         </div>
 
@@ -1896,24 +1900,42 @@
 
     // VIEW DE BALANÇO GLOBAL
     async function renderBalancoGlobal() {
+      const container = $("balanco-global-content");
+      if (!container) return;
+      
+      container.innerHTML = '<div class="text-center py-8"><div class="loader"></div><p class="mt-4 text-gray-600">Calculando balanço global...</p></div>';
+      
       const balancoPorSocio = {};
+      
+      // Filtros de data
+      const dataInicio = $("balanco-data-inicio")?.value;
+      const dataFim = $("balanco-data-fim")?.value;
 
       // Inicializar saldos para cada sócio
       state.socios.forEach(socio => {
         balancoPorSocio[socio.id] = {
           nome: socio.nome,
-          investimentos: 0,
-          custosPagos: 0,
-          receitasRecebidas: 0,
-          detalhesObras: []
+          totalInvestido: 0,      // Custos pagos
+          totalRecebido: 0,        // Receitas recebidas
+          vgvPrevisto: 0,          // Valor geral de vendas previsto
+          vendasConfirmadas: 0,    // Vendas realmente fechadas
+          equalizacoes: [],        // Equalização por obra
+          obras: []                // Detalhamento por obra
         };
       });
 
       // Para cada obra, carregar dados e calcular
       for (const obra of state.obras) {
-        const obraDetalhes = {
-          obraNome: obra.nome,
-          unidades: []
+        // Aplicar filtro de data se existir
+        if (dataInicio && obra.dataInicio && obra.dataInicio < dataInicio) continue;
+        if (dataFim && obra.dataInicio && obra.dataInicio > dataFim) continue;
+        
+        const obraInfo = {
+          nome: obra.nome,
+          dataInicio: obra.dataInicio,
+          custos: 0,
+          receitas: 0,
+          vgv: 0
         };
 
         try {
@@ -1921,7 +1943,7 @@
           const unidadesSnap = await getDocs(collection(db, "obras", obra.id, "unidades"));
           const unidades = unidadesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-          // Carregar lançamentos
+          // Carregar lançamentos (custos)
           const lancamentosSnap = await getDocs(collection(db, "obras", obra.id, "lancamentos"));
           const lancamentos = lancamentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -1929,7 +1951,7 @@
           const rateiosSnap = await getDocs(collection(db, "obras", obra.id, "rateios"));
           const rateios = rateiosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-          // Carregar recebimentos
+          // Carregar recebimentos (receitas)
           const recebimentosSnap = await getDocs(collection(db, "obras", obra.id, "recebimentos"));
           const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -1938,12 +1960,201 @@
             const proprietarioId = unidade.proprietario;
             if (!proprietarioId || !balancoPorSocio[proprietarioId]) return;
 
-            const custosUnidade = {
-              diretos: 0,
-              rateados: 0
-            };
+            let custoUnidade = 0;
+            let receitaUnidade = 0;
 
-            const receitasUnidade = {
+            // Custos diretos da unidade (lançamentos)
+            lancamentos.forEach(l => {
+              if (l.unidadeId === unidade.id) {
+                custoUnidade += l.valor || 0;
+              }
+            });
+
+            // Custos rateados
+            rateios.forEach(r => {
+              if (r.distribuicao) {
+                const dist = r.distribuicao.find(d => d.unidadeId === unidade.id);
+                if (dist) {
+                  const valorRateado = (dist.percentual / 100) * (r.valorTotal || 0);
+                  custoUnidade += valorRateado;
+                }
+              }
+            });
+
+            // Receitas da unidade (recebimentos confirmados)
+            recebimentos.forEach(rec => {
+              if (rec.unidadeId === unidade.id) {
+                receitaUnidade += rec.valor || 0;
+              }
+            });
+
+            // VGV previsto da unidade
+            const vgvUnidade = unidade.vgv || 0;
+            
+            // Acumular no sócio
+            balancoPorSocio[proprietarioId].totalInvestido += custoUnidade;
+            balancoPorSocio[proprietarioId].totalRecebido += receitaUnidade;
+            balancoPorSocio[proprietarioId].vgvPrevisto += vgvUnidade;
+            balancoPorSocio[proprietarioId].vendasConfirmadas += receitaUnidade;
+            
+            obraInfo.custos += custoUnidade;
+            obraInfo.receitas += receitaUnidade;
+            obraInfo.vgv += vgvUnidade;
+          });
+
+          // Adicionar obra no detalhamento
+          Object.values(balancoPorSocio).forEach(socio => {
+            if (obraInfo.custos > 0 || obraInfo.receitas > 0) {
+              socio.obras.push(obraInfo);
+            }
+          });
+
+        } catch (err) {
+          console.error("❌ Erro ao processar obra:", obra.nome, err);
+        }
+      }
+
+      // Renderizar HTML
+      if (state.socios.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12">
+            <div class="text-6xl mb-4">👔</div>
+            <p class="text-gray-600">Nenhum sócio cadastrado ainda</p>
+            <button onclick="openModal('modal-socios')" class="btn btn-green mt-4">Cadastrar Primeiro Sócio</button>
+          </div>
+        `;
+        return;
+      }
+
+      const html = `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          ${state.socios.map(socio => {
+            const dados = balancoPorSocio[socio.id];
+            const saldoAtual = dados.totalRecebido - dados.totalInvestido;
+            
+            // ROI Real (baseado em receitas confirmadas)
+            const roiReal = dados.totalInvestido > 0 
+              ? ((dados.totalRecebido - dados.totalInvestido) / dados.totalInvestido) * 100 
+              : 0;
+            
+            // ROI Previsto (baseado no VGV previsto)
+            const roiPrevisto = dados.totalInvestido > 0 
+              ? ((dados.vgvPrevisto - dados.totalInvestido) / dados.totalInvestido) * 100 
+              : 0;
+            
+            // Período (pegar menor dataInicio e data atual)
+            const datasObras = dados.obras.map(o => o.dataInicio).filter(d => d);
+            const dataMinima = datasObras.length > 0 
+              ? new Date(Math.min(...datasObras.map(d => new Date(d)))).toLocaleDateString('pt-BR')
+              : 'N/A';
+            const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+            return `
+              <div class="card p-6 ${saldoAtual >= 0 ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'}">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="font-black text-2xl text-gray-800">👔 ${escapeHtml(socio.nome)}</h3>
+                  ${saldoAtual >= 0 
+                    ? '<span class="badge bg-green-100 text-green-800">Credor</span>' 
+                    : '<span class="badge bg-red-100 text-red-800">Devedor</span>'}
+                </div>
+                
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                  <div class="text-xs text-gray-600 mb-1">📅 Período de Análise</div>
+                  <div class="font-bold text-gray-800">${dataMinima} até ${dataAtual}</div>
+                </div>
+                
+                <div class="space-y-3 mb-6">
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">💳 Total Investido:</span>
+                    <span class="font-bold text-red-600">R$ ${dados.totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">💰 Total Recebido:</span>
+                    <span class="font-bold text-green-600">R$ ${dados.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  
+                  <div class="border-t-2 border-gray-300 pt-3 mt-3">
+                    <div class="flex justify-between items-center">
+                      <span class="font-bold text-gray-800">🎯 SALDO ATUAL:</span>
+                      <span class="text-2xl font-black ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${saldoAtual >= 0 ? '+' : ''}R$ ${Math.abs(saldoAtual).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1 text-right">
+                      ${saldoAtual > 0 
+                        ? 'Tem a receber' 
+                        : saldoAtual < 0 
+                          ? 'Deve à sociedade' 
+                          : 'Equalizado'}
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div class="font-bold text-blue-900 mb-3">📈 Retorno sobre Investimento (ROI)</div>
+                  
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-blue-700">✅ ROI Real:</span>
+                      <span class="text-xl font-black ${roiReal >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${roiReal >= 0 ? '+' : ''}${roiReal.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div class="text-xs text-gray-600">Baseado em receitas confirmadas</div>
+                    
+                    <div class="border-t border-blue-200 pt-2 mt-2"></div>
+                    
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-blue-700">🎯 ROI Previsto:</span>
+                      <span class="text-xl font-black text-blue-600">
+                        ${roiPrevisto >= 0 ? '+' : ''}${roiPrevisto.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div class="text-xs text-gray-600">Baseado no VGV planejado</div>
+                  </div>
+                </div>
+                
+                ${dados.obras.length > 0 ? `
+                  <details class="mt-4">
+                    <summary class="text-sm font-bold text-gray-700 cursor-pointer hover:text-blue-600">
+                      📋 Detalhamento por Obra (${dados.obras.length})
+                    </summary>
+                    <div class="mt-3 space-y-2">
+                      ${dados.obras.map(obra => `
+                        <div class="text-xs p-2 bg-white border border-gray-200 rounded">
+                          <div class="font-bold text-gray-800">${obra.nome}</div>
+                          <div class="text-gray-600 mt-1">
+                            Custos: R$ ${obra.custos.toLocaleString('pt-BR', {minimumFractionDigits: 2})} | 
+                            Receitas: R$ ${obra.receitas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                          </div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </details>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+        
+        ${state.socios.length === 0 ? `
+          <div class="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <div class="text-6xl mb-4">📊</div>
+            <p class="text-gray-600 mb-2">Nenhum dado para exibir</p>
+            <p class="text-sm text-gray-500">Cadastre sócios e registre lançamentos para ver o balanço</p>
+          </div>
+        ` : ''}
+      `;
+
+      container.innerHTML = html;
+    }
+    
+    function limparFiltrosBalanco() {
+      $("balanco-data-inicio").value = '';
+      $("balanco-data-fim").value = '';
+      renderBalancoGlobal();
+    }
               total: 0
             };
 
@@ -2259,9 +2470,6 @@
         const socioB = state.socios.find(s => s.nome === obra.socioB);
         $("obra-socio-b").value = socioB ? socioB.id : '';
       }
-      
-      $("obra-investimento-a").value = obra.investimentoA || 0;
-      $("obra-investimento-b").value = obra.investimentoB || 0;
 
       // Mudar título do modal
       document.querySelector("#modal-obra .font-black").textContent = "✏️ Editar Obra";
@@ -2295,8 +2503,6 @@
       const dataRecebimento = $("obra-data-recebimento").value;
       const socioAId = $("obra-socio-a").value;
       const socioBId = $("obra-socio-b").value;
-      const investimentoA = parseFloat($("obra-investimento-a").value) || 0;
-      const investimentoB = parseFloat($("obra-investimento-b").value) || 0;
 
       if (!nome) {
         showToast('Digite o nome da obra', 'warning');
@@ -2325,8 +2531,6 @@
           // Nomes dos sócios (compatibilidade)
           socioA: socioA ? socioA.nome : 'Sócio A',
           socioB: socioB ? socioB.nome : null,
-          investimentoA,
-          investimentoB,
           updatedAt: serverTimestamp(),
           updatedBy: state.user.email
         });
@@ -4611,8 +4815,6 @@
       const dataRecebimento = $("obra-data-recebimento").value || null;
       const socioAId = $("obra-socio-a").value; // ID do sócio
       const socioBId = $("obra-socio-b").value; // ID do sócio (pode ser vazio)
-      const investimentoA = parseFloat($("obra-investimento-a").value) || 0;
-      const investimentoB = parseFloat($("obra-investimento-b").value) || 0;
       
       if (!nome) {
         showToast('Digite o nome da obra', 'warning');
@@ -4640,8 +4842,6 @@
           // Nomes dos sócios (compatibilidade)
           socioA: socioA ? socioA.nome : 'Sócio A',
           socioB: socioB ? socioB.nome : null,
-          investimentoA,
-          investimentoB,
           createdAt: serverTimestamp(),
           createdBy: state.user.email
         });
