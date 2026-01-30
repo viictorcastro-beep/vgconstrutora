@@ -4386,6 +4386,12 @@
     function renderObrasModal() {
       const container = $("obras-list");
       console.log("🔍 renderObrasModal chamado. Total de obras:", state.obras.length);
+      console.log("📦 Container encontrado:", container);
+      
+      if (!container) {
+        console.error("❌ Container obras-list NÃO ENCONTRADO!");
+        return;
+      }
       
       if (state.obras.length === 0) {
         container.innerHTML = '<p class="muted">Nenhuma obra cadastrada</p>';
@@ -4394,16 +4400,21 @@
 
       const html = state.obras.map(o => {
         console.log("  - Renderizando obra:", o.nome, "ID:", o.id);
+        const nomeSeguro = o.nome ? o.nome.replace(/[<>"']/g, '') : 'Sem nome';
         return `
-          <div class="flex justify-between items-center p-3 border rounded">
-            <span class="font-bold">${escapeHtml(o.nome)}</span>
-            <button onclick="window.deleteObra('${o.id}')" class="text-red-600 hover:underline text-sm">🗑️ Deletar</button>
+          <div class="flex justify-between items-center p-3 border rounded bg-gray-50 mb-2">
+            <span class="font-bold text-gray-800">${nomeSeguro}</span>
+            <div class="flex gap-2">
+              <button onclick="window.editarObra('${o.id}')" class="btn btn-soft text-sm">✏️</button>
+              <button onclick="window.deleteObra('${o.id}')" class="btn btn-danger text-sm">🗑️</button>
+            </div>
           </div>
         `;
       }).join('');
 
+      console.log("📝 HTML gerado (primeiros 200 chars):", html.substring(0, 200));
       container.innerHTML = html;
-      console.log("✅ obras-list atualizado com", state.obras.length, "obras");
+      console.log("✅ obras-list.innerHTML definido. Novo conteúdo:", container.innerHTML.substring(0, 200));
     }
 
     function renderUnidadesModal() {
