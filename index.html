@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Gestor de Obras — Multi-Obras / Multi-Casas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#f1f5f9; }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body class="text-slate-800">
+  <!-- LOGIN -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-6">
+    <div class="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center">
+      <h1 class="text-2xl font-bold mb-2">Gestor de Obras</h1>
+      <p class="text-sm text-slate-600 mb-5">Um sistema só. Várias obras. Várias casas.</p>
+      <button id="login-btn" class="bg-slate-900 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg w-full">
+        Entrar com Google
+      </button>
+      <p id="login-msg" class="text-xs text-red-600 mt-4 h-4"></p>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app-wrapper" class="hidden">
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+      <!-- Topbar -->
+      <div class="bg-white rounded-2xl shadow-lg p-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold">Gestor de Obras</h2>
+          <p class="text-sm text-slate-500">Multi-obras • Multi-casas • Rateio</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <img id="user-photo" class="w-9 h-9 rounded-full" />
+          <div class="text-sm">
+            <div id="user-name" class="font-semibold"></div>
+            <div id="user-email" class="text-slate-500"></div>
+          </div>
+          <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair</button>
+        </div>
+      </div>
+
+      <!-- Seletores -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl shadow-lg p-4">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-bold">Obra</h3>
+            <button id="obra-new-btn" class="text-sm bg-slate-900 hover:bg-slate-700 text-white font-bold px-3 py-2 rounded-lg">Nova</button>
+          </div>
+          <select id="obra-select" class="mt-3 w-full border rounded-lg p-2"></select>
+          <div id="obra-status" class="text-xs text-slate-500 mt-2"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg p-4">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-bold">Casa / Unidade</h3>
+            <button id="unidade-new-btn" class="text-sm bg-slate-900 hover:bg-slate-700 text-white font-bold px-3 py-2 rounded-lg">Nova</button>
+          </div>
+          <label class="text-xs text-slate-500 mt-3 block">Onde lançar</label>
+          <select id="unidade-current" class="mt-1 w-full border rounded-lg p-2"></select>
+          <label class="text-xs text-slate-500 mt-3 block">Visão / Filtro</label>
+          <select id="unidade-view" class="mt-1 w-full border rounded-lg p-2"></select>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg p-4">
+          <h3 class="font-bold">KPIs</h3>
+          <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-slate-100 rounded-xl p-3">
+              <div class="text-slate-500">Total (visão)</div>
+              <div id="kpi-total" class="text-lg font-bold">R$ 0,00</div>
+            </div>
+            <div class="bg-slate-100 rounded-xl p-3">
+              <div class="text-slate-500">Total (obra)</div>
+              <div id="kpi-total-obra" class="text-lg font-bold">R$ 0,00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cadastros rápidos -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl shadow-lg p-4">
+          <h3 class="font-bold">Fornecedores</h3>
+          <div class="mt-3 flex gap-2">
+            <input id="forn-nome" class="w-full border rounded-lg p-2" placeholder="Nome do fornecedor" />
+            <button id="forn-add" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 rounded-lg">+</button>
+          </div>
+          <ul id="forn-list" class="mt-3 text-sm space-y-2"></ul>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg p-4 lg:col-span-2">
+          <h3 class="font-bold">Categorias (Categoria → Grupo → Subgrupo)</h3>
+          <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+            <input id="cat" class="border rounded-lg p-2" placeholder="Categoria (ex: Material)" />
+            <input id="grp" class="border rounded-lg p-2" placeholder="Grupo (ex: Estrutura)" />
+            <input id="sub" class="border rounded-lg p-2" placeholder="Subgrupo (ex: Cimento)" />
+          </div>
+          <div class="mt-2 flex justify-end">
+            <button id="cat-add" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg">Adicionar</button>
+          </div>
+          <div id="cat-list" class="mt-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Lançamento -->
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <h3 class="font-bold text-lg">Novo Lançamento</h3>
+          <div class="text-xs text-slate-500">Será gravado na Obra selecionada + Unidade selecionada</div>
+        </div>
+
+        <form id="lanc-form" class="mt-4 grid grid-cols-1 md:grid-cols-6 gap-2">
+          <input id="lanc-dt" type="date" class="border rounded-lg p-2 md:col-span-1" required />
+          <input id="lanc-desc" class="border rounded-lg p-2 md:col-span-2" placeholder="Descrição" required />
+          <input id="lanc-valor" class="border rounded-lg p-2 md:col-span-1" placeholder="Valor" required />
+          <select id="lanc-forn" class="border rounded-lg p-2 md:col-span-1"></select>
+          <select id="lanc-catref" class="border rounded-lg p-2 md:col-span-1"></select>
+
+          <input id="lanc-anexo" class="border rounded-lg p-2 md:col-span-3" placeholder="URL do comprovante (opcional)" />
+          <button class="bg-slate-900 hover:bg-slate-700 text-white font-bold px-4 py-2 rounded-lg md:col-span-1">Salvar</button>
+          <div class="md:col-span-2 flex items-center text-xs text-slate-500" id="lanc-hint"></div>
+        </form>
+      </div>
+
+      <!-- Rateio -->
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <h3 class="font-bold text-lg">Rateio (um custo para várias casas)</h3>
+        <p class="text-sm text-slate-500 mt-1">
+          Use quando comprar “muro/cimento/areia” e quiser dividir. Você pode ratear do Transitório ou de qualquer casa.
+        </p>
+
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input id="rat-desc" class="border rounded-lg p-2 md:col-span-2" placeholder="Descrição (ex: Materiais do muro)" />
+          <input id="rat-valor" class="border rounded-lg p-2" placeholder="Valor total" />
+          <select id="rat-from" class="border rounded-lg p-2"></select>
+        </div>
+
+        <div class="mt-3 bg-slate-50 rounded-xl p-3">
+          <div class="flex items-center justify-between">
+            <div class="font-semibold">Destinos</div>
+            <button id="rat-add-dest" class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-2 rounded-lg">+ Destino</button>
+          </div>
+          <div id="rat-dests" class="mt-3 space-y-2"></div>
+
+          <div class="mt-3 flex justify-end gap-2">
+            <div id="rat-status" class="text-sm text-slate-600 self-center"></div>
+            <button id="rat-save" class="bg-slate-900 hover:bg-slate-700 text-white font-bold px-4 py-2 rounded-lg">Aplicar Rateio</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <h3 class="font-bold text-lg">Lançamentos</h3>
+          <div class="text-sm text-slate-500">Filtrando por: <span id="view-label" class="font-semibold"></span></div>
+        </div>
+
+        <div class="overflow-x-auto mt-3">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="p-2 text-left">Data</th>
+                <th class="p-2 text-left">Unidade</th>
+                <th class="p-2 text-left">Descrição</th>
+                <th class="p-2 text-left">Fornecedor</th>
+                <th class="p-2 text-left">Cat/Grp/Sub</th>
+                <th class="p-2 text-left">Valor</th>
+                <th class="p-2 text-left">Anexo</th>
+                <th class="p-2 text-left">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="lanc-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import {
+      getFirestore, collection, doc, addDoc, setDoc, deleteDoc, onSnapshot,
+      query, orderBy, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+    // ========= CONFIG =========
+    const firebaseConfig = {
+      apiKey: "SUA_API_KEY",
+      authDomain: "SEU_AUTH_DOMAIN",
+      projectId: "SEU_PROJECT_ID",
+      storageBucket: "SEU_BUCKET",
+      messagingSenderId: "SEU_SENDER",
+      appId: "SEU_APP_ID"
+    };
+
+    const ALLOW_EMAILS = new Set(["viictor.castro@gmail.com", "gcm.conceicao@gmail.com"]);
+
+    // ========= HELPERS =========
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(n||0));
+    const parseNum = (v) => parseFloat(String(v||"").replace(/\./g,"").replace(",", ".")) || 0;
+
+    // ========= FIREBASE =========
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // ========= STATE =========
+    let currentUser = null;
+    let OBRA_ID = localStorage.getItem("obraId") || "";
+    let unidadeCurrent = localStorage.getItem("unidadeCurrent") || "";
+    let unidadeView = localStorage.getItem("unidadeView") || "OBRA_TODA";
+    let listeners = [];
+
+    const state = {
+      obras: [],
+      obra: null,
+      unidades: [],
+      fornecedores: [],
+      categorias: [],
+      lancamentos: [],
+      rateios: []
+    };
+
+    function teardownRealtime() { listeners.forEach(u=>u()); listeners = []; }
+
+    function refsFor(obraId) {
+      return {
+        obraDoc: doc(db, "obras", obraId),
+        unidadesCol: collection(db, "obras", obraId, "unidades"),
+        fornecedoresCol: collection(db, "obras", obraId, "fornecedores"),
+        categoriasCol: collection(db, "obras", obraId, "categorias"),
+        lancamentosCol: collection(db, "obras", obraId, "lancamentos"),
+        rateiosCol: collection(db, "obras", obraId, "rateios"),
+      };
+    }
+
+    // ========= OBRAS =========
+    function setupObrasList() {
+      const obrasCol = collection(db, "obras");
+      listeners.push(onSnapshot(query(obrasCol, orderBy("createdAt","desc")), (snap) => {
+        state.obras = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        const sel = $("obra-select");
+
+        if (state.obras.length === 0) {
+          sel.innerHTML = `<option value="">Nenhuma obra — crie uma</option>`;
+          $("obra-status").textContent = "Crie uma obra para começar.";
+          return;
+        }
+
+        sel.innerHTML = state.obras.map(o => `<option value="${o.id}">${o.nome || o.id}</option>`).join("");
+
+        if (!OBRA_ID) OBRA_ID = state.obras[0].id;
+        sel.value = OBRA_ID;
+
+        $("obra-status").textContent = `Obra ativa: ${state.obras.find(o=>o.id===OBRA_ID)?.nome || OBRA_ID}`;
+        switchObra(OBRA_ID);
+      }));
+    }
+
+    async function createObra() {
+      const nome = prompt("Nome da obra (ex: Obra Terreno X):")?.trim();
+      if (!nome) return;
+
+      const obrasCol = collection(db, "obras");
+      const ref = await addDoc(obrasCol, {
+        nome,
+        createdAt: serverTimestamp(),
+        createdBy: currentUser.email
+      });
+
+      // cria unidades padrão
+      const r = refsFor(ref.id);
+      await addDoc(r.unidadesCol, { nome:"Casa A", createdAt: serverTimestamp() });
+      await addDoc(r.unidadesCol, { nome:"Casa B", createdAt: serverTimestamp() });
+      await addDoc(r.unidadesCol, { nome:"Transitório", fixed:true, createdAt: serverTimestamp() });
+
+      OBRA_ID = ref.id;
+      localStorage.setItem("obraId", OBRA_ID);
+    }
+
+    function switchObra(newId) {
+      if (!newId) return;
+      if (newId === OBRA_ID && state.obra) return;
+
+      OBRA_ID = newId;
+      localStorage.setItem("obraId", OBRA_ID);
+
+      teardownRealtime();
+      setupRealtimeForObra(OBRA_ID);
+    }
+
+    // ========= REALTIME POR OBRA =========
+    function setupRealtimeForObra(obraId) {
+      const r = refsFor(obraId);
+
+      listeners.push(onSnapshot(r.obraDoc, (d) => state.obra = d.exists() ? d.data() : null));
+
+      listeners.push(onSnapshot(query(r.unidadesCol, orderBy("createdAt","asc")), (snap) => {
+        state.unidades = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        hydrateUnidades();
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.fornecedoresCol, orderBy("nome","asc")), (snap) => {
+        state.fornecedores = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        hydrateFornecedores();
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.categoriasCol, orderBy("categoria","asc")), (snap) => {
+        state.categorias = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        hydrateCategorias();
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.lancamentosCol, orderBy("dt","desc")), (snap) => {
+        state.lancamentos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.rateiosCol, orderBy("dt","desc")), (snap) => {
+        state.rateios = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        rerender();
+      }));
+    }
+
+    // ========= UNIDADES =========
+    function hydrateUnidades() {
+      const units = state.unidades || [];
+
+      // default unidadeCurrent: Transitório se existir
+      const trans = units.find(u => (u.nome||"").toLowerCase().includes("transit"));
+      if (!unidadeCurrent || !units.some(u=>u.id===unidadeCurrent)) unidadeCurrent = trans?.id || units[0]?.id || "";
+
+      // unidadeView
+      if (unidadeView !== "OBRA_TODA" && !units.some(u=>u.id===unidadeView)) unidadeView = "OBRA_TODA";
+
+      $("unidade-current").innerHTML = units.map(u => `<option value="${u.id}">${u.nome}</option>`).join("");
+      $("unidade-current").value = unidadeCurrent;
+
+      $("unidade-view").innerHTML = [
+        `<option value="OBRA_TODA">Obra (Consolidado)</option>`,
+        ...units.map(u => `<option value="${u.id}">${u.nome}</option>`)
+      ].join("");
+      $("unidade-view").value = unidadeView;
+
+      hydrateRateioSelectors();
+      localStorage.setItem("unidadeCurrent", unidadeCurrent);
+      localStorage.setItem("unidadeView", unidadeView);
+    }
+
+    async function createUnidade() {
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const nome = prompt("Nome da unidade (ex: Casa C / Edícula / Depósito):")?.trim();
+      if (!nome) return;
+
+      const r = refsFor(OBRA_ID);
+      await addDoc(r.unidadesCol, { nome, createdAt: serverTimestamp() });
+    }
+
+    // ========= FORNECEDORES =========
+    function hydrateFornecedores() {
+      const sel = $("lanc-forn");
+      sel.innerHTML = [`<option value="">Fornecedor (opcional)</option>`]
+        .concat(state.fornecedores.map(f => `<option value="${f.id}">${f.nome}</option>`))
+        .join("");
+
+      // list
+      $("forn-list").innerHTML = state.fornecedores.map(f => `
+        <li class="flex items-center justify-between bg-slate-100 rounded-lg p-2">
+          <span>${f.nome}</span>
+          <button data-id="${f.id}" class="forn-del text-red-600 font-bold">X</button>
+        </li>
+      `).join("");
+    }
+
+    async function addFornecedor() {
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const nome = $("forn-nome").value.trim();
+      if (!nome) return;
+
+      const r = refsFor(OBRA_ID);
+      await addDoc(r.fornecedoresCol, { nome, createdAt: serverTimestamp() });
+      $("forn-nome").value = "";
+    }
+
+    // ========= CATEGORIAS/GRUPO/SUB =========
+    function hydrateCategorias() {
+      const sel = $("lanc-catref");
+      sel.innerHTML = [`<option value="">Cat/Grp/Sub (opcional)</option>`]
+        .concat(state.categorias.map(c => {
+          const label = `${c.categoria} / ${c.grupo} / ${c.subgrupo}`;
+          return `<option value="${c.id}">${label}</option>`;
+        }))
+        .join("");
+
+      $("cat-list").innerHTML = state.categorias.map(c => `
+        <div class="bg-slate-100 rounded-lg p-2 flex items-center justify-between">
+          <div class="text-xs">
+            <div class="font-semibold">${c.categoria}</div>
+            <div class="text-slate-600">${c.grupo} → ${c.subgrupo}</div>
+          </div>
+          <button data-id="${c.id}" class="cat-del text-red-600 font-bold">X</button>
+        </div>
+      `).join("");
+    }
+
+    async function addCategoria() {
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const categoria = $("cat").value.trim();
+      const grupo = $("grp").value.trim();
+      const subgrupo = $("sub").value.trim();
+      if (!categoria || !grupo || !subgrupo) return alert("Preencha categoria, grupo e subgrupo.");
+
+      const r = refsFor(OBRA_ID);
+      await addDoc(r.categoriasCol, { categoria, grupo, subgrupo, createdAt: serverTimestamp() });
+
+      $("cat").value = ""; $("grp").value = ""; $("sub").value = "";
+    }
+
+    // ========= LANÇAMENTOS =========
+    function computeTotais() {
+      const totalPorUnidade = {};
+      for (const u of state.unidades) totalPorUnidade[u.id] = 0;
+
+      // soma lançamentos
+      for (const l of state.lancamentos) {
+        if (l.unidadeId) totalPorUnidade[l.unidadeId] = (totalPorUnidade[l.unidadeId] || 0) + (l.valor || 0);
+      }
+
+      // aplica rateios (modelo N destinos)
+      for (const r of state.rateios) {
+        const v = r.valor || 0;
+        if (r.fromUnidadeId) totalPorUnidade[r.fromUnidadeId] = (totalPorUnidade[r.fromUnidadeId] || 0) - v;
+        for (const d of (r.destinos || [])) {
+          totalPorUnidade[d.unidadeId] = (totalPorUnidade[d.unidadeId] || 0) + v * (d.p || 0);
+        }
+      }
+
+      const totalObra = Object.values(totalPorUnidade).reduce((s,n)=>s+n,0);
+      const totalVisao = (unidadeView === "OBRA_TODA") ? totalObra : (totalPorUnidade[unidadeView] || 0);
+
+      return { totalPorUnidade, totalObra, totalVisao };
+    }
+
+    async function addLancamento(e) {
+      e.preventDefault();
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      if (!unidadeCurrent) return alert("Selecione uma unidade (casa).");
+
+      const dt = $("lanc-dt").value;
+      const desc = $("lanc-desc").value.trim();
+      const valor = parseNum($("lanc-valor").value);
+      const anexo = $("lanc-anexo").value.trim();
+
+      if (!dt) return alert("Data obrigatória.");
+      if (!desc) return alert("Descrição obrigatória.");
+      if (valor <= 0) return alert("Valor deve ser positivo.");
+
+      const fornId = $("lanc-forn").value || "";
+      const fornNome = state.fornecedores.find(f=>f.id===fornId)?.nome || "";
+
+      const catId = $("lanc-catref").value || "";
+      const catObj = state.categorias.find(c=>c.id===catId);
+
+      const r = refsFor(OBRA_ID);
+      await addDoc(r.lancamentosCol, {
+        dt,
+        desc,
+        valor,
+        unidadeId: unidadeCurrent,
+        unidadeNome: state.unidades.find(u=>u.id===unidadeCurrent)?.nome || "",
+        fornecedorId: fornId,
+        fornecedorNome: fornNome,
+        categoria: catObj?.categoria || "",
+        grupo: catObj?.grupo || "",
+        subgrupo: catObj?.subgrupo || "",
+        anexo,
+        createdBy: currentUser.email,
+        createdAt: serverTimestamp()
+      });
+
+      $("lanc-desc").value = "";
+      $("lanc-valor").value = "";
+      $("lanc-anexo").value = "";
+    }
+
+    // ========= RATEIO (N destinos) =========
+    function hydrateRateioSelectors() {
+      const opts = state.unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join("");
+      $("rat-from").innerHTML = opts;
+      // default from = Transitório se existir
+      const trans = state.unidades.find(u => (u.nome||"").toLowerCase().includes("transit"));
+      if (trans) $("rat-from").value = trans.id;
+      renderRateioDests(); // garante 2 destinos por padrão
+    }
+
+    let rateioDests = []; // { unidadeId, p }
+
+    function addRateioDestRow(defaultP=0.5) {
+      const first = state.unidades[0]?.id || "";
+      rateioDests.push({ unidadeId: first, p: defaultP });
+      renderRateioDests();
+    }
+
+    function renderRateioDests() {
+      if (!state.unidades.length) return;
+
+      // se vazio, cria 2 destinos default
+      if (rateioDests.length === 0 && state.unidades.length >= 2) {
+        rateioDests = [
+          { unidadeId: state.unidades[0].id, p: 0.5 },
+          { unidadeId: state.unidades[1].id, p: 0.5 }
+        ];
+      }
+
+      const unitOpts = (selectedId) =>
+        state.unidades.map(u => `<option value="${u.id}" ${u.id===selectedId?"selected":""}>${u.nome}</option>`).join("");
+
+      $("rat-dests").innerHTML = rateioDests.map((d, idx) => `
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
+          <select data-idx="${idx}" class="rat-u border rounded-lg p-2 md:col-span-7">
+            ${unitOpts(d.unidadeId)}
+          </select>
+          <input data-idx="${idx}" class="rat-p border rounded-lg p-2 md:col-span-4" type="number" step="0.01" min="0" max="1" value="${d.p}">
+          <button data-idx="${idx}" class="rat-del bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg p-2 md:col-span-1">X</button>
+        </div>
+      `).join("");
+
+      updateRateioStatus();
+    }
+
+    function updateRateioStatus() {
+      const sum = rateioDests.reduce((s,d)=>s+(Number(d.p)||0),0);
+      $("rat-status").textContent = `Soma %: ${(sum*100).toFixed(1)}% (precisa dar 100%)`;
+      $("rat-status").className = sum > 0.999 && sum < 1.001 ? "text-sm text-green-700" : "text-sm text-red-700";
+    }
+
+    async function saveRateio() {
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const desc = $("rat-desc").value.trim();
+      const valor = parseNum($("rat-valor").value);
+      const fromUnidadeId = $("rat-from").value;
+
+      if (!desc) return alert("Descrição do rateio obrigatória.");
+      if (valor <= 0) return alert("Valor do rateio deve ser positivo.");
+      if (!fromUnidadeId) return alert("Selecione a origem (de onde sai).");
+
+      // valida soma e destinos
+      const sum = rateioDests.reduce((s,d)=>s+(Number(d.p)||0),0);
+      if (!(sum > 0.999 && sum < 1.001)) return alert("A soma dos percentuais precisa dar 100% (1.00).");
+
+      // impede duplicar mesmo destino
+      const ids = rateioDests.map(d=>d.unidadeId);
+      const unique = new Set(ids);
+      if (unique.size !== ids.length) return alert("Não repita a mesma unidade nos destinos.");
+
+      const r = refsFor(OBRA_ID);
+      await addDoc(r.rateiosCol, {
+        dt: serverTimestamp(),
+        desc,
+        valor,
+        fromUnidadeId,
+        destinos: rateioDests.map(d => ({ unidadeId: d.unidadeId, p: Number(d.p)||0 })),
+        createdBy: currentUser.email,
+        createdAt: serverTimestamp()
+      });
+
+      $("rat-desc").value = "";
+      $("rat-valor").value = "";
+      // mantém destinos pro próximo rateio
+    }
+
+    // ========= RENDER =========
+    function rerender() {
+      const obraNome = state.obras.find(o=>o.id===OBRA_ID)?.nome || OBRA_ID;
+      $("obra-status").textContent = OBRA_ID ? `Obra ativa: ${obraNome}` : "Selecione uma obra.";
+      $("view-label").textContent = (unidadeView === "OBRA_TODA")
+        ? "Obra (Consolidado)"
+        : (state.unidades.find(u=>u.id===unidadeView)?.nome || "Unidade");
+
+      // hint do lançamento
+      const unidadeNome = state.unidades.find(u=>u.id===unidadeCurrent)?.nome || "";
+      $("lanc-hint").textContent = OBRA_ID && unidadeNome ? `→ ${obraNome} / ${unidadeNome}` : "";
+
+      // totals
+      const { totalObra, totalVisao } = computeTotais();
+      $("kpi-total-obra").textContent = fmt(totalObra);
+      $("kpi-total").textContent = fmt(totalVisao);
+
+      // tabela com filtro de visão
+      const list = (unidadeView === "OBRA_TODA")
+        ? state.lancamentos
+        : state.lancamentos.filter(l => l.unidadeId === unidadeView);
+
+      if (list.length === 0) {
+        $("lanc-tbody").innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-500">Nenhum lançamento.</td></tr>`;
+        return;
+      }
+
+      $("lanc-tbody").innerHTML = list.map(l => `
+        <tr class="border-b">
+          <td class="p-2">${l.dt || ""}</td>
+          <td class="p-2">${l.unidadeNome || ""}</td>
+          <td class="p-2">${l.desc || ""}</td>
+          <td class="p-2">${l.fornecedorNome || ""}</td>
+          <td class="p-2">${[l.categoria,l.grupo,l.subgrupo].filter(Boolean).join(" / ")}</td>
+          <td class="p-2 font-semibold">${fmt(l.valor)}</td>
+          <td class="p-2">${l.anexo ? `<a class="text-blue-600 hover:underline" target="_blank" href="${l.anexo}">Ver</a>` : "—"}</td>
+          <td class="p-2">
+            <button data-id="${l.id}" class="lanc-del text-red-600 font-bold">X</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    // ========= EVENTS =========
+    $("login-btn").addEventListener("click", () => {
+      signInWithPopup(auth, provider).catch(err => {
+        $("login-msg").textContent = err.code === "auth/unauthorized-domain"
+          ? "Domínio não autorizado no Firebase."
+          : "Erro no login.";
+      });
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user && ALLOW_EMAILS.has(user.email)) {
+        currentUser = user;
+        $("login-screen").classList.add("hidden");
+        $("app-wrapper").classList.remove("hidden");
+        $("user-photo").src = user.photoURL || "";
+        $("user-name").textContent = user.displayName || "";
+        $("user-email").textContent = user.email || "";
+
+        // default date
+        $("lanc-dt").valueAsDate = new Date();
+
+        setupObrasList();
+      } else {
+        if (user) signOut(auth);
+        currentUser = null;
+        teardownRealtime();
+        $("app-wrapper").classList.add("hidden");
+        $("login-screen").classList.remove("hidden");
+      }
+    });
+
+    $("logout-btn").addEventListener("click", () => signOut(auth));
+
+    $("obra-new-btn").addEventListener("click", createObra);
+    $("obra-select").addEventListener("change", (e) => switchObra(e.target.value));
+
+    $("unidade-new-btn").addEventListener("click", createUnidade);
+    $("unidade-current").addEventListener("change", (e) => {
+      unidadeCurrent = e.target.value;
+      localStorage.setItem("unidadeCurrent", unidadeCurrent);
+      rerender();
+    });
+    $("unidade-view").addEventListener("change", (e) => {
+      unidadeView = e.target.value;
+      localStorage.setItem("unidadeView", unidadeView);
+      rerender();
+    });
+
+    $("forn-add").addEventListener("click", addFornecedor);
+    $("cat-add").addEventListener("click", addCategoria);
+    $("lanc-form").addEventListener("submit", addLancamento);
+
+    $("rat-add-dest").addEventListener("click", () => addRateioDestRow(0.25));
+    $("rat-save").addEventListener("click", saveRateio);
+
+    // Delegation (delete)
+    document.body.addEventListener("click", async (e) => {
+      if (!OBRA_ID) return;
+      const r = refsFor(OBRA_ID);
+
+      if (e.target.classList.contains("forn-del")) {
+        const id = e.target.dataset.id;
+        await deleteDoc(doc(db, "obras", OBRA_ID, "fornecedores", id));
+      }
+
+      if (e.target.classList.contains("cat-del")) {
+        const id = e.target.dataset.id;
+        await deleteDoc(doc(db, "obras", OBRA_ID, "categorias", id));
+      }
+
+      if (e.target.classList.contains("lanc-del")) {
+        const id = e.target.dataset.id;
+        if (confirm("Excluir lançamento?")) {
+          await deleteDoc(doc(db, "obras", OBRA_ID, "lancamentos", id));
+        }
+      }
+
+      // rateio dest updates
+      if (e.target.classList.contains("rat-del")) {
+        const idx = Number(e.target.dataset.idx);
+        rateioDests.splice(idx, 1);
+        renderRateioDests();
+      }
+    });
+
+    // Inputs de rateio (delegation)
+    document.body.addEventListener("input", (e) => {
+      if (e.target.classList.contains("rat-p")) {
+        const idx = Number(e.target.dataset.idx);
+        rateioDests[idx].p = Number(e.target.value) || 0;
+        updateRateioStatus();
+      }
+    });
+
+    document.body.addEventListener("change", (e) => {
+      if (e.target.classList.contains("rat-u")) {
+        const idx = Number(e.target.dataset.idx);
+        rateioDests[idx].unidadeId = e.target.value;
+        updateRateioStatus();
+      }
+    });
+  </script>
+</body>
+</html>
