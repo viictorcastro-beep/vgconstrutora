@@ -487,7 +487,7 @@
               </div>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <div class="text-xs muted mb-1">Valor (R$) *</div>
                 <input id="receb-valor" type="number" step="0.01" class="input" required />
@@ -500,6 +500,14 @@
                   <option value="transferencia">Transferência</option>
                   <option value="cheque">Cheque</option>
                   <option value="financiamento">Financiamento</option>
+                </select>
+              </div>
+              <div>
+                <div class="text-xs muted mb-1">👤 Recebido por *</div>
+                <select id="receb-recebido-por" class="select" required>
+                  <option value="A">Sócio A</option>
+                  <option value="B">Sócio B</option>
+                  <option value="ambos">Ambos (50/50)</option>
                 </select>
               </div>
             </div>
@@ -671,11 +679,11 @@
 
       <div class="space-y-3 mb-4">
         <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-6">
+          <div class="col-span-4">
             <div class="text-xs muted mb-1">Nome</div>
             <input id="unid-new-nome" class="input" placeholder="Ex: Casa A" />
           </div>
-          <div class="col-span-3">
+          <div class="col-span-2">
             <div class="text-xs muted mb-1">Área (m²)</div>
             <input id="unid-new-area" type="number" step="0.01" class="input" placeholder="120.00" />
           </div>
@@ -685,6 +693,14 @@
               <option value="disponivel">Disponível</option>
               <option value="reservada">Reservada</option>
               <option value="vendida">Vendida</option>
+            </select>
+          </div>
+          <div class="col-span-3">
+            <div class="text-xs muted mb-1">📋 Proprietário</div>
+            <select id="unid-new-proprietario" class="input">
+              <option value="ambos">Ambos (50/50)</option>
+              <option value="A">Sócio A</option>
+              <option value="B">Sócio B</option>
             </select>
           </div>
         </div>
@@ -703,6 +719,11 @@
               <div class="text-xs muted mt-1">Valor confirmado da negociação</div>
             </div>
           </div>
+        </div>
+        
+        <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800">
+          💡 <strong>Proprietário:</strong> Indica em nome de quem a casa está registrada. Isso afeta a equalização:
+          custos e recebimentos seguem o proprietário.
         </div>
         
         <button id="unid-create" class="btn btn-dark w-full">Criar Unidade</button>
@@ -2250,9 +2271,9 @@
             
             <div class="space-y-3">
               <div class="bg-white rounded-lg p-3 border border-blue-200">
-                <div class="text-xs font-bold text-blue-800 mb-1">💰 DINHEIRO QUE ENTROU (50%)</div>
+                <div class="text-xs font-bold text-blue-800 mb-1">💰 DINHEIRO QUE ENTROU</div>
                 <div class="text-2xl font-black text-blue-600">R$ ${eq.recebeuA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                <div class="text-xs text-gray-600 mt-1">Sua parte dos recebimentos (${eq.totalRecebido > 0 ? '50%' : '0%'} de R$ ${eq.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+                <div class="text-xs text-gray-600 mt-1">Recebimentos das unidades conforme proprietário</div>
               </div>
 
               <div class="bg-white rounded-lg p-3 border border-red-200">
@@ -2295,9 +2316,9 @@
             
             <div class="space-y-3">
               <div class="bg-white rounded-lg p-3 border border-blue-200">
-                <div class="text-xs font-bold text-blue-800 mb-1">💰 DINHEIRO QUE ENTROU (50%)</div>
+                <div class="text-xs font-bold text-blue-800 mb-1">💰 DINHEIRO QUE ENTROU</div>
                 <div class="text-2xl font-black text-blue-600">R$ ${eq.recebeuB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                <div class="text-xs text-gray-600 mt-1">Sua parte dos recebimentos (${eq.totalRecebido > 0 ? '50%' : '0%'} de R$ ${eq.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+                <div class="text-xs text-gray-600 mt-1">Recebimentos das unidades conforme proprietário</div>
               </div>
 
               <div class="bg-white rounded-lg p-3 border border-red-200">
@@ -2335,12 +2356,22 @@
 
         <!-- Sugestão de Acerto -->
         ${eq.mensagem ? `
-          <div class="bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 border-2 border-orange-400 rounded-lg p-6 text-center">
-            <div class="text-2xl mb-2">💡</div>
-            <div class="text-lg font-bold text-gray-800 mb-2">Sugestão de Equalização</div>
-            <div class="text-2xl font-black text-orange-600">${eq.mensagem}</div>
-            <div class="text-sm text-gray-600 mt-3">
-              Use o formulário acima para registrar este acerto e zerar os saldos
+          <div class="bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 border-2 border-orange-400 rounded-lg p-6">
+            <div class="text-center mb-4">
+              <div class="text-2xl mb-2">💡</div>
+              <div class="text-lg font-bold text-gray-800 mb-2">Sugestão de Equalização</div>
+              <div class="text-2xl font-black text-orange-600">${eq.mensagem}</div>
+            </div>
+            <div class="flex gap-3 justify-center">
+              <button onclick="window.sugerirAcerto()" class="btn btn-green">
+                ✨ Criar Acerto Automaticamente
+              </button>
+              <button onclick="window.navigateTo('ACERTOS')" class="btn btn-dark">
+                📝 Criar Manualmente
+              </button>
+            </div>
+            <div class="text-sm text-gray-600 mt-3 text-center">
+              Clique para criar o acerto e zerar os saldos entre os sócios
             </div>
           </div>
         ` : `
@@ -2355,7 +2386,7 @@
         <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div class="font-bold text-blue-900 mb-2">📚 Como funciona a equalização:</div>
           <div class="text-sm text-blue-800 space-y-1">
-            <p>1️⃣ <strong>Dinheiro que Entrou:</strong> Cada sócio tem direito a 50% dos recebimentos (sinais, parcelas, etc)</p>
+            <p>1️⃣ <strong>Dinheiro que Entrou:</strong> Distribuído conforme quem RECEBEU fisicamente (selecionado ao registrar recebimento)</p>
             <p>2️⃣ <strong>Dinheiro que Pagou:</strong> O que cada um efetivamente desembolsou para pagar custos</p>
             <p>3️⃣ <strong>Deveria Pagar:</strong> Cada sócio deve arcar com 50% dos custos totais</p>
             <p>4️⃣ <strong>Saldo de Caixa:</strong> Recebeu - Pagou (mostra o fluxo real de cada um)</p>
@@ -2365,9 +2396,9 @@
           <div class="mt-3 p-3 bg-white rounded border border-blue-300">
             <div class="font-bold text-blue-900 text-sm mb-1">💡 Exemplo prático:</div>
             <div class="text-xs text-gray-700">
-              Entrou R$ 10.000 (sinal) → R$ 5.000 para cada sócio<br>
-              Gustavo deveria pagar R$ 5.000 de custos, mas Victor pagou usando o dinheiro do caixa<br>
-              Resultado: Gustavo deve R$ 5.000 para Victor (usou o dinheiro dele que estava no caixa)
+              <strong>Recebimento:</strong> Victor recebeu R$ 10.000 de sinal (registrado como "Recebido por: Sócio A")<br>
+              <strong>Custos:</strong> Gustavo deveria pagar R$ 5.000, mas Victor pagou usando o dinheiro que recebeu<br>
+              <strong>Resultado:</strong> Gustavo deve R$ 5.000 para Victor (usou o dinheiro dele que estava no caixa)
             </div>
           </div>
         </div>
@@ -2592,6 +2623,7 @@
               <th>Tipo</th>
               <th>Valor</th>
               <th>Forma</th>
+              <th>Recebido por</th>
               <th>Obs</th>
               <th></th>
             </tr>
@@ -2605,6 +2637,11 @@
                 quitacao: '✅ Quitação',
                 outro: '📝 Outro'
               };
+              const recebidoLabels = {
+                A: '👤 Sócio A',
+                B: '👤 Sócio B',
+                ambos: '👥 50/50'
+              };
               return `
                 <tr>
                   <td>${new Date(r.data).toLocaleDateString('pt-BR')}</td>
@@ -2612,6 +2649,7 @@
                   <td>${tipoLabels[r.tipo] || r.tipo}</td>
                   <td class="font-bold ok">R$ ${r.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td>${escapeHtml(r.formaPagamento || 'N/A')}</td>
+                  <td><span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">${recebidoLabels[r.recebidoPor || 'ambos']}</span></td>
                   <td class="text-xs muted">${escapeHtml(r.observacoes || '-')}</td>
                   <td>
                     <button onclick="window.deleteRecebimento('${r.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
@@ -2770,12 +2808,19 @@
         vendida: '🔴 Vendida'
       };
 
+      const proprietarioLabels = {
+        A: '👤 Sócio A',
+        B: '👤 Sócio B',
+        ambos: '👥 Ambos (50/50)'
+      };
+
       const html = state.unidades.map(u => `
         <div class="flex justify-between items-center p-3 border rounded">
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-1">
               <div class="font-bold">${escapeHtml(u.nome)}</div>
               <span class="text-xs badge">${statusLabels[u.status || 'disponivel'] || u.status}</span>
+              <span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">${proprietarioLabels[u.proprietario || 'ambos'] || '👥 Ambos'}</span>
             </div>
             <div class="text-xs muted">
               VGV: R$ ${(u.vgvPrevisto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
@@ -2869,6 +2914,7 @@
       const nome = $("unid-new-nome").value.trim();
       const area = parseFloat($("unid-new-area").value) || 0;
       const status = $("unid-new-status").value;
+      const proprietario = $("unid-new-proprietario").value;
       const vgv = parseFloat($("unid-new-vgv").value) || 0;
       const valorVenda = parseFloat($("unid-new-venda").value) || null;
 
@@ -2882,6 +2928,7 @@
           nome,
           areaConstruida: area,
           status,
+          proprietario,
           vgvPrevisto: vgv,
           valorVenda,
           createdAt: serverTimestamp(),
@@ -2889,6 +2936,7 @@
         });
         $("unid-new-nome").value = "";
         $("unid-new-area").value = "";
+        $("unid-new-proprietario").value = "ambos";
         $("unid-new-vgv").value = "";
         $("unid-new-venda").value = "";
         showToast('Unidade criada com sucesso!', 'success');
@@ -3201,9 +3249,10 @@
       const tipo = $("receb-tipo").value;
       const valor = parseFloat($("receb-valor").value);
       const formaPagamento = $("receb-forma").value;
+      const recebidoPor = $("receb-recebido-por").value;
       const observacoes = $("receb-obs").value.trim();
 
-      if (!data || !unidadeId || !valor) {
+      if (!data || !unidadeId || !valor || !recebidoPor) {
         showToast('Preencha todos os campos obrigatórios', 'warning');
         return;
       }
@@ -3215,6 +3264,7 @@
           tipo,
           valor,
           formaPagamento,
+          recebidoPor,
           observacoes,
           createdAt: serverTimestamp(),
           createdBy: state.user.email
@@ -3290,6 +3340,7 @@
       $("unid-new-nome").value = unidade.nome || "";
       $("unid-new-area").value = unidade.areaConstruida || "";
       $("unid-new-status").value = unidade.status || "disponivel";
+      $("unid-new-proprietario").value = unidade.proprietario || "ambos";
       $("unid-new-vgv").value = unidade.vgvPrevisto || "";
       $("unid-new-venda").value = unidade.valorVenda || "";
 
@@ -3300,6 +3351,7 @@
         const nome = $("unid-new-nome").value.trim();
         const area = parseFloat($("unid-new-area").value) || 0;
         const status = $("unid-new-status").value;
+        const proprietario = $("unid-new-proprietario").value;
         const vgv = parseFloat($("unid-new-vgv").value) || 0;
         const valorVenda = parseFloat($("unid-new-venda").value) || null;
 
@@ -3313,6 +3365,7 @@
             nome,
             areaConstruida: area,
             status,
+            proprietario,
             vgvPrevisto: vgv,
             valorVenda,
             updatedAt: serverTimestamp()
@@ -3336,6 +3389,48 @@
       // Scroll para o formulário
       $("unid-new-nome").scrollIntoView({ behavior: 'smooth', block: 'center' });
       $("unid-new-nome").focus();
+    };
+
+    window.sugerirAcerto = async () => {
+      const eq = computeEqualizacao();
+      if (!eq || !eq.mensagem) {
+        showToast('Não há acerto pendente', 'info');
+        return;
+      }
+
+      // Determinar quem deve pagar para quem
+      let de, para, valor;
+      if (eq.saldoFinalA > 0) {
+        // A tem a receber, B deve pagar para A
+        de = "B";
+        para = "A";
+        valor = Math.abs(eq.saldoFinalA);
+      } else {
+        // B tem a receber, A deve pagar para B
+        de = "A";
+        para = "B";
+        valor = Math.abs(eq.saldoFinalB);
+      }
+
+      // Navegar para a view de acertos
+      navigateTo('ACERTOS');
+
+      // Aguardar um pouco para garantir que a view foi carregada
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Preencher formulário
+      const hoje = new Date().toISOString().split('T')[0];
+      $("ac-data").value = hoje;
+      $("ac-de").value = de;
+      $("ac-para").value = para;
+      $("ac-valor").value = valor.toFixed(2);
+      $("ac-descricao").value = `Equalização automática - ${new Date().toLocaleDateString('pt-BR')}`;
+
+      // Focar no campo de descrição
+      $("ac-descricao").focus();
+      $("ac-descricao").select();
+
+      showToast('✨ Formulário preenchido! Revise e salve o acerto.', 'success');
     };
 
     window.deleteFornecedor = async (id) => {
@@ -3545,10 +3640,24 @@
       const socioA = state.config.socioA || "Sócio A";
       const socioB = state.config.socioB || "Sócio B";
 
-      // 1. RECEBIMENTOS (Dinheiro que entrou - dividido 50/50)
-      const totalRecebido = state.recebimentos.reduce((sum, r) => sum + r.valor, 0);
-      const recebeuA = totalRecebido / 2;  // 50% para A
-      const recebeuB = totalRecebido / 2;  // 50% para B
+      // 1. RECEBIMENTOS (Dinheiro que entrou - baseado em quem RECEBEU fisicamente)
+      let recebeuA = 0;
+      let recebeuB = 0;
+
+      state.recebimentos.forEach(r => {
+        const recebidoPor = r.recebidoPor || "ambos"; // Quem recebeu fisicamente o dinheiro
+
+        if (recebidoPor === "A") {
+          recebeuA += r.valor;  // 100% para A
+        } else if (recebidoPor === "B") {
+          recebeuB += r.valor;  // 100% para B
+        } else {
+          recebeuA += r.valor / 2;  // 50% para cada
+          recebeuB += r.valor / 2;
+        }
+      });
+
+      const totalRecebido = recebeuA + recebeuB;
 
       // 2. GASTOS (Dinheiro que saiu - quem efetivamente pagou)
       let pagouA = 0;
