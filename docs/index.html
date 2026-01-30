@@ -253,6 +253,9 @@
         <!-- KPIs -->
         <div id="kpis-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6"></div>
         
+        <!-- Análise Financeira Detalhada por Sócio e Unidade -->
+        <div id="analise-detalhada"></div>
+        
         <!-- Métricas de Rentabilidade -->
         <div id="roi-section" class="mb-6"></div>
         
@@ -727,18 +730,21 @@
         </div>
 
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div class="font-bold text-blue-900 mb-3">💰 Investimentos Iniciais</div>
+          <div class="font-bold text-blue-900 mb-3">💰 Investimentos dos Sócios</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <div class="text-xs muted mb-1">Investimento Sócio A (R$)</div>
+              <div class="text-xs muted mb-1">Total Investido por Sócio A (R$)</div>
               <input id="obra-invest-a" type="number" step="0.01" class="input" placeholder="0.00" />
-              <div class="text-xs text-gray-600 mt-1">Ex: Sinal do terreno pago por A</div>
+              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes, etc.</div>
             </div>
             <div>
-              <div class="text-xs muted mb-1">Investimento Sócio B (R$)</div>
+              <div class="text-xs muted mb-1">Total Investido por Sócio B (R$)</div>
               <input id="obra-invest-b" type="number" step="0.01" class="input" placeholder="0.00" />
-              <div class="text-xs text-gray-600 mt-1">Ex: Sinal do terreno pago por B</div>
+              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes, etc.</div>
             </div>
+          </div>
+          <div class="text-xs text-gray-600 mt-2">
+            💡 Pode ser atualizado a qualquer momento conforme novos aportes
           </div>
         </div>
 
@@ -749,6 +755,51 @@
 
         <button type="submit" class="btn btn-green w-full">Criar Obra</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Gestão de Usuários da Obra (ADMIN ONLY) -->
+  <div id="modal-usuarios" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="font-black text-xl">👥 Gestão de Usuários</div>
+          <div class="text-sm text-gray-600 mt-1" id="modal-usuarios-obra-nome"></div>
+        </div>
+        <button data-close="modal-usuarios" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <!-- Adicionar Usuário -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div class="font-bold text-blue-900 mb-3">➕ Adicionar Usuário</div>
+        <form id="form-add-usuario" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">Email do Usuário</div>
+            <input id="add-usuario-email" type="email" class="input" placeholder="socio@exemplo.com" required />
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">Sócio</div>
+            <select id="add-usuario-socio" class="input" required>
+              <option value="">Selecione...</option>
+              <option value="A">Sócio A</option>
+              <option value="B">Sócio B</option>
+              <option value="C">Sócio C</option>
+              <option value="D">Sócio D</option>
+              <option value="E">Sócio E</option>
+            </select>
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">&nbsp;</div>
+            <button type="submit" class="btn btn-green w-full">Adicionar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Lista de Usuários -->
+      <div>
+        <div class="font-bold text-gray-800 mb-3">Usuários com Acesso</div>
+        <div id="lista-usuarios" class="space-y-2"></div>
+      </div>
     </div>
   </div>
 
@@ -1072,6 +1123,49 @@
 
     const listeners = [];
 
+    // SISTEMA DE PERMISSÕES
+    const ROLES = {
+      ADMIN: 'admin',
+      SOCIO: 'socio'
+    };
+
+    const ADMIN_EMAIL = 'viictor.castro@gmail.com';
+
+    function isAdmin() {
+      return state.user && state.user.email === ADMIN_EMAIL;
+    }
+
+    function hasAccessToObra(obraId) {
+      if (isAdmin()) return true;
+      
+      const obra = state.obras.find(o => o.id === obraId);
+      if (!obra) return false;
+      
+      // Verificar se o usuário está vinculado à obra
+      const usuarios = obra.usuarios || [];
+      return usuarios.some(u => u.email === state.user.email);
+    }
+
+    function getUserRoleInObra(obraId) {
+      if (isAdmin()) return ROLES.ADMIN;
+      
+      const obra = state.obras.find(o => o.id === obraId);
+      if (!obra) return null;
+      
+      const usuarios = obra.usuarios || [];
+      const usuario = usuarios.find(u => u.email === state.user.email);
+      return usuario ? usuario.role : null;
+    }
+
+    function getSocioIdForUser(obraId) {
+      const obra = state.obras.find(o => o.id === obraId);
+      if (!obra) return null;
+      
+      const usuarios = obra.usuarios || [];
+      const usuario = usuarios.find(u => u.email === state.user.email);
+      return usuario ? usuario.socioId : null;
+    }
+
     // Firestore refs
     function refs(obraId) {
       return {
@@ -1344,7 +1438,20 @@
       const r = refs("dummy").obrasCol;
       listeners.push(onSnapshot(r, (snap) => {
         console.log("📊 Obras carregadas:", snap.size);
-        state.obras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const todasObras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Filtrar obras baseado em permissões
+        if (isAdmin()) {
+          state.obras = todasObras;
+          console.log("👑 ADMIN: acesso a todas as", todasObras.length, "obras");
+        } else {
+          state.obras = todasObras.filter(obra => {
+            const usuarios = obra.usuarios || [];
+            return usuarios.some(u => u.email === state.user.email);
+          });
+          console.log("👤 Sócio: acesso a", state.obras.length, "obras");
+        }
+        
         hydrateObrasSelect();
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
@@ -1427,6 +1534,16 @@
     function switchObra() {
       OBRA_ID = $("obra-select").value;
       if (OBRA_ID) {
+        // Verificar acesso
+        if (!hasAccessToObra(OBRA_ID)) {
+          showToast('❌ Você não tem acesso a esta obra', 'error');
+          OBRA_ID = null;
+          localStorage.removeItem("obraId");
+          VIEW = "OBRAS";
+          rerender();
+          return;
+        }
+        
         localStorage.setItem("obraId", OBRA_ID);
         subscribeObra();
       }
@@ -1678,6 +1795,7 @@
                 <div class="text-sm text-gray-600">${escapeHtml(obra.endereco || 'Endereço não informado')}</div>
               </div>
               <div class="flex gap-2">
+                ${isAdmin() ? `<button onclick="event.stopPropagation(); window.gerenciarUsuarios('${obra.id}')" class="btn btn-soft text-sm" title="Gerenciar usuários">👥</button>` : ''}
                 <button onclick="event.stopPropagation(); window.editarObra('${obra.id}')" class="btn btn-soft text-sm">✏️</button>
                 <button onclick="event.stopPropagation(); window.deletarObra('${obra.id}')" class="btn btn-danger text-sm">🗑️</button>
               </div>
@@ -1745,6 +1863,128 @@
       }
     };
 
+    // GESTÃO DE USUÁRIOS (ADMIN ONLY)
+    let CURRENT_OBRA_USUARIOS = null;
+
+    window.gerenciarUsuarios = (obraId) => {
+      if (!isAdmin()) {
+        showToast('❌ Apenas administradores podem gerenciar usuários', 'error');
+        return;
+      }
+
+      CURRENT_OBRA_USUARIOS = obraId;
+      const obra = state.obras.find(o => o.id === obraId);
+      if (!obra) return;
+
+      $("modal-usuarios-obra-nome").textContent = `Obra: ${obra.nome}`;
+      renderListaUsuarios(obra);
+      openModal("modal-usuarios");
+    };
+
+    function renderListaUsuarios(obra) {
+      const usuarios = obra.usuarios || [];
+      
+      if (usuarios.length === 0) {
+        $("lista-usuarios").innerHTML = `
+          <div class="text-center text-gray-500 py-8">
+            <div class="text-4xl mb-2">👥</div>
+            <p>Nenhum usuário vinculado ainda</p>
+            <p class="text-sm mt-1">Adicione usuários acima para conceder acesso</p>
+          </div>
+        `;
+        return;
+      }
+
+      const html = usuarios.map((u, idx) => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <div class="flex-1">
+            <div class="font-bold text-gray-800">${escapeHtml(u.email)}</div>
+            <div class="text-sm text-gray-600">Sócio ${u.socioId} • ${u.role || 'socio'}</div>
+          </div>
+          <button onclick="window.removerUsuario(${idx})" class="btn btn-danger text-sm">
+            🗑️ Remover
+          </button>
+        </div>
+      `).join('');
+
+      $("lista-usuarios").innerHTML = html;
+    }
+
+    window.removerUsuario = async (index) => {
+      if (!isAdmin()) return;
+
+      const obra = state.obras.find(o => o.id === CURRENT_OBRA_USUARIOS);
+      if (!obra) return;
+
+      const usuarios = obra.usuarios || [];
+      const usuario = usuarios[index];
+
+      if (!confirm(`Remover acesso de ${usuario.email}?`)) return;
+
+      try {
+        usuarios.splice(index, 1);
+        await updateDoc(doc(db, "obras", CURRENT_OBRA_USUARIOS), {
+          usuarios: usuarios
+        });
+        
+        renderListaUsuarios({ ...obra, usuarios });
+        showToast('Usuário removido com sucesso!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao remover usuário', 'error');
+      }
+    };
+
+    $("form-add-usuario").onsubmit = async (e) => {
+      e.preventDefault();
+      
+      if (!isAdmin()) {
+        showToast('❌ Apenas administradores podem adicionar usuários', 'error');
+        return;
+      }
+
+      const email = $("add-usuario-email").value.trim().toLowerCase();
+      const socioId = $("add-usuario-socio").value;
+
+      if (!email || !socioId) {
+        showToast('Preencha todos os campos', 'warning');
+        return;
+      }
+
+      try {
+        const obra = state.obras.find(o => o.id === CURRENT_OBRA_USUARIOS);
+        if (!obra) return;
+
+        const usuarios = obra.usuarios || [];
+        
+        // Verificar se já existe
+        if (usuarios.some(u => u.email === email)) {
+          showToast('Este usuário já tem acesso a esta obra', 'warning');
+          return;
+        }
+
+        // Adicionar novo usuário
+        usuarios.push({
+          email: email,
+          socioId: socioId,
+          role: ROLES.SOCIO,
+          addedAt: new Date().toISOString(),
+          addedBy: state.user.email
+        });
+
+        await updateDoc(doc(db, "obras", CURRENT_OBRA_USUARIOS), {
+          usuarios: usuarios
+        });
+
+        $("form-add-usuario").reset();
+        renderListaUsuarios({ ...obra, usuarios });
+        showToast(`✅ Acesso concedido para ${email}`, 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao adicionar usuário', 'error');
+      }
+    };
+
     // DASHBOARD
     function renderDashboard() {
       renderAlertasVencimento();
@@ -1791,6 +2031,9 @@
         </div>
       `;
       $("kpis-grid").innerHTML = kpisHTML;
+
+      // Nova seção: Análise Detalhada por Unidade e Sócio
+      renderAnaliseDetalhada(lancs, rats);
 
       // Métricas de Rentabilidade
       renderROISection(custoTotal, lucroData, totalRecebido);
@@ -2377,6 +2620,365 @@
       });
     }
 
+    function renderAnaliseDetalhada(lancs, rats) {
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+
+      // Verificar permissões
+      const meuSocioId = getSocioIdForUser(OBRA_ID);
+      const somenteMinhaVisao = !isAdmin() && meuSocioId;
+
+      // 1. Calcular custos por unidade
+      const custosPorUnidade = {};
+      
+      // Lançamentos diretos
+      lancs.forEach(l => {
+        if (!l.unidadeId) return;
+        if (!custosPorUnidade[l.unidadeId]) {
+          custosPorUnidade[l.unidadeId] = {
+            custoTotal: 0,
+            pagoPorA: 0,
+            pagoPorB: 0,
+            receitas: 0,
+            recebidoPorA: 0,
+            recebidoPorB: 0
+          };
+        }
+        
+        custosPorUnidade[l.unidadeId].custoTotal += l.valor;
+        
+        // Quem pagou
+        if (l.pagoPor === "A") {
+          custosPorUnidade[l.unidadeId].pagoPorA += l.valor;
+        } else if (l.pagoPor === "B") {
+          custosPorUnidade[l.unidadeId].pagoPorB += l.valor;
+        } else {
+          // 50/50
+          custosPorUnidade[l.unidadeId].pagoPorA += l.valor / 2;
+          custosPorUnidade[l.unidadeId].pagoPorB += l.valor / 2;
+        }
+      });
+
+      // Rateios distribuídos
+      rats.forEach(r => {
+        if (!r.distribuicao || r.distribuicao.length === 0) return;
+        
+        r.distribuicao.forEach(d => {
+          if (!custosPorUnidade[d.unidadeId]) {
+            custosPorUnidade[d.unidadeId] = {
+              custoTotal: 0,
+              pagoPorA: 0,
+              pagoPorB: 0,
+              receitas: 0,
+              recebidoPorA: 0,
+              recebidoPorB: 0
+            };
+          }
+          
+          const valorRateado = (d.percentual / 100) * r.valorTotal;
+          custosPorUnidade[d.unidadeId].custoTotal += valorRateado;
+          
+          // Quem pagou
+          if (r.pagoPor === "A") {
+            custosPorUnidade[d.unidadeId].pagoPorA += valorRateado;
+          } else if (r.pagoPor === "B") {
+            custosPorUnidade[d.unidadeId].pagoPorB += valorRateado;
+          } else {
+            // 50/50
+            custosPorUnidade[d.unidadeId].pagoPorA += valorRateado / 2;
+            custosPorUnidade[d.unidadeId].pagoPorB += valorRateado / 2;
+          }
+        });
+      });
+
+      // 2. Calcular receitas por unidade
+      state.recebimentos.forEach(rec => {
+        if (!rec.unidadeId) return;
+        
+        if (!custosPorUnidade[rec.unidadeId]) {
+          custosPorUnidade[rec.unidadeId] = {
+            custoTotal: 0,
+            pagoPorA: 0,
+            pagoPorB: 0,
+            receitas: 0,
+            recebidoPorA: 0,
+            recebidoPorB: 0
+          };
+        }
+        
+        custosPorUnidade[rec.unidadeId].receitas += rec.valor;
+        
+        // Quem recebeu fisicamente
+        if (rec.recebidoPor === "A") {
+          custosPorUnidade[rec.unidadeId].recebidoPorA += rec.valor;
+        } else if (rec.recebidoPor === "B") {
+          custosPorUnidade[rec.unidadeId].recebidoPorB += rec.valor;
+        } else {
+          // 50/50
+          custosPorUnidade[rec.unidadeId].recebidoPorA += rec.valor / 2;
+          custosPorUnidade[rec.unidadeId].recebidoPorB += rec.valor / 2;
+        }
+      });
+
+      // 3. Calcular totais por sócio (considerando investimentos)
+      const investimentoA = obra?.investimentoA || 0;
+      const investimentoB = obra?.investimentoB || 0;
+      
+      let totalPagoA = investimentoA;
+      let totalPagoB = investimentoB;
+      let totalRecebidoA = 0;
+      let totalRecebidoB = 0;
+      
+      Object.values(custosPorUnidade).forEach(u => {
+        totalPagoA += u.pagoPorA;
+        totalPagoB += u.pagoPorB;
+        totalRecebidoA += u.recebidoPorA;
+        totalRecebidoB += u.recebidoPorB;
+      });
+
+      const retornoA = totalRecebidoA - totalPagoA;
+      const retornoB = totalRecebidoB - totalPagoB;
+      const roiA = totalPagoA > 0 ? (retornoA / totalPagoA) * 100 : 0;
+      const roiB = totalPagoB > 0 ? (retornoB / totalPagoB) * 100 : 0;
+
+      // Calcular período e retorno mensal
+      let mesesOperacao = 0;
+      let retornoMensalA = 0;
+      let retornoMensalB = 0;
+      let periodoTexto = "";
+      
+      if (obra?.dataInicio) {
+        const inicio = new Date(obra.dataInicio);
+        const fim = obra.dataRecebimento ? new Date(obra.dataRecebimento) : new Date();
+        const diasOperacao = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24));
+        mesesOperacao = Math.max(1, diasOperacao / 30);
+        
+        retornoMensalA = retornoA / mesesOperacao;
+        retornoMensalB = retornoB / mesesOperacao;
+        
+        const inicioFormatado = inicio.toLocaleDateString('pt-BR');
+        const fimFormatado = obra.dataRecebimento 
+          ? new Date(obra.dataRecebimento).toLocaleDateString('pt-BR')
+          : new Date().toLocaleDateString('pt-BR');
+        
+        periodoTexto = `${inicioFormatado} até ${fimFormatado} (${mesesOperacao.toFixed(1)} meses)`;
+      }
+
+      // 4. Preparar dados das unidades
+      const unidadesData = Object.entries(custosPorUnidade).map(([unidadeId, dados]) => {
+        const unidade = state.unidades.find(u => u.id === unidadeId);
+        const lucro = dados.receitas - dados.custoTotal;
+        const roi = dados.custoTotal > 0 ? (lucro / dados.custoTotal) * 100 : 0;
+        
+        return {
+          unidade,
+          ...dados,
+          lucro,
+          roi
+        };
+      }).filter(u => u.unidade).sort((a, b) => b.custoTotal - a.custoTotal);
+
+      // 5. Renderizar HTML
+      const html = `
+        <div class="card p-6 mb-6">
+          <div class="flex justify-between items-center mb-4">
+            <div class="font-black text-lg">💼 Análise Financeira Detalhada ${somenteMinhaVisao ? '(Seus Dados)' : 'por Sócio'}</div>
+            ${periodoTexto ? `<div class="text-sm text-gray-600">📅 ${periodoTexto}</div>` : ''}
+          </div>
+          
+          ${somenteMinhaVisao ? `
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div class="text-sm text-blue-800">
+                👤 Visualizando apenas seus dados como <strong>${meuSocioId === 'A' ? socioA : socioB}</strong>
+              </div>
+            </div>
+          ` : ''}
+          
+          <!-- Resumo por Sócio -->
+          <div class="grid grid-cols-1 ${somenteMinhaVisao ? '' : 'md:grid-cols-2'} gap-4 mb-6">
+            ${!somenteMinhaVisao || meuSocioId === 'A' ? `
+            <!-- Sócio A -->
+            <div class="border-2 ${retornoA >= 0 ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'} rounded-lg p-4">
+              <h4 class="font-bold text-gray-800 mb-3 text-xl flex items-center gap-2">
+                👤 ${escapeHtml(socioA)}
+              </h4>
+              <div class="space-y-2">
+                ${investimentoA > 0 ? `
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">💼 Investimentos gerais:</span>
+                  <span class="font-bold text-purple-600">R$ ${investimentoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                ` : ''}
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">💳 Total pago (custos + investimentos):</span>
+                  <span class="font-bold text-red-600">R$ ${totalPagoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">💰 Total recebido:</span>
+                  <span class="font-bold text-green-600">R$ ${totalRecebidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                <div class="flex justify-between text-sm pt-2 border-t-2">
+                  <span class="text-gray-700 font-bold">🎯 Retorno líquido:</span>
+                  <span class="font-black text-xl ${retornoA >= 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${retornoA >= 0 ? '+' : ''}R$ ${retornoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                  </span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-700 font-bold">📊 ROI:</span>
+                  <span class="font-black text-xl ${roiA >= 0 ? 'text-blue-600' : 'text-red-600'}">
+                    ${roiA >= 0 ? '+' : ''}${roiA.toFixed(2)}%
+                  </span>
+                </div>
+                ${mesesOperacao > 0 ? `
+                <div class="flex justify-between text-sm border-t pt-2 mt-2">
+                  <span class="text-gray-600">📈 Retorno/Mês:</span>
+                  <span class="font-bold ${retornoMensalA >= 0 ? 'text-green-600' : 'text-red-600'}">
+                    R$ ${retornoMensalA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                  </span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">📊 ROI Mensal:</span>
+                  <span class="font-bold text-indigo-600">
+                    ${(roiA / mesesOperacao).toFixed(2)}%/mês
+                  </span>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+            ` : ''}
+
+            ${!somenteMinhaVisao || meuSocioId === 'B' ? `
+            <!-- Sócio B -->
+            <div class="border-2 ${retornoB >= 0 ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'} rounded-lg p-4">
+              <h4 class="font-bold text-gray-800 mb-3 text-xl flex items-center gap-2">
+                👤 ${escapeHtml(socioB)}
+              </h4>
+              <div class="space-y-2">
+                ${investimentoB > 0 ? `
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">💼 Investimentos gerais:</span>
+                  <span class="font-bold text-purple-600">R$ ${investimentoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                ` : ''}
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">💳 Total pago (custos + investimentos):</span>
+                  <span class="font-bold text-red-600">R$ ${totalPagoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">💰 Total recebido:</span>
+                  <span class="font-bold text-green-600">R$ ${totalRecebidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                <div class="flex justify-between text-sm pt-2 border-t-2">
+                  <span class="text-gray-700 font-bold">🎯 Retorno líquido:</span>
+                  <span class="font-black text-xl ${retornoB >= 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${retornoB >= 0 ? '+' : ''}R$ ${retornoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                  </span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-700 font-bold">📊 ROI:</span>
+                  <span class="font-black text-xl ${roiB >= 0 ? 'text-blue-600' : 'text-red-600'}">
+                    ${roiB >= 0 ? '+' : ''}${roiB.toFixed(2)}%
+                  </span>
+                </div>
+                ${mesesOperacao > 0 ? `
+                <div class="flex justify-between text-sm border-t pt-2 mt-2">
+                  <span class="text-gray-600">📈 Retorno/Mês:</span>
+                  <span class="font-bold ${retornoMensalB >= 0 ? 'text-green-600' : 'text-red-600'}">
+                    R$ ${retornoMensalB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                  </span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">📊 ROI Mensal:</span>
+                  <span class="font-bold text-indigo-600">
+                    ${(roiB / mesesOperacao).toFixed(2)}%/mês
+                  </span>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+            ` : ''}
+          </div>
+
+          ${unidadesData.length > 0 ? `
+            <!-- Detalhamento por Unidade -->
+            <div class="mt-6">
+              <h5 class="font-bold text-gray-800 mb-3">🏠 Breakdown por Unidade</h5>
+              <div class="space-y-4">
+                ${unidadesData.map(u => `
+                  <div class="border border-gray-300 rounded-lg p-4 bg-white">
+                    <div class="flex justify-between items-start mb-3">
+                      <h6 class="font-bold text-lg">${escapeHtml(u.unidade.nome)}</h6>
+                      <div class="text-right">
+                        <div class="text-xs text-gray-600">Resultado</div>
+                        <div class="text-lg font-black ${u.lucro >= 0 ? 'text-green-600' : 'text-red-600'}">
+                          ${u.lucro >= 0 ? '+' : ''}R$ ${u.lucro.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </div>
+                        <div class="text-xs font-bold ${u.roi >= 0 ? 'text-blue-600' : 'text-red-600'}">
+                          ROI: ${u.roi >= 0 ? '+' : ''}${u.roi.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <!-- Custos -->
+                      <div>
+                        <div class="font-bold text-red-700 mb-2">💳 Custos (R$ ${u.custoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+                        <div class="space-y-1 ml-4">
+                          <div class="flex justify-between">
+                            <span>• Pago por ${escapeHtml(socioA)}:</span>
+                            <span class="font-bold">R$ ${u.pagoPorA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                          </div>
+                          <div class="flex justify-between">
+                            <span>• Pago por ${escapeHtml(socioB)}:</span>
+                            <span class="font-bold">R$ ${u.pagoPorB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Receitas -->
+                      <div>
+                        <div class="font-bold text-green-700 mb-2">💰 Receitas (R$ ${u.receitas.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+                        <div class="space-y-1 ml-4">
+                          <div class="flex justify-between">
+                            <span>• Recebido por ${escapeHtml(socioA)}:</span>
+                            <span class="font-bold">R$ ${u.recebidoPorA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                          </div>
+                          <div class="flex justify-between">
+                            <span>• Recebido por ${escapeHtml(socioB)}:</span>
+                            <span class="font-bold">R$ ${u.recebidoPorB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : `
+            <div class="text-center text-gray-500 mt-4">
+              <p>📊 Nenhuma unidade com custos ou receitas registrados ainda</p>
+            </div>
+          `}
+          
+          <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="text-sm text-blue-800">
+              <p class="font-bold mb-2">💡 Como interpretar estes dados:</p>
+              <ul class="list-disc ml-5 space-y-1">
+                <li><strong>Total pago:</strong> Soma de investimentos gerais + custos diretos pagos por cada sócio</li>
+                <li><strong>Total recebido:</strong> Soma de receitas recebidas fisicamente por cada sócio</li>
+                <li><strong>Retorno líquido:</strong> Total recebido - Total pago (lucro ou prejuízo real de cada um)</li>
+                <li><strong>ROI:</strong> (Retorno / Total pago) × 100 - percentual de retorno sobre o investimento</li>
+                <li><strong>Breakdown por unidade:</strong> Mostra custos e receitas específicas de cada casa</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+
+      $("analise-detalhada").innerHTML = html;
+    }
+
     function renderCustoM2(lancs, rats) {
       const custoPorUnidade = {};
 
@@ -2569,6 +3171,125 @@
         return;
       }
 
+      // Verificar permissões: sócio vê apenas seus próprios dados
+      const meuSocioId = getSocioIdForUser(OBRA_ID);
+      const somenteMinhaVisao = !isAdmin() && meuSocioId;
+
+      // Se é sócio, mostrar apenas seu card
+      if (somenteMinhaVisao) {
+        const meusDados = meuSocioId === 'A' ? {
+          nome: eq.socioA,
+          investimento: eq.investimentoA,
+          recebeu: eq.recebeuA,
+          temDireito: eq.temDireitoA,
+          deveRepassar: eq.deveRepassarA,
+          pagou: eq.pagouA,
+          deveGastar: eq.deveGastarA,
+          saldoCaixa: eq.saldoCaixaA,
+          diferencaGastos: eq.diferencaGastosA,
+          saldoFinal: eq.saldoFinalA
+        } : {
+          nome: eq.socioB,
+          investimento: eq.investimentoB,
+          recebeu: eq.recebeuB,
+          temDireito: eq.temDireitoB,
+          deveRepassar: eq.deveRepassarB,
+          pagou: eq.pagouB,
+          deveGastar: eq.deveGastarB,
+          saldoCaixa: eq.saldoCaixaB,
+          diferencaGastos: eq.diferencaGastosB,
+          saldoFinal: eq.saldoFinalB
+        };
+
+        const html = `
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div class="text-sm text-blue-800">
+              👤 Você está visualizando apenas seus próprios dados como <strong>${meusDados.nome}</strong>
+            </div>
+          </div>
+
+          <div class="border border-gray-200 rounded-lg p-6 bg-gradient-to-br from-blue-50 to-white max-w-2xl mx-auto">
+            <h4 class="font-bold text-gray-800 mb-4 text-xl flex items-center gap-2">
+              👤 ${escapeHtml(meusDados.nome)} (Você)
+            </h4>
+            
+            <div class="space-y-3">
+              ${meusDados.investimento > 0 ? `
+              <div class="bg-purple-100 rounded-lg p-3 border-2 border-purple-300">
+                <div class="text-xs font-bold text-purple-900 mb-1">💼 INVESTIMENTOS</div>
+                <div class="text-2xl font-black text-purple-700">R$ ${meusDados.investimento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-purple-800 mt-1">Aportes, terreno, etc.</div>
+              </div>
+              ` : ''}
+              
+              <div class="bg-white rounded-lg p-3 border border-blue-200">
+                <div class="text-xs font-bold text-blue-800 mb-1">💰 RECEBEU FISICAMENTE</div>
+                <div class="text-2xl font-black text-blue-600">R$ ${meusDados.recebeu.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Dinheiro que você recebeu na mão</div>
+              </div>
+
+              <div class="bg-white rounded-lg p-3 border border-green-200">
+                <div class="text-xs font-bold text-green-800 mb-1">✅ TEM DIREITO</div>
+                <div class="text-2xl font-black text-green-600">R$ ${meusDados.temDireito.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Sua parte baseado no proprietário das unidades</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-${meusDados.deveRepassar > 0 ? 'orange' : 'cyan'}-50 to-white rounded-lg p-3 border-2 border-${meusDados.deveRepassar > 0 ? 'orange' : 'cyan'}-300">
+                <div class="text-xs font-bold text-${meusDados.deveRepassar > 0 ? 'orange' : 'cyan'}-800 mb-1">💸 ${meusDados.deveRepassar > 0 ? 'DEVE REPASSAR' : 'DEVE RECEBER'}</div>
+                <div class="text-2xl font-black text-${meusDados.deveRepassar > 0 ? 'orange' : 'cyan'}-700">R$ ${Math.abs(meusDados.deveRepassar).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-700 mt-1">${meusDados.deveRepassar > 0 ? 'Você recebeu mais do que tem direito' : 'Você recebeu menos do que tem direito'}</div>
+              </div>
+
+              <div class="bg-white rounded-lg p-3 border border-red-200">
+                <div class="text-xs font-bold text-red-800 mb-1">💳 PAGOU EM CUSTOS</div>
+                <div class="text-2xl font-black text-red-600">R$ ${meusDados.pagou.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Custos que você efetivamente pagou</div>
+              </div>
+
+              <div class="bg-white rounded-lg p-3 border border-orange-200">
+                <div class="text-xs font-bold text-orange-800 mb-1">📊 DEVERIA PAGAR (50%)</div>
+                <div class="text-2xl font-black text-orange-600">R$ ${meusDados.deveGastar.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Sua parte dos custos totais</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-${meusDados.saldoCaixa >= 0 ? 'green' : 'red'}-50 to-${meusDados.saldoCaixa >= 0 ? 'green' : 'red'}-100 rounded-lg p-3 border-2 border-${meusDados.saldoCaixa >= 0 ? 'green' : 'red'}-300">
+                <div class="text-xs font-bold text-${meusDados.saldoCaixa >= 0 ? 'green' : 'red'}-900 mb-1">🏦 SALDO DE CAIXA</div>
+                <div class="text-2xl font-black text-${meusDados.saldoCaixa >= 0 ? 'green' : 'red'}-700">R$ ${meusDados.saldoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-${meusDados.saldoCaixa >= 0 ? 'green' : 'red'}-800 mt-1">Recebeu - Pagou = ${meusDados.saldoCaixa >= 0 ? 'Positivo' : 'Negativo'}</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-${meusDados.diferencaGastos >= 0 ? 'purple' : 'yellow'}-50 to-white rounded-lg p-3 border-2 border-${meusDados.diferencaGastos >= 0 ? 'purple' : 'yellow'}-300">
+                <div class="text-xs font-bold text-${meusDados.diferencaGastos >= 0 ? 'purple' : 'yellow'}-900 mb-1">⚖️ DIFERENÇA NOS GASTOS</div>
+                <div class="text-2xl font-black text-${meusDados.diferencaGastos >= 0 ? 'purple' : 'yellow'}-700">${meusDados.diferencaGastos >= 0 ? '+' : ''}R$ ${meusDados.diferencaGastos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-700 mt-1">${meusDados.diferencaGastos >= 0 ? 'Você pagou MAIS que sua parte' : 'Você pagou MENOS que sua parte'}</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg p-3 border-2 border-indigo-400">
+                <div class="text-xs font-bold text-indigo-900 mb-1">🎯 SALDO FINAL (após acertos)</div>
+                <div class="text-3xl font-black text-indigo-700">${meusDados.saldoFinal >= 0 ? '+' : ''}R$ ${meusDados.saldoFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-indigo-800 mt-1">${meusDados.saldoFinal >= 0 ? 'Tem a receber' : 'Tem a pagar'}</div>
+              </div>
+            </div>
+          </div>
+
+          ${eq.mensagem && meusDados.saldoFinal !== 0 ? `
+            <div class="bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 border-2 border-orange-400 rounded-lg p-6 mt-6">
+              <div class="text-center">
+                <div class="text-2xl mb-2">💡</div>
+                <div class="text-lg font-bold text-gray-800 mb-2">Situação Atual</div>
+                <div class="text-xl font-black text-orange-600">
+                  ${meusDados.saldoFinal > 0 ? 'Você tem a receber' : 'Você tem a pagar'} R$ ${Math.abs(meusDados.saldoFinal).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        `;
+
+        $("equalizacao-section").innerHTML = html;
+        return;
+      }
+
+      // ADMIN: Visualização completa (código original)
       const html = `
         <!-- Análise Detalhada de Fluxo de Caixa por Sócio -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -2581,9 +3302,9 @@
             <div class="space-y-3">
               ${eq.investimentoA > 0 || eq.investimentoB > 0 ? `
               <div class="bg-purple-100 rounded-lg p-3 border-2 border-purple-300">
-                <div class="text-xs font-bold text-purple-900 mb-1">🏗️ INVESTIMENTO INICIAL</div>
+                <div class="text-xs font-bold text-purple-900 mb-1">💼 INVESTIMENTOS</div>
                 <div class="text-2xl font-black text-purple-700">R$ ${eq.investimentoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                <div class="text-xs text-purple-800 mt-1">Sinal do terreno, etc</div>
+                <div class="text-xs text-purple-800 mt-1">Aportes, terreno, etc.</div>
               </div>
               ` : ''}
               
@@ -2644,9 +3365,9 @@
             <div class="space-y-3">
               ${eq.investimentoA > 0 || eq.investimentoB > 0 ? `
               <div class="bg-purple-100 rounded-lg p-3 border-2 border-purple-300">
-                <div class="text-xs font-bold text-purple-900 mb-1">🏗️ INVESTIMENTO INICIAL</div>
+                <div class="text-xs font-bold text-purple-900 mb-1">💼 INVESTIMENTOS</div>
                 <div class="text-2xl font-black text-purple-700">R$ ${eq.investimentoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                <div class="text-xs text-purple-800 mt-1">Sinal do terreno, etc</div>
+                <div class="text-xs text-purple-800 mt-1">Aportes, terreno, etc.</div>
               </div>
               ` : ''}
               
