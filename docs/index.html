@@ -2218,10 +2218,20 @@
       showToast('Obra selecionada!', 'success');
     };
 
+    let editandoObraId = null; // Flag para evitar loop infinito
+    
     window.editarObra = async (obraId) => {
+      // PROTEÇÃO: evitar chamadas repetidas
+      if (editandoObraId === obraId) {
+        console.log("⚠️ editarObra já em execução para:", obraId);
+        return;
+      }
+      editandoObraId = obraId;
+      
       const obra = state.obras.find(o => o.id === obraId);
       if (!obra) {
         showToast('Obra não encontrada', 'error');
+        editandoObraId = null;
         return;
       }
 
@@ -2266,6 +2276,9 @@
 
       // Modal já está aberto, não precisa chamar openModal()
       console.log("✏️ Modo edição ativado para:", obra.nome);
+      
+      // Resetar flag após 100ms
+      setTimeout(() => { editandoObraId = null; }, 100);
     };
 
     async function salvarEdicaoObra(obraId) {
@@ -2323,6 +2336,7 @@
     }
 
     function resetarModalObra() {
+      editandoObraId = null; // Resetar flag de edição
       document.querySelector("#modal-obra .font-black").textContent = "🏗️ Nova Obra";
       const btnSubmit = $("obra-submit-btn");
       btnSubmit.textContent = "Criar Obra";
