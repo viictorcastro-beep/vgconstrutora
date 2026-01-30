@@ -176,13 +176,33 @@
       <div id="alertas-vencimento"></div>
       
       <!-- View Selector -->
-      <div class="flex gap-3 mb-6 flex-wrap">
-        <button class="btn btn-dark view-btn" data-view="DASHBOARD">📊 Dashboard</button>
+      <div id="view-selector" class="flex gap-3 mb-6 flex-wrap">
+        <button class="btn btn-dark view-btn" data-view="OBRAS">🏗️ Obras</button>
+        <button class="btn btn-soft view-btn" data-view="DASHBOARD">📊 Dashboard</button>
         <button class="btn btn-soft view-btn" data-view="LANCAMENTOS">💰 Lançamentos</button>
         <button class="btn btn-soft view-btn" data-view="RATEIOS">⚖️ Rateios</button>
         <button class="btn btn-soft view-btn" data-view="RECEBIMENTOS">💵 Recebimentos</button>
         <button class="btn btn-soft view-btn" data-view="ACERTOS">🤝 Acertos Sócios</button>
         <button class="btn btn-soft view-btn" data-view="CONFIG">⚙️ Config</button>
+      </div>
+
+      <!-- OBRAS VIEW (Dashboard Geral) -->
+      <div id="view-OBRAS" class="view-content">
+        <div class="card p-6 mb-6">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h2 class="font-black text-3xl text-gray-800 mb-2">🏗️ Visão Geral de Obras</h2>
+              <p class="text-gray-600">Gerencie todas as obras e veja a equalização global entre sócios</p>
+            </div>
+            <button id="criar-obra-btn" class="btn btn-green">+ Nova Obra</button>
+          </div>
+        </div>
+
+        <!-- Equalização Global -->
+        <div id="equalizacao-global" class="mb-6"></div>
+
+        <!-- Lista de Obras -->
+        <div id="obras-lista" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
       </div>
 
       <!-- DASHBOARD VIEW -->
@@ -670,6 +690,68 @@
     </div>
   </div>
 
+  <!-- Modal Criar/Editar Obra -->
+  <div id="modal-obra" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-6 w-full max-w-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <div class="font-black text-xl">🏗️ Nova Obra</div>
+        <button data-close="modal-obra" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <form id="obra-form" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs muted mb-1">Nome da Obra *</div>
+            <input id="obra-nome" type="text" class="input" placeholder="Ex: Residencial Solar" required />
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">Data de Início *</div>
+            <input id="obra-inicio" type="date" class="input" required />
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs muted mb-1">Endereço</div>
+          <input id="obra-endereco" type="text" class="input" placeholder="Rua, número, bairro" />
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs muted mb-1">Total Previsto de Unidades</div>
+            <input id="obra-total-unidades" type="number" class="input" placeholder="Ex: 4" />
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">Prazo Estimado (meses)</div>
+            <input id="obra-prazo" type="number" class="input" placeholder="Ex: 18" />
+          </div>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div class="font-bold text-blue-900 mb-3">💰 Investimentos Iniciais</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="text-xs muted mb-1">Investimento Sócio A (R$)</div>
+              <input id="obra-invest-a" type="number" step="0.01" class="input" placeholder="0.00" />
+              <div class="text-xs text-gray-600 mt-1">Ex: Sinal do terreno pago por A</div>
+            </div>
+            <div>
+              <div class="text-xs muted mb-1">Investimento Sócio B (R$)</div>
+              <input id="obra-invest-b" type="number" step="0.01" class="input" placeholder="0.00" />
+              <div class="text-xs text-gray-600 mt-1">Ex: Sinal do terreno pago por B</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs muted mb-1">Observações</div>
+          <textarea id="obra-obs" class="input" rows="2" placeholder="Informações adicionais sobre a obra..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-green w-full">Criar Obra</button>
+      </form>
+    </div>
+  </div>
+
   <div id="modal-unidades" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
     <div class="card p-6 w-full max-w-3xl">
       <div class="flex items-center justify-between mb-4">
@@ -965,7 +1047,7 @@
     }
 
     // Global state
-    let VIEW = "DASHBOARD";
+    let VIEW = "OBRAS";  // Começa no dashboard de obras
     let OBRA_ID = null;
     let filterText = "";
     let filterCategoria = "TODAS";
@@ -1122,6 +1204,54 @@
       $("rat-igual-btn").onclick = ratearIgualmente;
 
       $("receb-form").onsubmit = addRecebimento;
+
+      $("obra-form").onsubmit = async (e) => {
+        e.preventDefault();
+        
+        const nome = $("obra-nome").value.trim();
+        const dataInicio = $("obra-inicio").value;
+        const endereco = $("obra-endereco").value.trim();
+        const totalUnidades = parseInt($("obra-total-unidades").value) || null;
+        const prazo = parseInt($("obra-prazo").value) || null;
+        const investimentoA = parseFloat($("obra-invest-a").value) || 0;
+        const investimentoB = parseFloat($("obra-invest-b").value) || 0;
+        const observacoes = $("obra-obs").value.trim();
+
+        if (!nome || !dataInicio) {
+          showToast('Preencha nome e data de início', 'warning');
+          return;
+        }
+
+        try {
+          const novaObra = await addDoc(collection(db, "obras"), {
+            nome,
+            dataInicio,
+            endereco,
+            totalUnidades,
+            prazo,
+            investimentoA,
+            investimentoB,
+            observacoes,
+            createdAt: serverTimestamp(),
+            createdBy: state.user.email
+          });
+
+          $("obra-form").reset();
+          closeModal("modal-obra");
+          showToast('Obra criada com sucesso!', 'success');
+          
+          // Selecionar a obra recém-criada
+          OBRA_ID = novaObra.id;
+          localStorage.setItem("obraId", OBRA_ID);
+          VIEW = "DASHBOARD";
+          rerender();
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao criar obra', 'error');
+        }
+      };
+
+      $("criar-obra-btn").onclick = () => openModal("modal-obra");
 
       $("acerto-form").onsubmit = addAcerto;
       $("acerto-sugerir").onclick = () => {
@@ -1304,7 +1434,7 @@
 
     // RENDER
     function rerender() {
-      if (!OBRA_ID || !state.user) return;
+      if (!state.user) return;
 
       // Update view buttons
       document.querySelectorAll(".view-btn").forEach(btn => {
@@ -1322,6 +1452,20 @@
         el.classList.add("hidden");
       });
       $(`view-${VIEW}`)?.classList.remove("hidden");
+
+      // View de Obras não precisa de OBRA_ID
+      if (VIEW === "OBRAS") {
+        renderObrasView();
+        return;
+      }
+
+      // Outras views precisam de uma obra selecionada
+      if (!OBRA_ID) {
+        showToast('Selecione uma obra primeiro', 'warning');
+        VIEW = "OBRAS";
+        rerender();
+        return;
+      }
 
       // Read filters
       filterText = $("filter-text")?.value?.trim().toLowerCase() || "";
@@ -1435,6 +1579,171 @@
 
       return rats;
     }
+
+    // VIEW DE OBRAS (Dashboard Geral)
+    function renderObrasView() {
+      renderEqualizacaoGlobal();
+      renderObrasLista();
+    }
+
+    function renderEqualizacaoGlobal() {
+      // Consolidar dados de todas as obras
+      let totalRecebeuA = 0, totalRecebeuB = 0;
+      let totalPagouA = 0, totalPagouB = 0;
+      let totalInvestA = 0, totalInvestB = 0;
+
+      state.obras.forEach(obra => {
+        // Investimentos iniciais
+        totalInvestA += obra.investimentoA || 0;
+        totalInvestB += obra.investimentoB || 0;
+      });
+
+      // Para cada obra, somar recebimentos e pagamentos
+      // Nota: Isso requer carregar dados de todas as obras, simplificando aqui
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
+
+      const html = `
+        <div class="card p-6">
+          <div class="font-black text-2xl mb-4">⚖️ Equalização Global - Todas as Obras</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Sócio A -->
+            <div class="bg-gradient-to-br from-blue-50 to-white rounded-lg p-6 border-2 border-blue-200">
+              <h4 class="font-bold text-xl text-blue-900 mb-4">👤 ${escapeHtml(socioA)}</h4>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-700">💰 Investimentos Iniciais:</span>
+                  <span class="font-bold text-blue-600">R$ ${totalInvestA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                <div class="text-sm text-gray-600 mt-2">Total investido em sinais, terrenos, etc.</div>
+              </div>
+            </div>
+
+            <!-- Sócio B -->
+            <div class="bg-gradient-to-br from-green-50 to-white rounded-lg p-6 border-2 border-green-200">
+              <h4 class="font-bold text-xl text-green-900 mb-4">👤 ${escapeHtml(socioB)}</h4>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-700">💰 Investimentos Iniciais:</span>
+                  <span class="font-bold text-green-600">R$ ${totalInvestB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                <div class="text-sm text-gray-600 mt-2">Total investido em sinais, terrenos, etc.</div>
+              </div>
+            </div>
+          </div>
+
+          ${totalInvestA !== totalInvestB ? `
+            <div class="mt-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+              <div class="font-bold text-yellow-900 mb-2">💡 Diferença de Investimentos Iniciais</div>
+              <div class="text-yellow-800">
+                ${totalInvestA > totalInvestB ? 
+                  `${socioA} investiu R$ ${(totalInvestA - totalInvestB).toLocaleString('pt-BR', {minimumFractionDigits: 2})} a mais que ${socioB}` :
+                  `${socioB} investiu R$ ${(totalInvestB - totalInvestA).toLocaleString('pt-BR', {minimumFractionDigits: 2})} a mais que ${socioA}`
+                }
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="mt-4 text-center text-sm text-gray-600">
+            Clique em uma obra abaixo para ver detalhes completos e equalização específica
+          </div>
+        </div>
+      `;
+
+      $("equalizacao-global").innerHTML = html;
+    }
+
+    function renderObrasLista() {
+      if (state.obras.length === 0) {
+        $("obras-lista").innerHTML = `
+          <div class="col-span-2 text-center py-12">
+            <div class="text-6xl mb-4">🏗️</div>
+            <div class="text-xl font-bold text-gray-800 mb-2">Nenhuma obra cadastrada</div>
+            <div class="text-gray-600 mb-4">Comece criando sua primeira obra</div>
+            <button onclick="window.openModal('modal-obra')" class="btn btn-green">+ Criar Primeira Obra</button>
+          </div>
+        `;
+        return;
+      }
+
+      const html = state.obras.map(obra => {
+        const dataInicio = obra.dataInicio ? new Date(obra.dataInicio).toLocaleDateString('pt-BR') : 'N/A';
+        const totalInvest = (obra.investimentoA || 0) + (obra.investimentoB || 0);
+        
+        return `
+          <div class="card p-6 hover:shadow-xl transition-shadow cursor-pointer" onclick="window.selecionarObra('${obra.id}')">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex-1">
+                <h3 class="font-black text-xl text-gray-800 mb-1">${escapeHtml(obra.nome)}</h3>
+                <div class="text-sm text-gray-600">${escapeHtml(obra.endereco || 'Endereço não informado')}</div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="event.stopPropagation(); window.editarObra('${obra.id}')" class="btn btn-soft text-sm">✏️</button>
+                <button onclick="event.stopPropagation(); window.deletarObra('${obra.id}')" class="btn btn-danger text-sm">🗑️</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div class="bg-blue-50 rounded-lg p-3">
+                <div class="text-xs text-blue-800 mb-1">📅 Início</div>
+                <div class="font-bold text-blue-900">${dataInicio}</div>
+              </div>
+              <div class="bg-green-50 rounded-lg p-3">
+                <div class="text-xs text-green-800 mb-1">🏠 Unidades</div>
+                <div class="font-bold text-green-900">${obra.totalUnidades || 'N/A'}</div>
+              </div>
+            </div>
+
+            ${totalInvest > 0 ? `
+              <div class="bg-purple-50 rounded-lg p-3 mb-3">
+                <div class="text-xs text-purple-800 mb-2">💰 Investimentos Iniciais</div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span class="text-gray-700">Sócio A:</span>
+                    <span class="font-bold text-purple-900 ml-2">R$ ${(obra.investimentoA || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-700">Sócio B:</span>
+                    <span class="font-bold text-purple-900 ml-2">R$ ${(obra.investimentoB || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+
+            <button class="btn btn-dark w-full mt-2">
+              Acessar Obra →
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      $("obras-lista").innerHTML = html;
+    }
+
+    window.selecionarObra = (obraId) => {
+      OBRA_ID = obraId;
+      localStorage.setItem("obraId", OBRA_ID);
+      VIEW = "DASHBOARD";
+      rerender();
+      showToast('Obra selecionada!', 'success');
+    };
+
+    window.editarObra = (obraId) => {
+      // TODO: Implementar edição
+      showToast('Edição de obra em desenvolvimento', 'info');
+    };
+
+    window.deletarObra = async (obraId) => {
+      if (!confirm('Tem certeza que deseja deletar esta obra? Todos os dados serão perdidos!')) return;
+      
+      try {
+        await deleteDoc(doc(db, "obras", obraId));
+        showToast('Obra deletada com sucesso!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao deletar obra', 'error');
+      }
+    };
 
     // DASHBOARD
     function renderDashboard() {
@@ -2270,6 +2579,14 @@
             </h4>
             
             <div class="space-y-3">
+              ${eq.investimentoA > 0 || eq.investimentoB > 0 ? `
+              <div class="bg-purple-100 rounded-lg p-3 border-2 border-purple-300">
+                <div class="text-xs font-bold text-purple-900 mb-1">🏗️ INVESTIMENTO INICIAL</div>
+                <div class="text-2xl font-black text-purple-700">R$ ${eq.investimentoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-purple-800 mt-1">Sinal do terreno, etc</div>
+              </div>
+              ` : ''}
+              
               <div class="bg-white rounded-lg p-3 border border-blue-200">
                 <div class="text-xs font-bold text-blue-800 mb-1">💰 RECEBEU FISICAMENTE</div>
                 <div class="text-2xl font-black text-blue-600">R$ ${eq.recebeuA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
@@ -2325,6 +2642,14 @@
             </h4>
             
             <div class="space-y-3">
+              ${eq.investimentoA > 0 || eq.investimentoB > 0 ? `
+              <div class="bg-purple-100 rounded-lg p-3 border-2 border-purple-300">
+                <div class="text-xs font-bold text-purple-900 mb-1">🏗️ INVESTIMENTO INICIAL</div>
+                <div class="text-2xl font-black text-purple-700">R$ ${eq.investimentoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-purple-800 mt-1">Sinal do terreno, etc</div>
+              </div>
+              ` : ''}
+              
               <div class="bg-white rounded-lg p-3 border border-blue-200">
                 <div class="text-xs font-bold text-blue-800 mb-1">💰 RECEBEU FISICAMENTE</div>
                 <div class="text-2xl font-black text-blue-600">R$ ${eq.recebeuB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
@@ -3663,6 +3988,11 @@
       const socioA = state.config.socioA || "Sócio A";
       const socioB = state.config.socioB || "Sócio B";
 
+      // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      const investimentoA = obra?.investimentoA || 0;
+      const investimentoB = obra?.investimentoB || 0;
+
       // 1. RECEBIMENTOS
       let recebeuFisicamenteA = 0; // Quanto A recebeu fisicamente
       let recebeuFisicamenteB = 0; // Quanto B recebeu fisicamente
@@ -3735,12 +4065,18 @@
       const diferencaGastosA = pagouA - deveGastarA;
       const diferencaGastosB = pagouB - deveGastarB;
 
-      // 5. SALDO BRUTO (antes de acertos)
+      // 5. SALDO BRUTO (antes de acertos e investimentos iniciais)
       // Combina: (quanto deve repassar de recebimentos) + (quanto deve receber de gastos)
       // Se deveRepassarA é positivo (recebeu mais), diminui o saldo
       // Se diferencaGastosA é positivo (pagou mais), aumenta o saldo
       let saldoBrutoA = diferencaGastosA - deveRepassarA;
       let saldoBrutoB = diferencaGastosB - deveRepassarB;
+
+      // 5.1 ADICIONAR INVESTIMENTOS INICIAIS
+      // Se A investiu mais no início (ex: sinal do terreno), B deve compensar
+      const diferencaInvestimento = investimentoA - investimentoB;
+      saldoBrutoA += diferencaInvestimento;  // Se A investiu mais, aumenta seu saldo
+      saldoBrutoB -= diferencaInvestimento;  // Se A investiu mais, diminui saldo de B
 
       // 6. APLICAR ACERTOS (transferências entre sócios)
       let saldoFinalA = saldoBrutoA;
@@ -3766,6 +4102,8 @@
       return {
         socioA,
         socioB,
+        investimentoA,
+        investimentoB,
         recebeuA: recebeuFisicamenteA,
         recebeuB: recebeuFisicamenteB,
         temDireitoA,
