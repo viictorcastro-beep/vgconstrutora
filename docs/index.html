@@ -1357,25 +1357,43 @@
         .sort((a, b) => b.custoM2 - a.custoM2);
 
       if (unidadesComCusto.length === 0) {
-        $("custo-m2-section").innerHTML = "";
+        $("custo-m2-section").innerHTML = '<div class="card p-6 mb-6"><p class="text-sm muted">Configure a área (m²) das unidades em <b>🏠 Unidades</b></p></div>';
         return;
       }
+
+      const totalCusto = unidadesComCusto.reduce((sum, item) => sum + item.custo, 0);
+      const totalArea = unidadesComCusto.reduce((sum, item) => sum + item.areaTotal, 0);
+      const custoM2Medio = totalArea > 0 ? totalCusto / totalArea : 0;
 
       const html = `
         <div class="card p-6 mb-6">
           <div class="font-black text-lg mb-4">📐 Custo por m² / Unidade</div>
+          
+          ${totalArea > 0 ? `
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div class="text-sm muted mb-1">💰 Custo Total da Obra</div>
+              <div class="text-2xl font-black text-blue-600">R$ ${totalCusto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              <div class="text-sm muted mt-2">
+                📏 Área Total: ${totalArea.toFixed(2)} m² | 
+                📊 Custo Médio: R$ ${custoM2Medio.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}/m²
+              </div>
+            </div>
+          ` : ''}
+          
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             ${unidadesComCusto.map(item => `
               <div class="border rounded-lg p-4">
                 <h4 class="font-bold text-gray-800 mb-2">${escapeHtml(item.unidade.nome)}</h4>
                 <div class="space-y-1 text-sm">
                   <p><span class="muted">Custo Total:</span> <span class="font-bold">R$ ${item.custo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></p>
-                  <p><span class="muted">Área:</span> ${item.areaTotal.toFixed(2)} m²</p>
-                  <p><span class="muted">Custo/m²:</span> <span class="font-bold text-blue-600">R$ ${item.custoM2.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></p>
+                  <p><span class="muted">Área:</span> ${item.areaTotal > 0 ? item.areaTotal.toFixed(2) + ' m²' : '<span class="text-red-600">Não configurada</span>'}</p>
+                  <p><span class="muted">Custo/m²:</span> ${item.areaTotal > 0 ? `<span class="font-bold text-blue-600">R$ ${item.custoM2.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>` : '<span class="muted">-</span>'}</p>
                 </div>
               </div>
             `).join('')}
           </div>
+          
+          ${totalArea === 0 ? '<p class="text-xs muted mt-4 text-center">💡 Dica: Configure a área (m²) de cada unidade em <b>🏠 Unidades</b> para ver o custo por m²</p>' : ''}
         </div>
       `;
 
@@ -2603,62 +2621,64 @@
     }
 
     function computeEqualizacao() {
-      const pagamentosA = {};
-      const pagamentosB = {};
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
 
-      state.unidades.forEach(u => {
-        pagamentosA[u.id] = 0;
-        pagamentosB[u.id] = 0;
-      });
+      // Calcular quanto cada um pagou
+      let pagouA = 0;
+      let pagouB = 0;
 
       state.lancamentos.forEach(l => {
-        const metade = l.valor / 2;
         if (l.pagador === "A") {
-          pagamentosA[l.unidadeId] = (pagamentosA[l.unidadeId] || 0) + l.valor;
-          pagamentosA[l.unidadeId] -= metade;
-          pagamentosB[l.unidadeId] = (pagamentosB[l.unidadeId] || 0) - metade;
+          pagouA += l.valor;
         } else {
-          pagamentosB[l.unidadeId] = (pagamentosB[l.unidadeId] || 0) + l.valor;
-          pagamentosB[l.unidadeId] -= metade;
-          pagamentosA[l.unidadeId] = (pagamentosA[l.unidadeId] || 0) - metade;
+          pagouB += l.valor;
         }
       });
 
       state.rateios.forEach(r => {
-        r.distribuicao?.forEach(d => {
-          const metade = d.valor / 2;
-          pagamentosA[d.unidadeId] = (pagamentosA[d.unidadeId] || 0) - metade;
-          pagamentosB[d.unidadeId] = (pagamentosB[d.unidadeId] || 0) - metade;
-        });
-      });
-
-      state.acertos.forEach(a => {
-        if (a.de === "A" && a.para === "B") {
-          Object.keys(pagamentosA).forEach(uid => {
-            pagamentosA[uid] -= a.valor / state.unidades.length;
-            pagamentosB[uid] += a.valor / state.unidades.length;
-          });
-        } else if (a.de === "B" && a.para === "A") {
-          Object.keys(pagamentosA).forEach(uid => {
-            pagamentosA[uid] += a.valor / state.unidades.length;
-            pagamentosB[uid] -= a.valor / state.unidades.length;
-          });
+        const totalRateio = r.distribuicao?.reduce((sum, d) => sum + d.valor, 0) || 0;
+        if (r.pagador === "A") {
+          pagouA += totalRateio;
+        } else {
+          pagouB += totalRateio;
         }
       });
 
-      const saldoA = Object.values(pagamentosA).reduce((sum, v) => sum + v, 0);
-      const saldoB = Object.values(pagamentosB).reduce((sum, v) => sum + v, 0);
+      // Total de gastos
+      const totalGasto = pagouA + pagouB;
 
-      const socioA = state.config.socioA || "Sócio A";
-      const socioB = state.config.socioB || "Sócio B";
+      // Cada um deveria pagar metade
+      const deveA = totalGasto / 2;
+      const deveB = totalGasto / 2;
 
+      // Saldo antes dos acertos
+      let saldoA = pagouA - deveA;  // Se positivo, A pagou a mais
+      let saldoB = pagouB - deveB;  // Se positivo, B pagou a mais
+
+      // Aplicar acertos (transferências entre sócios)
+      state.acertos.forEach(a => {
+        if (a.de === "A" && a.para === "B") {
+          // A transferiu dinheiro para B
+          saldoA -= a.valor;  // A diminui saldo (deu dinheiro)
+          saldoB += a.valor;  // B aumenta saldo (recebeu dinheiro)
+        } else if (a.de === "B" && a.para === "A") {
+          // B transferiu dinheiro para A
+          saldoB -= a.valor;
+          saldoA += a.valor;
+        }
+      });
+
+      // Resultado final
       if (Math.abs(saldoA) < 1 && Math.abs(saldoB) < 1) {
         return null;
       }
 
       if (saldoA > 0) {
+        // A pagou a mais, então B deve para A
         return `${socioB} deve R$ ${Math.abs(saldoA).toFixed(2)} para ${socioA}`;
       } else {
+        // A pagou a menos, então A deve para B
         return `${socioA} deve R$ ${Math.abs(saldoA).toFixed(2)} para ${socioB}`;
       }
     }
