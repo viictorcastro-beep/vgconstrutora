@@ -1700,9 +1700,16 @@
     };
 
     // RENDER
+    let rerenderTimer = null;
     function rerender() {
       console.log("🔄 rerender() chamado | VIEW atual:", VIEW, "| OBRA_ID:", OBRA_ID);
       
+      // Debounce: só renderiza depois que parar de receber chamadas por 50ms
+      if (rerenderTimer) clearTimeout(rerenderTimer);
+      rerenderTimer = setTimeout(_doRender, 50);
+    }
+    
+    function _doRender() {
       if (!state.user) return;
 
       // Update view buttons
@@ -1737,7 +1744,7 @@
       if (!OBRA_ID) {
         showToast('Selecione uma obra primeiro', 'warning');
         VIEW = "OBRAS";
-        rerender();
+        _doRender(); // Mudado de rerender() para evitar loop
         return;
       }
 
