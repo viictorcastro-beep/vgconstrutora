@@ -602,10 +602,18 @@
     };
 
     // Initialize
+    console.log("🔥 Inicializando Firebase...");
+    console.log("Project ID:", firebaseConfig.projectId);
+    console.log("Auth Domain:", firebaseConfig.authDomain);
+    
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
+    
+    console.log("✓ Firebase inicializado");
+    console.log("✓ Auth configurado");
+    console.log("✓ Firestore configurado");
 
     // Whitelist
     const ALLOWED_EMAILS = ["viictor.castro@gmail.com", "gcm.conceicao@gmail.com"];
@@ -835,7 +843,10 @@
       let msg = "";
       let debugInfo = "";
       
-      if (err.code === "auth/unauthorized-domain") {
+      if (err.code === "auth/api-key-not-valid.-please-pass-a-valid-api-key.") {
+        msg = "⚠️ API Key inválida. Problema de configuração do Firebase.";
+        debugInfo = "A API key precisa ser verificada no Firebase Console > Project Settings > General";
+      } else if (err.code === "auth/unauthorized-domain") {
         msg = "⚠️ Domínio não autorizado no Firebase.";
         debugInfo = `Adicione "${window.location.hostname}" em Authentication > Settings`;
       } else if (err.code === "auth/operation-not-allowed") {
