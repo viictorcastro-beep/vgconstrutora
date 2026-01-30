@@ -1697,6 +1697,8 @@
 
     // RENDER
     function rerender() {
+      console.log("🔄 rerender() chamado | VIEW atual:", VIEW, "| OBRA_ID:", OBRA_ID);
+      
       if (!state.user) return;
 
       // Update view buttons
