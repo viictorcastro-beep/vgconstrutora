@@ -1939,26 +1939,37 @@
         };
 
         try {
+          console.log(`📊 Processando obra: ${obra.nome} (ID: ${obra.id})`);
+          
           // Carregar unidades da obra
           const unidadesSnap = await getDocs(collection(db, "obras", obra.id, "unidades"));
           const unidades = unidadesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          console.log(`  📦 ${unidades.length} unidades encontradas`);
 
           // Carregar lançamentos (custos)
           const lancamentosSnap = await getDocs(collection(db, "obras", obra.id, "lancamentos"));
           const lancamentos = lancamentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          console.log(`  💳 ${lancamentos.length} lançamentos encontrados`);
 
           // Carregar rateios
           const rateiosSnap = await getDocs(collection(db, "obras", obra.id, "rateios"));
           const rateios = rateiosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          console.log(`  ⚖️ ${rateios.length} rateios encontrados`);
 
           // Carregar recebimentos (receitas)
           const recebimentosSnap = await getDocs(collection(db, "obras", obra.id, "recebimentos"));
           const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          console.log(`  💰 ${recebimentos.length} recebimentos encontrados`);
 
           // Processar cada unidade
           unidades.forEach(unidade => {
             const proprietarioId = unidade.proprietario;
-            if (!proprietarioId || !balancoPorSocio[proprietarioId]) return;
+            console.log(`    🏠 Unidade: ${unidade.nome}, Proprietário ID: ${proprietarioId}`);
+            
+            if (!proprietarioId || !balancoPorSocio[proprietarioId]) {
+              console.log(`      ⚠️ Proprietário não encontrado ou inválido`);
+              return;
+            }
 
             let custoUnidade = 0;
             let receitaUnidade = 0;
@@ -1967,6 +1978,7 @@
             lancamentos.forEach(l => {
               if (l.unidadeId === unidade.id) {
                 custoUnidade += l.valor || 0;
+                console.log(`      💳 Lançamento: R$ ${l.valor}`);
               }
             });
 
@@ -1985,11 +1997,14 @@
             recebimentos.forEach(rec => {
               if (rec.unidadeId === unidade.id) {
                 receitaUnidade += rec.valor || 0;
+                console.log(`      💰 Recebimento: R$ ${rec.valor}`);
               }
             });
 
             // VGV previsto da unidade
             const vgvUnidade = unidade.vgv || 0;
+            
+            console.log(`      📊 Total unidade - Custos: R$ ${custoUnidade}, Receitas: R$ ${receitaUnidade}, VGV: R$ ${vgvUnidade}`);
             
             // Acumular no sócio
             balancoPorSocio[proprietarioId].totalInvestido += custoUnidade;
