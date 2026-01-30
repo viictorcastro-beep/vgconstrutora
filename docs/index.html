@@ -1619,7 +1619,7 @@
       rerender();
     }
 
-    function switchObra() {
+    window.switchObra = function() {
       OBRA_ID = $("obra-select").value;
       if (OBRA_ID) {
         // Verificar acesso
@@ -1635,7 +1635,7 @@
         localStorage.setItem("obraId", OBRA_ID);
         subscribeObra();
       }
-    }
+    };
 
     // RENDER
     function rerender() {
