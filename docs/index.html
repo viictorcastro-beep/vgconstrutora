@@ -467,15 +467,27 @@
             <div class="font-black text-lg mb-4">💸 Deduções de Lucro</div>
             <div class="text-xs muted mb-3">Impostos, taxas e outras deduções que reduzem o lucro</div>
             
-            <div class="grid grid-cols-12 gap-2 mb-3">
-              <div class="col-span-7">
-                <input id="ded-nome" type="text" class="input text-sm" placeholder="Ex: INSS" />
+            <div class="space-y-2 mb-3">
+              <input id="ded-nome" type="text" class="input text-sm" placeholder="Ex: IR, INSS, Corretagem" />
+              
+              <div class="grid grid-cols-2 gap-2">
+                <select id="ded-tipo" class="input text-sm">
+                  <option value="percentual">Percentual (%)</option>
+                  <option value="fixo">Valor Fixo (R$)</option>
+                </select>
+                <select id="ded-base" class="input text-sm">
+                  <option value="lucro">Sobre Lucro Bruto</option>
+                  <option value="vgv">Sobre VGV</option>
+                </select>
               </div>
-              <div class="col-span-3">
-                <input id="ded-percent" type="number" step="0.01" class="input text-sm" placeholder="11.00" />
-              </div>
-              <div class="col-span-2">
-                <button id="ded-create" class="btn btn-dark w-full text-sm">+</button>
+              
+              <div class="grid grid-cols-12 gap-2">
+                <div class="col-span-10">
+                  <input id="ded-valor" type="number" step="0.01" class="input text-sm" placeholder="Ex: 15.00" />
+                </div>
+                <div class="col-span-2">
+                  <button id="ded-create" class="btn btn-dark w-full text-sm">+</button>
+                </div>
               </div>
             </div>
             
@@ -1383,7 +1395,7 @@
           <div class="text-xs muted mt-4">
             <div class="font-bold mb-2">Deduções aplicadas:</div>
             ${lucroData.deducoes.map(d => `
-              <div>• ${escapeHtml(d.nome)}: ${d.percentual.toFixed(2)}% = R$ ${d.valorDeducao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              <div>• ${escapeHtml(d.nome)}: ${d.displayTipo} sobre ${d.displayBase} = R$ ${d.valorDeducao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
             `).join('')}
           </div>
         `;
@@ -1662,12 +1674,24 @@
         return;
       }
 
-      const html = state.deducoes.map(d => `
-        <div class="flex justify-between items-center p-2 border rounded">
-          <span>${escapeHtml(d.nome)} — ${d.percentual.toFixed(2)}%</span>
-          <button onclick="window.deleteDeducao('${d.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
-        </div>
-      `).join('');
+      const html = state.deducoes.map(d => {
+        const tipo = d.tipo || 'percentual';
+        const base = d.base || 'lucro';
+        const valor = d.valor || d.percentual || 0;
+        
+        let displayValor = tipo === 'percentual' ? `${valor.toFixed(2)}%` : `R$ ${valor.toFixed(2)}`;
+        let displayBase = base === 'lucro' ? 'Lucro Bruto' : 'VGV';
+        
+        return `
+          <div class="flex justify-between items-center p-2 border rounded">
+            <div class="flex-1">
+              <div class="font-bold text-sm">${escapeHtml(d.nome)}</div>
+              <div class="text-xs muted">${displayValor} sobre ${displayBase}</div>
+            </div>
+            <button onclick="window.deleteDeducao('${d.id}')" class="text-red-600 hover:underline text-sm ml-2">🗑️</button>
+          </div>
+        `;
+      }).join('');
 
       container.innerHTML = html;
     }
@@ -1867,21 +1891,27 @@
 
     async function createDeducao() {
       const nome = $("ded-nome").value.trim();
-      const percentual = parseFloat($("ded-percent").value);
+      const tipo = $("ded-tipo").value;
+      const base = $("ded-base").value;
+      const valor = parseFloat($("ded-valor").value);
 
-      if (!nome || !percentual) {
-        showToast('Preencha nome e percentual', 'warning');
+      if (!nome || !valor || valor <= 0) {
+        showToast('Preencha todos os campos corretamente', 'warning');
         return;
       }
 
       try {
         await addDoc(refs(OBRA_ID).deducoesCol, {
           nome,
-          percentual,
+          tipo,
+          base,
+          valor,
+          // Manter compatibilidade com dados antigos
+          percentual: tipo === 'percentual' ? valor : 0,
           createdAt: serverTimestamp()
         });
         $("ded-nome").value = "";
-        $("ded-percent").value = "";
+        $("ded-valor").value = "";
         showToast('Dedução criada com sucesso!', 'success');
       } catch (err) {
         console.error(err);
@@ -2303,10 +2333,29 @@
 
       let valorDeducoes = 0;
       const deducoesAplicadas = [];
+      
       state.deducoes.forEach(d => {
-        const valor = (d.percentual / 100) * lucroBruto;
-        valorDeducoes += valor;
-        deducoesAplicadas.push({ ...d, valorDeducao: valor });
+        let valorDeducao = 0;
+        const tipo = d.tipo || 'percentual';
+        const base = d.base || 'lucro';
+        const valor = d.valor || d.percentual || 0;
+        
+        if (tipo === 'percentual') {
+          // Aplica percentual sobre a base escolhida
+          const baseCalculo = base === 'vgv' ? vgvTotal : lucroBruto;
+          valorDeducao = (valor / 100) * baseCalculo;
+        } else {
+          // Valor fixo
+          valorDeducao = valor;
+        }
+        
+        valorDeducoes += valorDeducao;
+        deducoesAplicadas.push({ 
+          ...d, 
+          valorDeducao,
+          displayTipo: tipo === 'percentual' ? `${valor.toFixed(2)}%` : `R$ ${valor.toFixed(2)}`,
+          displayBase: base === 'lucro' ? 'Lucro Bruto' : 'VGV'
+        });
       });
 
       const lucroLiquido = lucroBruto - valorDeducoes;
