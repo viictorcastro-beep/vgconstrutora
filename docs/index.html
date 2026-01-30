@@ -159,6 +159,7 @@
       </div>
       <div class="flex items-center gap-4">
         <button id="menu-obras" class="btn btn-soft text-sm">Obras</button>
+        <button id="menu-socios" class="btn btn-soft text-sm" onclick="window.gerenciarSocios()" title="Gerenciar Sócios (Admin)">👔 Sócios</button>
         <button id="menu-unidades" class="btn btn-soft text-sm">Unidades</button>
         <button id="menu-fornecedores" class="btn btn-soft text-sm">Fornecedores</button>
         <button id="menu-categorias" class="btn btn-soft text-sm">Categorias</button>
@@ -758,6 +759,40 @@
     </div>
   </div>
 
+  <!-- Modal: Gestão de Sócios (ADMIN ONLY) -->
+  <div id="modal-socios" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="font-black text-xl">👔 Gestão de Sócios</div>
+          <div class="text-sm text-gray-600 mt-1">Configure os sócios que participam dos projetos</div>
+        </div>
+        <button data-close="modal-socios" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <!-- Adicionar Sócio -->
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+        <div class="font-bold text-green-900 mb-3">➕ Adicionar Novo Sócio</div>
+        <form id="form-add-socio" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">Nome do Sócio</div>
+            <input id="add-socio-nome" type="text" class="input" placeholder="Ex: Victor Castro" required />
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">&nbsp;</div>
+            <button type="submit" class="btn btn-green w-full">Adicionar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Lista de Sócios -->
+      <div>
+        <div class="font-bold text-gray-800 mb-3">Sócios Cadastrados</div>
+        <div id="lista-socios" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Gestão de Usuários da Obra (ADMIN ONLY) -->
   <div id="modal-usuarios" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
     <div class="card p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1110,6 +1145,7 @@
     const state = {
       user: null,
       obras: [],
+      socios: [],  // Lista de sócios personalizados
       unidades: [],
       categorias: [],
       fornecedores: [],
@@ -1170,6 +1206,7 @@
     function refs(obraId) {
       return {
         obrasCol: collection(db, "obras"),
+        sociosCol: collection(db, "socios"),  // Coleção global de sócios
         obraDoc: doc(db, "obras", obraId),
         unidadesCol: collection(db, "obras", obraId, "unidades"),
         categoriasCol: collection(db, "obras", obraId, "categorias"),
@@ -1203,6 +1240,7 @@
         $("login-screen").classList.add("hidden");
         $("app").classList.remove("hidden");
         
+        subscribeSocios();
         subscribeObrasList();
         setupEventListeners();
         
@@ -1438,6 +1476,18 @@
     }
 
     // SUBSCRIPTIONS
+    function subscribeSocios() {
+      const r = refs("dummy").sociosCol;
+      listeners.push(onSnapshot(r, (snap) => {
+        state.socios = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.nome.localeCompare(b.nome));
+        console.log("👔 Sócios carregados:", state.socios.length);
+        hydrateSociosSelect();
+        renderListaSocios();
+      }, (err) => {
+        console.error("❌ Erro ao carregar sócios:", err);
+      }));
+    }
+
     function subscribeObrasList() {
       const r = refs("dummy").obrasCol;
       listeners.push(onSnapshot(r, (snap) => {
@@ -1878,6 +1928,108 @@
       }
     };
 
+    // GESTÃO DE SÓCIOS (ADMIN ONLY)
+    window.gerenciarSocios = () => {
+      if (!isAdmin()) {
+        showToast('❌ Apenas administradores podem gerenciar sócios', 'error');
+        return;
+      }
+      
+      renderListaSocios();
+      openModal("modal-socios");
+    };
+
+    function renderListaSocios() {
+      if (!$("lista-socios")) return;
+      
+      if (state.socios.length === 0) {
+        $("lista-socios").innerHTML = `
+          <div class="text-center text-gray-500 py-8">
+            <div class="text-4xl mb-2">👔</div>
+            <p>Nenhum sócio cadastrado ainda</p>
+            <p class="text-sm mt-1">Adicione sócios acima para usar no sistema</p>
+          </div>
+        `;
+        return;
+      }
+
+      const html = state.socios.map((s, idx) => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <div class="flex-1">
+            <div class="font-bold text-gray-800">${escapeHtml(s.nome)}</div>
+            <div class="text-sm text-gray-600">ID: ${s.id}</div>
+          </div>
+          <button onclick="window.removerSocio('${s.id}')" class="btn btn-danger text-sm">
+            🗑️ Remover
+          </button>
+        </div>
+      `).join('');
+
+      $("lista-socios").innerHTML = html;
+    }
+
+    function hydrateSociosSelect() {
+      const select = $("add-usuario-socio");
+      if (!select) return;
+      
+      if (state.socios.length === 0) {
+        select.innerHTML = '<option value="">Cadastre sócios primeiro (⚙️ Config)</option>';
+        return;
+      }
+
+      select.innerHTML = `
+        <option value="">Selecione...</option>
+        ${state.socios.map(s => `<option value="${s.id}">${escapeHtml(s.nome)}</option>`).join('')}
+      `;
+    }
+
+    window.removerSocio = async (socioId) => {
+      if (!isAdmin()) return;
+
+      const socio = state.socios.find(s => s.id === socioId);
+      if (!socio) return;
+
+      if (!confirm(`Remover o sócio "${socio.nome}"?\n\nAtenção: Usuários vinculados a este sócio perderão a referência.`)) return;
+
+      try {
+        await deleteDoc(doc(db, "socios", socioId));
+        showToast('Sócio removido com sucesso!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao remover sócio', 'error');
+      }
+    };
+
+    $("form-add-socio").onsubmit = async (e) => {
+      e.preventDefault();
+      
+      if (!isAdmin()) {
+        showToast('❌ Apenas administradores podem adicionar sócios', 'error');
+        return;
+      }
+
+      const nome = $("add-socio-nome").value.trim();
+
+      if (!nome) {
+        showToast('Preencha o nome do sócio', 'warning');
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "socios"), {
+          nome: nome,
+          createdAt: serverTimestamp(),
+          createdBy: state.user.email
+        });
+
+        $("form-add-socio").reset();
+        showToast(`✅ Sócio "${nome}" adicionado com sucesso!`, 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao adicionar sócio', 'error');
+      }
+    };
+
     // GESTÃO DE USUÁRIOS (ADMIN ONLY)
     let CURRENT_OBRA_USUARIOS = null;
 
@@ -1910,17 +2062,22 @@
         return;
       }
 
-      const html = usuarios.map((u, idx) => `
+      const html = usuarios.map((u, idx) => {
+        const socio = state.socios.find(s => s.id === u.socioId);
+        const socioNome = socio ? socio.nome : `Sócio ${u.socioId}`;
+        
+        return `
         <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
           <div class="flex-1">
             <div class="font-bold text-gray-800">${escapeHtml(u.email)}</div>
-            <div class="text-sm text-gray-600">Sócio ${u.socioId} • ${u.role || 'socio'}</div>
+            <div class="text-sm text-gray-600">${escapeHtml(socioNome)} • ${u.role || 'socio'}</div>
           </div>
           <button onclick="window.removerUsuario(${idx})" class="btn btn-danger text-sm">
             🗑️ Remover
           </button>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       $("lista-usuarios").innerHTML = html;
     }
