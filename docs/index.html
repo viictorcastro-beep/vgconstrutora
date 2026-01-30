@@ -1494,11 +1494,21 @@
         console.log("📊 Total de obras no Firestore:", snap.size);
         const todasObras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         
-        console.log("🔍 Todas as obras:", todasObras.map(o => ({
-          id: o.id,
-          nome: o.nome,
-          temUsuarios: !!(o.usuarios && o.usuarios.length > 0)
-        })));
+        console.log("🔍 TODAS as obras no banco (inclui ID completo):");
+        todasObras.forEach(o => {
+          console.log("  -", o.nome || "SEM NOME", "| ID:", o.id, "| Tem usuários:", !!(o.usuarios && o.usuarios.length > 0));
+        });
+        
+        console.log("🔍 Procurando por 'qd61' ou 'lt32':");
+        const obrasProcuradas = todasObras.filter(o => 
+          (o.nome && (o.nome.toLowerCase().includes('qd61') || o.nome.toLowerCase().includes('lt32'))) ||
+          (o.id && (o.id.toLowerCase().includes('qd61') || o.id.toLowerCase().includes('lt32')))
+        );
+        if (obrasProcuradas.length > 0) {
+          console.log("✅ Encontradas:", obrasProcuradas);
+        } else {
+          console.log("❌ NÃO ENCONTRADA - obra qd61 lt32 não existe no banco");
+        }
         
         // Filtrar obras baseado em permissões
         if (isAdmin()) {
@@ -1517,6 +1527,19 @@
         }
         
         console.log("✅ Obras disponíveis:", state.obras.map(o => o.nome));
+        
+        // Verificar se a obra atualmente selecionada ainda está disponível
+        if (OBRA_ID) {
+          const obraAtual = state.obras.find(o => o.id === OBRA_ID);
+          if (!obraAtual) {
+            console.warn("⚠️ Obra selecionada (" + OBRA_ID + ") não está mais disponível");
+            OBRA_ID = null;
+            localStorage.removeItem("obraId");
+          } else {
+            console.log("✓ Obra selecionada ainda disponível:", obraAtual.nome);
+          }
+        }
+        
         hydrateObrasSelect();
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
