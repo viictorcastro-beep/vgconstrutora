@@ -42,11 +42,24 @@
 
   <!-- LOGIN -->
   <div id="login-screen" class="min-h-screen flex items-center justify-center p-6">
-    <div class="card p-8 max-w-sm w-full text-center">
+    <div class="card p-8 max-w-md w-full text-center">
       <h1 class="text-2xl font-black mb-2">VG CONSTRUTORA</h1>
       <p class="text-sm muted mb-5">Sistema único • Multi-obras • Multi-casas • Sócios • Rateio • Lucro previsto</p>
-      <button id="login-btn" class="btn btn-dark w-full">Entrar com Google</button>
-      <p id="login-msg" class="text-xs text-red-600 mt-4 h-4"></p>
+      
+      <button id="login-btn" class="btn btn-dark w-full mb-2">
+        <span id="login-btn-text">Entrar com Google</span>
+      </button>
+      
+      <button id="login-redirect-btn" class="btn btn-soft w-full text-xs">
+        Entrar (método alternativo)
+      </button>
+      
+      <p id="login-msg" class="text-xs text-red-600 mt-4 min-h-[16px]"></p>
+      
+      <div id="debug-info" class="mt-4 text-xs muted text-left p-2 bg-slate-100 rounded hidden">
+        <div class="font-bold mb-1">Debug Info:</div>
+        <div id="debug-content"></div>
+      </div>
     </div>
   </div>
 
@@ -515,7 +528,8 @@
       onSnapshot, query, orderBy, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
     import {
-      getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
+      getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, 
+      getRedirectResult, onAuthStateChanged, signOut
     } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
     // ✅ Seu Firebase Config (já preenchido)
@@ -711,19 +725,47 @@
       $("rat-save").onclick = () => { addRateio(); };
 
       $("login-btn").onclick = () => {
-        $("login-msg").textContent = "Aguarde...";
-        signInWithPopup(auth, provider).catch(err => {
-          console.error("Erro de login:", err);
-          if (err.code === "auth/unauthorized-domain") {
-            $("login-msg").textContent = "⚠️ Domínio não autorizado. Adicione o domínio nas configurações do Firebase (Authentication > Settings > Authorized domains).";
-          } else if (err.code === "auth/popup-blocked") {
-            $("login-msg").textContent = "⚠️ Popup bloqueado. Permita popups para este site.";
-          } else if (err.code === "auth/popup-closed-by-user") {
-            $("login-msg").textContent = "Login cancelado.";
-          } else {
-            $("login-msg").textContent = `Erro: ${err.code || err.message}`;
-          }
-        });
+        $("login-btn-text").textContent = "Conectando...";
+        $("login-msg").textContent = "";
+        
+        signInWithPopup(auth, provider)
+          .then(() => {
+            $("login-msg").textContent = "✓ Login realizado!";
+            $("login-msg").className = "text-xs text-green-600 mt-4 min-h-[16px]";
+          })
+          .catch(err => {
+            $("login-btn-text").textContent = "Entrar com Google";
+            console.error("Erro de login (popup):", err);
+            
+            let msg = "";
+            if (err.code === "auth/unauthorized-domain") {
+              msg = "⚠️ Domínio não autorizado no Firebase.";
+            } else if (err.code === "auth/popup-blocked") {
+              msg = "⚠️ Popup bloqueado. Use o botão alternativo abaixo.";
+            } else if (err.code === "auth/popup-closed-by-user") {
+              msg = "Login cancelado.";
+            } else if (err.code === "auth/configuration-not-found") {
+              msg = "⚠️ Google Sign-In não configurado no Firebase. Vá em Authentication > Sign-in method > Google > Enable";
+            } else {
+              msg = `Erro: ${err.code || err.message}`;
+            }
+            
+            $("login-msg").textContent = msg;
+            $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
+            
+            // Debug info
+            $("debug-content").innerHTML = `
+              <div>• Code: ${err.code || 'N/A'}</div>
+              <div>• Message: ${err.message || 'N/A'}</div>
+              <div>• Domain: ${window.location.hostname}</div>
+            `;
+            $("debug-info").classList.remove("hidden");
+          });
+      };
+
+      $("login-redirect-btn").onclick = () => {
+        $("login-msg").textContent = "Redirecionando...";
+        signInWithRedirect(auth, provider);
       };
     }
 
@@ -1487,6 +1529,8 @@
 
     // ---------- auth ----------
     onAuthStateChanged(auth, (user) => {
+      console.log("Auth state changed:", user ? user.email : "no user");
+      
       if (user && ALLOW_EMAILS.has(user.email)) {
         currentUser = user;
 
@@ -1504,13 +1548,31 @@
         if (OBRA_ID) subscribeObra();
 
       } else {
-        if (user) signOut(auth);
+        if (user) {
+          console.log("Usuário não autorizado:", user.email);
+          $("login-msg").textContent = `❌ Acesso negado para: ${user.email}`;
+          $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
+          signOut(auth);
+        }
         currentUser = null;
         unsubAll();
         $("app-wrapper").classList.add("hidden");
         $("login-screen").classList.remove("hidden");
       }
     });
+
+    // Verifica redirect result (para login alternativo)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          console.log("Login por redirect bem-sucedido:", result.user.email);
+        }
+      })
+      .catch((err) => {
+        console.error("Erro no redirect:", err);
+        $("login-msg").textContent = `Erro no redirect: ${err.code}`;
+        $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
+      });
 
   </script>
 </body>
