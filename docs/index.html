@@ -611,14 +611,19 @@
           </div>
         </div>
         
-        <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-6">
-            <div class="text-xs muted mb-1">VGV Previsto (R$)</div>
-            <input id="unid-new-vgv" type="number" step="0.01" class="input" placeholder="450000.00" />
-          </div>
-          <div class="col-span-6">
-            <div class="text-xs muted mb-1">Valor de Venda Real (R$)</div>
-            <input id="unid-new-venda" type="number" step="0.01" class="input" placeholder="Deixe vazio se não vendida" />
+        <div class="mb-3">
+          <div class="text-xs font-bold text-gray-700 mb-2">💰 Valores Financeiros</div>
+          <div class="grid grid-cols-12 gap-3">
+            <div class="col-span-6">
+              <div class="text-xs muted mb-1">VGV Previsto (R$) *</div>
+              <input id="unid-new-vgv" type="number" step="0.01" class="input" placeholder="450000.00" />
+              <div class="text-xs muted mt-1">Expectativa inicial de venda</div>
+            </div>
+            <div class="col-span-6">
+              <div class="text-xs muted mb-1">Valor Real de Venda (R$)</div>
+              <input id="unid-new-venda" type="number" step="0.01" class="input" placeholder="Preencha após vender" />
+              <div class="text-xs muted mt-1">Valor confirmado da negociação</div>
+            </div>
           </div>
         </div>
         
@@ -1929,7 +1934,10 @@
               ${u.areaConstruida ? ` | ${u.areaConstruida}m²` : ''}
             </div>
           </div>
-          <button onclick="window.deleteUnidade('${u.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
+          <div class="flex gap-2">
+            <button onclick="window.editUnidade('${u.id}')" class="text-blue-600 hover:underline text-sm">✏️ Editar</button>
+            <button onclick="window.deleteUnidade('${u.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
+          </div>
         </div>
       `).join('');
 
@@ -2416,6 +2424,62 @@
         console.error(err);
         showToast('Erro ao deletar unidade', 'error');
       }
+    };
+
+    window.editUnidade = async (id) => {
+      const unidade = state.unidades.find(u => u.id === id);
+      if (!unidade) return;
+
+      // Preencher formulário com dados atuais
+      $("unid-new-nome").value = unidade.nome || "";
+      $("unid-new-area").value = unidade.areaConstruida || "";
+      $("unid-new-status").value = unidade.status || "disponivel";
+      $("unid-new-vgv").value = unidade.vgvPrevisto || "";
+      $("unid-new-venda").value = unidade.valorVenda || "";
+
+      // Mudar botão para modo edição
+      const btn = $("unid-create");
+      btn.textContent = "💾 Salvar Alterações";
+      btn.onclick = async () => {
+        const nome = $("unid-new-nome").value.trim();
+        const area = parseFloat($("unid-new-area").value) || 0;
+        const status = $("unid-new-status").value;
+        const vgv = parseFloat($("unid-new-vgv").value) || 0;
+        const valorVenda = parseFloat($("unid-new-venda").value) || null;
+
+        if (!nome) {
+          showToast('Digite o nome da unidade', 'warning');
+          return;
+        }
+
+        try {
+          await updateDoc(doc(db, "obras", OBRA_ID, "unidades", id), {
+            nome,
+            areaConstruida: area,
+            status,
+            vgvPrevisto: vgv,
+            valorVenda,
+            updatedAt: serverTimestamp()
+          });
+          
+          // Resetar formulário e botão
+          $("unid-new-nome").value = "";
+          $("unid-new-area").value = "";
+          $("unid-new-vgv").value = "";
+          $("unid-new-venda").value = "";
+          btn.textContent = "Criar Unidade";
+          btn.onclick = createUnidade;
+          
+          showToast('Unidade atualizada com sucesso!', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao atualizar unidade', 'error');
+        }
+      };
+
+      // Scroll para o formulário
+      $("unid-new-nome").scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $("unid-new-nome").focus();
     };
 
     window.deleteFornecedor = async (id) => {
