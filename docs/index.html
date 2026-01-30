@@ -4361,13 +4361,20 @@
 
     // MODALS
     function openModal(id) {
+      console.log("🔓 Abrindo modal:", id);
       $(id).classList.remove("hidden");
       $(id).classList.add("flex");
       
       // Renderizar conteúdo específico do modal quando abrir
       if (id === "modal-obra") {
-        renderObrasModal();
-        resetarModalObra();
+        console.log("  📋 Chamando renderObrasModal...");
+        try {
+          renderObrasModal();
+          resetarModalObra();
+          console.log("  ✅ Modal renderizado com sucesso");
+        } catch (err) {
+          console.error("  ❌ Erro ao renderizar modal:", err);
+        }
       }
     }
 
