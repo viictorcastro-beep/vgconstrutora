@@ -4363,6 +4363,12 @@
     function openModal(id) {
       $(id).classList.remove("hidden");
       $(id).classList.add("flex");
+      
+      // Renderizar conteúdo específico do modal quando abrir
+      if (id === "modal-obra") {
+        renderObrasModal();
+        resetarModalObra();
+      }
     }
 
     function closeModal(id) {
