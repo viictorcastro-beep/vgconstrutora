@@ -1625,57 +1625,68 @@
     function subscribeObra() {
       if (!OBRA_ID) return;
       
-      // Clear previous listeners
+      // Clear previous listeners (except obras list listener at index 0)
       while (listeners.length > 1) {
         const unsub = listeners.pop();
         unsub();
       }
 
       const r = refs(OBRA_ID);
+      
+      // Usar flag para evitar múltiplas renderizações simultâneas
+      let batchUpdate = false;
+      const scheduleRerender = () => {
+        if (batchUpdate) return;
+        batchUpdate = true;
+        setTimeout(() => {
+          batchUpdate = false;
+          rerender();
+        }, 100);
+      };
 
       listeners.push(onSnapshot(r.unidadesCol, (snap) => {
         state.unidades = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.categoriasCol, (snap) => {
         state.categorias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.fornecedoresCol, (snap) => {
         state.fornecedores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.deducoesCol, (snap) => {
         state.deducoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.lancamentosCol, (snap) => {
         state.lancamentos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.rateiosCol, (snap) => {
         state.rateios = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.recebimentosCol, (snap) => {
         state.recebimentos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.acertosCol, (snap) => {
         state.acertos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rerender();
+        scheduleRerender();
       }));
 
       listeners.push(onSnapshot(r.configDoc, (snap) => {
         state.config = snap.exists() ? snap.data() : {};
-        rerender();
+        scheduleRerender();
       }));
 
       rerender();
@@ -1700,16 +1711,7 @@
     };
 
     // RENDER
-    let rerenderTimer = null;
     function rerender() {
-      console.log("🔄 rerender() chamado | VIEW atual:", VIEW, "| OBRA_ID:", OBRA_ID);
-      
-      // Debounce: só renderiza depois que parar de receber chamadas por 50ms
-      if (rerenderTimer) clearTimeout(rerenderTimer);
-      rerenderTimer = setTimeout(_doRender, 50);
-    }
-    
-    function _doRender() {
       if (!state.user) return;
 
       // Update view buttons
@@ -1744,7 +1746,7 @@
       if (!OBRA_ID) {
         showToast('Selecione uma obra primeiro', 'warning');
         VIEW = "OBRAS";
-        _doRender(); // Mudado de rerender() para evitar loop
+        rerender();
         return;
       }
 
@@ -2107,9 +2109,6 @@
     }
 
     function renderObrasLista() {
-      console.log("🏗️ renderObrasLista chamado. Total de obras:", state.obras.length);
-      console.log("📋 Obras:", state.obras.map(o => o.nome));
-      
       if (state.obras.length === 0) {
         $("obras-lista").innerHTML = `
           <div class="col-span-2 text-center py-12">
