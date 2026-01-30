@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>VG CONSTRUTORA — Gestor de Obras</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    body { background:#f1f5f9; }
+    .hidden { display:none !important; }
+    .modal { background: rgba(0,0,0,.55); }
+    .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background:#e2e8f0; }
+    .btn { border-radius: 12px; font-weight: 700; padding: 10px 14px; }
+    .btn-dark { background:#0f172a; color:white; }
+    .btn-dark:hover { background:#334155; }
+    .btn-danger { background:#dc2626; color:white; }
+    .btn-danger:hover { background:#b91c1c; }
+    .btn-soft { background:#e2e8f0; color:#0f172a; }
+    .btn-soft:hover { background:#cbd5e1; }
+    .btn-green { background:#059669; color:white; }
+    .btn-green:hover { background:#047857; }
+    .btn-indigo { background:#4f46e5; color:white; }
+    .btn-indigo:hover { background:#4338ca; }
+    .muted { color:#64748b; }
+    .card { background:white; border-radius: 18px; box-shadow: 0 10px 24px rgba(15,23,42,.08); }
+    .table th { background:#f1f5f9; font-weight:800; }
+    .table td,.table th { padding:10px; }
+    .input { border:1px solid #cbd5e1; border-radius:12px; padding:10px; width:100%; }
+    .select { border:1px solid #cbd5e1; border-radius:12px; padding:10px; width:100%; background:white; }
+    .danger { color:#dc2626; font-weight: 800; }
+    .ok { color:#059669; font-weight: 800; }
+  </style>
+</head>
+
+<body class="text-slate-800">
+
+  <!-- LOGIN -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-6">
+    <div class="card p-8 max-w-sm w-full text-center">
+      <h1 class="text-2xl font-black mb-2">VG CONSTRUTORA</h1>
+      <p class="text-sm muted mb-5">Sistema único • Multi-obras • Multi-casas • Sócios • Rateio • Lucro previsto</p>
+      <button id="login-btn" class="btn btn-dark w-full">Entrar com Google</button>
+      <p id="login-msg" class="text-xs text-red-600 mt-4 h-4"></p>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app-wrapper" class="hidden">
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+      <!-- TOP BAR -->
+      <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-[260px]">
+          <div class="flex items-center gap-2">
+            <div class="text-xl font-black">VG CONSTRUTORA</div>
+            <span class="chip">v1</span>
+          </div>
+          <div class="text-sm muted">Gestor de Obras</div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="min-w-[280px]">
+            <div class="text-xs muted mb-1">Obra ativa</div>
+            <select id="obra-select" class="select"></select>
+          </div>
+
+          <div class="min-w-[260px]">
+            <div class="text-xs muted mb-1">Visão (filtro)</div>
+            <select id="view-select" class="select"></select>
+          </div>
+
+          <button id="btn-obras" class="btn btn-soft">Obras</button>
+          <button id="btn-unidades" class="btn btn-soft">Unidades</button>
+          <button id="btn-fornecedores" class="btn btn-soft">Fornecedores</button>
+          <button id="btn-categorias" class="btn btn-soft">Categorias</button>
+          <button id="btn-lucro" class="btn btn-soft">Lucro</button>
+          <button id="btn-export" class="btn btn-indigo">PDF</button>
+
+          <div class="flex items-center gap-2 pl-2 border-l">
+            <img id="user-photo" class="w-9 h-9 rounded-full" />
+            <div class="text-xs">
+              <div id="user-name" class="font-bold"></div>
+              <div id="user-email" class="muted"></div>
+            </div>
+            <button id="logout-btn" class="btn btn-danger">Sair</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        <div class="card p-4">
+          <div class="font-black">KPIs</div>
+          <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-slate-100 rounded-2xl p-3">
+              <div class="muted">Custo (visão)</div>
+              <div id="kpi-custo" class="text-lg font-black">R$ 0,00</div>
+            </div>
+            <div class="bg-slate-100 rounded-2xl p-3">
+              <div class="muted">Lucro previsto</div>
+              <div id="kpi-lucro" class="text-lg font-black">R$ 0,00</div>
+            </div>
+            <div class="bg-slate-100 rounded-2xl p-3 col-span-2">
+              <div class="muted">Equalização (sócios)</div>
+              <div id="kpi-equal" class="text-sm font-black">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex items-center justify-between">
+            <div class="font-black">Top Categorias</div>
+            <span class="chip" id="top-cat-label">visão</span>
+          </div>
+          <div id="top-categorias" class="mt-3 space-y-2 text-sm"></div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex items-center justify-between">
+            <div class="font-black">Top Fornecedores</div>
+            <span class="chip" id="top-forn-label">visão</span>
+          </div>
+          <div id="top-fornecedores" class="mt-3 space-y-2 text-sm"></div>
+        </div>
+      </div>
+
+      <!-- SOCIOS -->
+      <div class="card p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="font-black">Sócios (por obra)</div>
+            <div class="text-sm muted">Pagador do lançamento + % de rateio por sócio. Acertos entram no cálculo.</div>
+          </div>
+          <button id="socios-save" class="btn btn-dark">Salvar</button>
+        </div>
+        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <input id="socio-a" class="input font-bold" placeholder="Sócio A" />
+          <input id="socio-b" class="input font-bold" placeholder="Sócio B" />
+        </div>
+      </div>
+
+      <!-- NOVO LANÇAMENTO -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-black text-lg">Novo Lançamento</div>
+            <div class="text-sm muted">Obra → Unidade → Categoria → Fornecedor → Pagador → % Sócios → Link do Drive</div>
+          </div>
+        </div>
+
+        <form id="lanc-form" class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-2">
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">Data</div>
+            <input id="lanc-dt" type="date" class="input" required />
+          </div>
+
+          <div class="md:col-span-4">
+            <div class="text-xs muted mb-1">Descrição</div>
+            <input id="lanc-desc" class="input" placeholder="Ex: Areia, cimento, mão de obra..." required />
+          </div>
+
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">Valor</div>
+            <input id="lanc-valor" class="input" placeholder="Ex: 1.234,56" required />
+          </div>
+
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">Unidade (onde lançar)</div>
+            <select id="lanc-unidade" class="select"></select>
+          </div>
+
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">Pagador</div>
+            <select id="lanc-pagador" class="select"></select>
+          </div>
+
+          <div class="md:col-span-3">
+            <div class="text-xs muted mb-1">Categoria (Grupo/Subgrupo)</div>
+            <select id="lanc-categoria" class="select"></select>
+          </div>
+
+          <div class="md:col-span-3">
+            <div class="text-xs muted mb-1">Fornecedor</div>
+            <select id="lanc-fornecedor" class="select"></select>
+          </div>
+
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">% Sócio A</div>
+            <input id="lanc-pa" type="number" step="0.01" min="0" max="1" value="0.5" class="input" />
+          </div>
+
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">% Sócio B</div>
+            <input id="lanc-pb" type="number" step="0.01" min="0" max="1" value="0.5" class="input" />
+          </div>
+
+          <div class="md:col-span-6">
+            <div class="text-xs muted mb-1">Comprovante (link Drive)</div>
+            <input id="lanc-link" type="url" class="input" placeholder="Cole aqui o link do comprovante no Google Drive" />
+          </div>
+
+          <div class="md:col-span-6">
+            <div class="text-xs muted mb-1">Observação</div>
+            <input id="lanc-notas" class="input" placeholder="Opcional" />
+          </div>
+
+          <div class="md:col-span-12 flex gap-2">
+            <button class="btn btn-dark">Salvar</button>
+            <button id="lanc-quick" type="button" class="btn btn-soft">Rápido (Transitório)</button>
+          </div>
+
+          <div class="md:col-span-12 text-xs muted">
+            Regra: <b>pA + pB = 1.00</b> (100%). Rateio entre casas é na seção "Rateio".
+          </div>
+        </form>
+      </div>
+
+      <!-- ACERTOS + RATEIO -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        <!-- ACERTOS -->
+        <div class="card p-4">
+          <div class="font-black text-lg">Acertos</div>
+          <div class="text-sm muted">Registra transferência entre sócios (comprovante por link do Drive).</div>
+
+          <form id="acerto-form" class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+            <div class="md:col-span-3">
+              <div class="text-xs muted mb-1">De</div>
+              <select id="acerto-de" class="select"></select>
+            </div>
+            <div class="md:col-span-3">
+              <div class="text-xs muted mb-1">Para</div>
+              <select id="acerto-para" class="select"></select>
+            </div>
+            <div class="md:col-span-3">
+              <div class="text-xs muted mb-1">Valor</div>
+              <input id="acerto-valor" class="input" placeholder="Ex: 500,00" required />
+            </div>
+            <div class="md:col-span-3">
+              <div class="text-xs muted mb-1">Comprovante (Drive)</div>
+              <input id="acerto-link" type="url" class="input" placeholder="Link" />
+            </div>
+
+            <div class="md:col-span-12 flex gap-2">
+              <button class="btn btn-green">Registrar</button>
+              <button id="acerto-sugerir" type="button" class="btn btn-soft">Sugestão</button>
+            </div>
+          </form>
+
+          <div id="balanca" class="mt-3 bg-slate-100 rounded-2xl p-3 text-sm"></div>
+
+          <div class="mt-3">
+            <div class="font-black">Histórico</div>
+            <div id="acertos-list" class="mt-2 space-y-2 text-sm"></div>
+          </div>
+        </div>
+
+        <!-- RATEIO -->
+        <div class="card p-4">
+          <div class="font-black text-lg">Rateio</div>
+          <div class="text-sm muted">Um custo feito agora (ex.: muro/material) e rateado entre várias unidades.</div>
+
+          <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+            <div class="md:col-span-5">
+              <div class="text-xs muted mb-1">Descrição</div>
+              <input id="rat-desc" class="input" placeholder="Ex: Material do muro" />
+            </div>
+            <div class="md:col-span-3">
+              <div class="text-xs muted mb-1">Valor total</div>
+              <input id="rat-valor" class="input" placeholder="Ex: 10.000,00" />
+            </div>
+            <div class="md:col-span-4">
+              <div class="text-xs muted mb-1">Origem (de onde sai)</div>
+              <select id="rat-from" class="select"></select>
+            </div>
+
+            <div class="md:col-span-12">
+              <div class="bg-slate-50 rounded-2xl p-3">
+                <div class="flex items-center justify-between">
+                  <div class="font-black">Destinos</div>
+                  <button id="rat-add-dest" class="btn btn-indigo" type="button">+ Destino</button>
+                </div>
+                <div id="rat-dests" class="mt-3 space-y-2"></div>
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+                  <div class="md:col-span-8">
+                    <div class="text-xs muted mb-1">Comprovante (Drive)</div>
+                    <input id="rat-link" type="url" class="input" placeholder="Link (opcional)" />
+                  </div>
+                  <div class="md:col-span-4 flex items-end gap-2">
+                    <div id="rat-status" class="text-sm font-black flex-1"></div>
+                    <button id="rat-save" class="btn btn-dark" type="button">Aplicar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <div class="font-black">Histórico</div>
+            <div id="rateios-list" class="mt-2 space-y-2 text-sm"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LISTA LANÇAMENTOS -->
+      <div class="card p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="font-black text-lg">Lançamentos</div>
+            <div class="text-sm muted">Filtro por visão + busca por texto, categoria, fornecedor.</div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <input id="filter-text" class="input w-[260px]" placeholder="Buscar (descrição/nota)" />
+            <select id="filter-categoria" class="select w-[240px]"></select>
+            <select id="filter-fornecedor" class="select w-[240px]"></select>
+            <button id="filters-clear" class="btn btn-soft">Limpar</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto mt-3">
+          <table class="w-full text-sm table">
+            <thead>
+              <tr>
+                <th class="text-left">Data</th>
+                <th class="text-left">Unidade</th>
+                <th class="text-left">Categoria</th>
+                <th class="text-left">Fornecedor</th>
+                <th class="text-left">Pagador</th>
+                <th class="text-left">Descrição</th>
+                <th class="text-left">Comprovante</th>
+                <th class="text-left">Valor</th>
+                <th class="text-left">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="lanc-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FOOT NOTE -->
+      <div class="text-xs muted pb-6">
+        Observação: link do Drive é manual. Segurança de acesso é pelo Firestore Rules (e-mails permitidos).
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <div id="modal-obras" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-4 w-full max-w-3xl">
+      <div class="flex items-center justify-between">
+        <div class="font-black text-lg">Obras</div>
+        <button data-close="modal-obras" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+        <div class="md:col-span-8">
+          <div class="text-xs muted mb-1">Nome da obra</div>
+          <input id="obra-new-nome" class="input" placeholder="Ex: Obra Terreno X" />
+        </div>
+        <div class="md:col-span-4 flex items-end">
+          <button id="obra-create" class="btn btn-dark w-full">Criar obra</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="font-black">Lista</div>
+        <div id="obras-list" class="mt-2 space-y-2 text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-unidades" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-4 w-full max-w-3xl">
+      <div class="flex items-center justify-between">
+        <div class="font-black text-lg">Unidades (casas)</div>
+        <button data-close="modal-unidades" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+        <div class="md:col-span-6">
+          <div class="text-xs muted mb-1">Nome</div>
+          <input id="unid-new-nome" class="input" placeholder="Ex: Casa A" />
+        </div>
+        <div class="md:col-span-4">
+          <div class="text-xs muted mb-1">VGV previsto</div>
+          <input id="unid-new-vgv" class="input" placeholder="Ex: 450.000,00" />
+        </div>
+        <div class="md:col-span-2 flex items-end">
+          <button id="unid-create" class="btn btn-dark w-full">Criar</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="font-black">Lista</div>
+        <div id="unidades-list" class="mt-2 space-y-2 text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-fornecedores" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-4 w-full max-w-3xl">
+      <div class="flex items-center justify-between">
+        <div class="font-black text-lg">Fornecedores</div>
+        <button data-close="modal-fornecedores" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+        <div class="md:col-span-4">
+          <div class="text-xs muted mb-1">Nome</div>
+          <input id="forn-nome" class="input" placeholder="Ex: Depósito X" />
+        </div>
+        <div class="md:col-span-4">
+          <div class="text-xs muted mb-1">Contato</div>
+          <input id="forn-contato" class="input" placeholder="Telefone / WhatsApp" />
+        </div>
+        <div class="md:col-span-3">
+          <div class="text-xs muted mb-1">CNPJ/CPF</div>
+          <input id="forn-doc" class="input" placeholder="Opcional" />
+        </div>
+        <div class="md:col-span-1 flex items-end">
+          <button id="forn-create" class="btn btn-dark w-full">+</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="font-black">Lista</div>
+        <div id="forn-list" class="mt-2 space-y-2 text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-categorias" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-4 w-full max-w-3xl">
+      <div class="flex items-center justify-between">
+        <div class="font-black text-lg">Categorias (Grupo/Subgrupo)</div>
+        <button data-close="modal-categorias" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+        <div class="md:col-span-5">
+          <div class="text-xs muted mb-1">Grupo</div>
+          <input id="cat-grupo" class="input" placeholder="Ex: Material" />
+        </div>
+        <div class="md:col-span-5">
+          <div class="text-xs muted mb-1">Subgrupo</div>
+          <input id="cat-sub" class="input" placeholder="Ex: Cimento" />
+        </div>
+        <div class="md:col-span-2 flex items-end">
+          <button id="cat-create" class="btn btn-dark w-full">Criar</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="font-black">Lista</div>
+        <div id="cats-list" class="mt-2 space-y-2 text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-lucro" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
+    <div class="card p-4 w-full max-w-4xl">
+      <div class="flex items-center justify-between">
+        <div class="font-black text-lg">Parâmetros de Lucro (por obra)</div>
+        <button data-close="modal-lucro" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <div class="mt-2 text-sm muted">
+        Deduções aplicadas no VGV previsto: corretor/impostos/encargos. Você pode usar % do VGV ou valor fixo.
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2">
+        <div class="md:col-span-4">
+          <div class="text-xs muted mb-1">Nome</div>
+          <input id="ded-nome" class="input" placeholder="Ex: Corretagem" />
+        </div>
+        <div class="md:col-span-3">
+          <div class="text-xs muted mb-1">Tipo</div>
+          <select id="ded-tipo" class="select">
+            <option value="percent">Percentual (%)</option>
+            <option value="fixed">Valor fixo (R$)</option>
+          </select>
+        </div>
+        <div class="md:col-span-3">
+          <div class="text-xs muted mb-1">Valor</div>
+          <input id="ded-valor" class="input" placeholder="Ex: 5 (ou 15000,00)" />
+        </div>
+        <div class="md:col-span-2 flex items-end">
+          <button id="ded-create" class="btn btn-dark w-full">Adicionar</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="font-black">Deduções</div>
+        <div id="deds-list" class="mt-2 space-y-2 text-sm"></div>
+      </div>
+
+      <div class="mt-4">
+        <div class="font-black">Prévia (por unidade)</div>
+        <div id="lucro-preview" class="mt-2 space-y-2 text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import {
+      getFirestore, collection, doc, addDoc, setDoc, deleteDoc, updateDoc,
+      onSnapshot, query, orderBy, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+    // ✅ Seu Firebase Config (já preenchido)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCOrMx8Hv2qRkoIBwBBVq4V2DONUa7T0lU",
+      authDomain: "qd20-lt2-a-b.firebaseapp.com",
+      projectId: "qd20-lt2-a-b",
+      storageBucket: "qd20-lt2-a-b.firebasestorage.app",
+      messagingSenderId: "648174167866",
+      appId: "1:648174167866:web:98fb10be18b73fcc7a9203"
+    };
+
+    // 🔒 Gate no front (conveniência). Segurança real = Firestore Rules.
+    const ALLOW_EMAILS = new Set(["viictor.castro@gmail.com", "gcm.conceicao@gmail.com"]);
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(n||0));
+    const parseNum = (v) => parseFloat(String(v||"").replace(/\./g,"").replace(",", ".")) || 0;
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    let currentUser = null;
+    let OBRA_ID = localStorage.getItem("obraId") || "";
+    let VIEW = localStorage.getItem("view") || "OBRA_TODA";
+
+    // filtros lançamentos
+    let filterText = "";
+    let filterCategoria = "TODAS";
+    let filterFornecedor = "TODOS";
+
+    let listeners = [];
+    const unsubAll = () => { listeners.forEach(u=>u()); listeners=[]; };
+
+    // estado
+    const state = {
+      obras: [],
+      config: { socioA:"Sócio A", socioB:"Sócio B", deductions: [] },
+      unidades: [],
+      fornecedores: [],
+      categorias: [],
+      lancamentos: [],
+      acertos: [],
+      rateios: []
+    };
+
+    // refs por obra
+    function refs(obraId){
+      return {
+        obrasCol: collection(db, "obras"),
+        obraDoc: doc(db, "obras", obraId),
+        configDoc: doc(db, "obras", obraId, "config", "main"),
+        unidadesCol: collection(db, "obras", obraId, "unidades"),
+        fornecedoresCol: collection(db, "obras", obraId, "fornecedores"),
+        categoriasCol: collection(db, "obras", obraId, "categorias"),
+        lancamentosCol: collection(db, "obras", obraId, "lancamentos"),
+        acertosCol: collection(db, "obras", obraId, "acertos"),
+        rateiosCol: collection(db, "obras", obraId, "rateios"),
+      };
+    }
+
+    // ---------- UI helpers ----------
+    function showModal(id){ $(id).classList.remove("hidden"); $(id).classList.add("flex"); }
+    function hideModal(id){ $(id).classList.add("hidden"); $(id).classList.remove("flex"); }
+    function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    // ---------- bootstrap ----------
+    function wireUI(){
+      $("btn-obras").onclick = () => { renderObrasModal(); showModal("modal-obras"); };
+      $("btn-unidades").onclick = () => { renderUnidadesModal(); showModal("modal-unidades"); };
+      $("btn-fornecedores").onclick = () => { renderFornecedoresModal(); showModal("modal-fornecedores"); };
+      $("btn-categorias").onclick = () => { renderCategoriasModal(); showModal("modal-categorias"); };
+      $("btn-lucro").onclick = () => { renderLucroModal(); showModal("modal-lucro"); };
+      $("btn-export").onclick = exportPDF;
+
+      document.body.addEventListener("click", (e) => {
+        const closeId = e.target?.getAttribute?.("data-close");
+        if (closeId) hideModal(closeId);
+
+        // delete lançamento
+        if (e.target.classList.contains("l-del")) {
+          const id = e.target.dataset.id;
+          if (!confirm("Excluir lançamento?")) return;
+          deleteDoc(doc(db, "obras", OBRA_ID, "lancamentos", id));
+        }
+
+        // delete acerto
+        if (e.target.classList.contains("a-del")) {
+          const id = e.target.dataset.id;
+          if (!confirm("Excluir acerto?")) return;
+          deleteDoc(doc(db, "obras", OBRA_ID, "acertos", id));
+        }
+
+        // delete rateio
+        if (e.target.classList.contains("r-del")) {
+          const id = e.target.dataset.id;
+          if (!confirm("Excluir rateio?")) return;
+          deleteDoc(doc(db, "obras", OBRA_ID, "rateios", id));
+        }
+
+        // delete fornecedor
+        if (e.target.classList.contains("f-del")) {
+          const id = e.target.dataset.id;
+          if (!confirm("Excluir fornecedor?")) return;
+          deleteDoc(doc(db, "obras", OBRA_ID, "fornecedores", id));
+        }
+
+        // delete categoria
+        if (e.target.classList.contains("c-del")) {
+          const id = e.target.dataset.id;
+          if (!confirm("Excluir categoria?")) return;
+          deleteDoc(doc(db, "obras", OBRA_ID, "categorias", id));
+        }
+
+        // delete dedução
+        if (e.target.classList.contains("d-del")) {
+          const idx = Number(e.target.dataset.idx);
+          const deds = Array.isArray(state.config.deductions) ? [...state.config.deductions] : [];
+          deds.splice(idx, 1);
+          setDoc(refs(OBRA_ID).configDoc, { deductions: deds }, { merge:true });
+        }
+
+        // obra: set active
+        if (e.target.classList.contains("obra-set")) {
+          const id = e.target.dataset.id;
+          OBRA_ID = id;
+          localStorage.setItem("obraId", OBRA_ID);
+          hideModal("modal-obras");
+          subscribeObra();
+        }
+
+        // obra: delete (hard)
+        if (e.target.classList.contains("obra-del")) {
+          alert("Apagar obra inteira (com subcoleções) não é feito pelo front. Isso é intencional.");
+        }
+      });
+
+      $("obra-select").onchange = (e) => {
+        OBRA_ID = e.target.value;
+        localStorage.setItem("obraId", OBRA_ID);
+        subscribeObra();
+      };
+
+      $("view-select").onchange = (e) => {
+        VIEW = e.target.value;
+        localStorage.setItem("view", VIEW);
+        rerender();
+      };
+
+      $("filters-clear").onclick = () => {
+        $("filter-text").value = "";
+        $("filter-categoria").value = "TODAS";
+        $("filter-fornecedor").value = "TODOS";
+        filterText = ""; filterCategoria="TODAS"; filterFornecedor="TODOS";
+        rerender();
+      };
+
+      $("filter-text").oninput = (e) => { filterText = e.target.value.trim().toLowerCase(); rerender(); };
+      $("filter-categoria").onchange = (e) => { filterCategoria = e.target.value; rerender(); };
+      $("filter-fornecedor").onchange = (e) => { filterFornecedor = e.target.value; rerender(); };
+
+      $("socios-save").onclick = async () => {
+        const socioA = $("socio-a").value.trim() || "Sócio A";
+        const socioB = $("socio-b").value.trim() || "Sócio B";
+        await setDoc(refs(OBRA_ID).configDoc, { socioA, socioB, updatedAt: serverTimestamp() }, { merge:true });
+      };
+
+      $("obra-create").onclick = createObra;
+      $("unid-create").onclick = createUnidade;
+      $("forn-create").onclick = createFornecedor;
+      $("cat-create").onclick = createCategoria;
+      $("ded-create").onclick = createDeducao;
+
+      $("logout-btn").onclick = () => signOut(auth);
+
+      $("lanc-quick").onclick = () => {
+        // seta unidade "Transitório" se existir
+        const trans = state.unidades.find(u => (u.nome||"").toLowerCase().includes("transit"));
+        if (trans) $("lanc-unidade").value = trans.id;
+      };
+
+      $("lanc-form").onsubmit = addLancamento;
+      $("acerto-form").onsubmit = addAcerto;
+
+      $("acerto-sugerir").onclick = () => {
+        const eq = computeEqualizacao();
+        alert(eq || "Sem sugestão (saldos zerados).");
+      };
+
+      $("rat-add-dest").onclick = () => { rateioAddDest(); };
+      $("rat-save").onclick = () => { addRateio(); };
+
+      $("login-btn").onclick = () => {
+        signInWithPopup(auth, provider).catch(err => {
+          $("login-msg").textContent = err.code === "auth/unauthorized-domain"
+            ? "Domínio não autorizado no Firebase (adicione em Authorized domains)."
+            : "Erro no login.";
+          console.error(err);
+        });
+      };
+    }
+
+    // ---------- data subscriptions ----------
+    function subscribeObrasList(){
+      const r = refs("dummy").obrasCol;
+      listeners.push(onSnapshot(query(r, orderBy("createdAt","desc")), (snap) => {
+        state.obras = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        hydrateObrasSelect();
+      }));
+    }
+
+    function hydrateObrasSelect(){
+      const sel = $("obra-select");
+      if (!state.obras.length){
+        sel.innerHTML = `<option value="">Nenhuma obra</option>`;
+        return;
+      }
+      sel.innerHTML = state.obras.map(o => `<option value="${o.id}">${escapeHtml(o.nome || o.id)}</option>`).join("");
+      if (!OBRA_ID) OBRA_ID = state.obras[0].id;
+      sel.value = OBRA_ID;
+    }
+
+    function subscribeObra(){
+      if (!OBRA_ID) return;
+      unsubAll();
+      subscribeObrasList(); // mantém lista viva
+      const r = refs(OBRA_ID);
+
+      listeners.push(onSnapshot(r.configDoc, (d) => {
+        state.config = d.exists() ? d.data() : { socioA:"Sócio A", socioB:"Sócio B", deductions: [] };
+        hydrateSocios();
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.unidadesCol, orderBy("createdAt","asc")), (snap) => {
+        state.unidades = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        hydrateUnidades();
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.fornecedoresCol, orderBy("nome","asc")), (snap) => {
+        state.fornecedores = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        hydrateFornecedores();
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.categoriasCol, orderBy("grupo","asc")), (snap) => {
+        state.categorias = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        hydrateCategorias();
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.lancamentosCol, orderBy("dt","desc")), (snap) => {
+        state.lancamentos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.acertosCol, orderBy("createdAt","desc")), (snap) => {
+        state.acertos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        rerender();
+      }));
+
+      listeners.push(onSnapshot(query(r.rateiosCol, orderBy("createdAt","desc")), (snap) => {
+        state.rateios = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        rerender();
+      }));
+    }
+
+    function hydrateSocios(){
+      const a = state.config?.socioA || "Sócio A";
+      const b = state.config?.socioB || "Sócio B";
+      $("socio-a").value = a;
+      $("socio-b").value = b;
+
+      const opts = [a,b].map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+      $("lanc-pagador").innerHTML = opts;
+      $("acerto-de").innerHTML = opts;
+      $("acerto-para").innerHTML = opts;
+    }
+
+    function hydrateUnidades(){
+      const units = state.unidades || [];
+      const viewSel = $("view-select");
+      const lancSel = $("lanc-unidade");
+      const fromSel = $("rat-from");
+
+      if (!units.length){
+        viewSel.innerHTML = `<option value="OBRA_TODA">Obra (consolidado)</option>`;
+        lancSel.innerHTML = `<option value="">—</option>`;
+        fromSel.innerHTML = `<option value="">—</option>`;
+        return;
+      }
+
+      viewSel.innerHTML = [
+        `<option value="OBRA_TODA">Obra (consolidado)</option>`,
+        ...units.map(u => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`)
+      ].join("");
+
+      if (!VIEW) VIEW = "OBRA_TODA";
+      if (VIEW !== "OBRA_TODA" && !units.some(u=>u.id===VIEW)) VIEW = "OBRA_TODA";
+      viewSel.value = VIEW;
+
+      lancSel.innerHTML = units.map(u => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`).join("");
+      // default: Casa A se existir
+      const casaA = units.find(u => (u.nome||"").toLowerCase() === "casa a");
+      lancSel.value = casaA?.id || units[0].id;
+
+      fromSel.innerHTML = units.map(u => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`).join("");
+      const trans = units.find(u => (u.nome||"").toLowerCase().includes("transit"));
+      fromSel.value = trans?.id || units[0].id;
+
+      localStorage.setItem("view", VIEW);
+
+      // rateio init dests
+      ensureRateioDefault();
+      renderRateioDests();
+    }
+
+    function hydrateFornecedores(){
+      const sel = $("lanc-fornecedor");
+      const fsel = $("filter-fornecedor");
+      const list = state.fornecedores || [];
+
+      const opts = [`<option value="">(sem fornecedor)</option>`, ...list.map(f => `<option value="${f.id}">${escapeHtml(f.nome)}</option>`)];
+      sel.innerHTML = opts.join("");
+
+      fsel.innerHTML = [
+        `<option value="TODOS">Todos fornecedores</option>`,
+        ...list.map(f => `<option value="${f.id}">${escapeHtml(f.nome)}</option>`)
+      ].join("");
+
+      if (!fsel.value) fsel.value = "TODOS";
+    }
+
+    function hydrateCategorias(){
+      const sel = $("lanc-categoria");
+      const csel = $("filter-categoria");
+      const list = state.categorias || [];
+
+      const label = (c) => `${c.grupo || "Outros"} / ${c.subgrupo || "Geral"}`;
+      sel.innerHTML = [`<option value="">(sem categoria)</option>`, ...list.map(c => `<option value="${c.id}">${escapeHtml(label(c))}</option>`)].join("");
+
+      csel.innerHTML = [
+        `<option value="TODAS">Todas categorias</option>`,
+        ...list.map(c => `<option value="${c.id}">${escapeHtml(label(c))}</option>`)
+      ].join("");
+
+      if (!csel.value) csel.value = "TODAS";
+    }
+
+    // ---------- CRUD ----------
+    async function createObra(){
+      const nome = $("obra-new-nome").value.trim();
+      if (!nome) return alert("Nome da obra obrigatório.");
+
+      const r = refs("dummy").obrasCol;
+      const refNew = await addDoc(r, { nome, createdAt: serverTimestamp(), createdBy: currentUser.email });
+
+      // config default
+      await setDoc(refs(refNew.id).configDoc, {
+        socioA: "Sócio A",
+        socioB: "Sócio B",
+        deductions: [
+          { nome:"Corretagem", tipo:"percent", valor: 5 },
+          { nome:"Impostos", tipo:"percent", valor: 15 }
+        ],
+        createdAt: serverTimestamp()
+      }, { merge:true });
+
+      // unidades default
+      await addDoc(refs(refNew.id).unidadesCol, { nome:"Casa A", vgvPrevisto: 0, createdAt: serverTimestamp() });
+      await addDoc(refs(refNew.id).unidadesCol, { nome:"Casa B", vgvPrevisto: 0, createdAt: serverTimestamp() });
+      await addDoc(refs(refNew.id).unidadesCol, { nome:"Transitório", vgvPrevisto: 0, fixed:true, createdAt: serverTimestamp() });
+
+      $("obra-new-nome").value = "";
+      OBRA_ID = refNew.id;
+      localStorage.setItem("obraId", OBRA_ID);
+      subscribeObra();
+    }
+
+    async function createUnidade(){
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const nome = $("unid-new-nome").value.trim();
+      const vgv = parseNum($("unid-new-vgv").value);
+      if (!nome) return alert("Nome obrigatório.");
+
+      await addDoc(refs(OBRA_ID).unidadesCol, { nome, vgvPrevisto: vgv, createdAt: serverTimestamp() });
+      $("unid-new-nome").value = "";
+      $("unid-new-vgv").value = "";
+    }
+
+    async function createFornecedor(){
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const nome = $("forn-nome").value.trim();
+      if (!nome) return alert("Nome do fornecedor obrigatório.");
+      await addDoc(refs(OBRA_ID).fornecedoresCol, {
+        nome,
+        contato: $("forn-contato").value.trim(),
+        doc: $("forn-doc").value.trim(),
+        createdAt: serverTimestamp()
+      });
+      $("forn-nome").value = "";
+      $("forn-contato").value = "";
+      $("forn-doc").value = "";
+    }
+
+    async function createCategoria(){
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const grupo = $("cat-grupo").value.trim();
+      const subgrupo = $("cat-sub").value.trim();
+      if (!grupo || !subgrupo) return alert("Grupo e Subgrupo obrigatórios.");
+      await addDoc(refs(OBRA_ID).categoriasCol, { grupo, subgrupo, createdAt: serverTimestamp() });
+      $("cat-grupo").value = "";
+      $("cat-sub").value = "";
+    }
+
+    async function createDeducao(){
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const nome = $("ded-nome").value.trim();
+      const tipo = $("ded-tipo").value;
+      const valorRaw = $("ded-valor").value.trim();
+      if (!nome) return alert("Nome obrigatório.");
+      if (!valorRaw) return alert("Valor obrigatório.");
+
+      const deds = Array.isArray(state.config.deductions) ? [...state.config.deductions] : [];
+      deds.push({ nome, tipo, valor: (tipo==="percent" ? Number(valorRaw) : parseNum(valorRaw)) });
+
+      await setDoc(refs(OBRA_ID).configDoc, { deductions: deds }, { merge:true });
+
+      $("ded-nome").value = "";
+      $("ded-valor").value = "";
+    }
+
+    // ---------- Lançamentos / Acertos / Rateio ----------
+    async function addLancamento(e){
+      e.preventDefault();
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+
+      const dt = $("lanc-dt").value;
+      const desc = $("lanc-desc").value.trim();
+      const valor = parseNum($("lanc-valor").value);
+      const unidadeId = $("lanc-unidade").value;
+      const pagador = $("lanc-pagador").value;
+      const pA = Number($("lanc-pa").value);
+      const pB = Number($("lanc-pb").value);
+      const categoriaId = $("lanc-categoria").value || "";
+      const fornecedorId = $("lanc-fornecedor").value || "";
+      const anexoUrl = $("lanc-link").value.trim();
+      const notas = $("lanc-notas").value.trim();
+
+      if (!dt) return alert("Data obrigatória.");
+      if (!desc) return alert("Descrição obrigatória.");
+      if (valor <= 0) return alert("Valor deve ser positivo.");
+      if (!unidadeId) return alert("Selecione uma unidade.");
+      if (Math.abs((pA + pB) - 1) > 0.001) return alert("pA + pB precisa dar 1.00 (100%).");
+
+      const unidadeNome = state.unidades.find(u=>u.id===unidadeId)?.nome || "";
+      const categoriaNome = categoriaId ? catLabelById(categoriaId) : "";
+      const fornecedorNome = fornecedorId ? fornNomeById(fornecedorId) : "";
+
+      await addDoc(refs(OBRA_ID).lancamentosCol, {
+        dt, desc, valor,
+        unidadeId, unidadeNome,
+        pagador, pA, pB,
+        categoriaId, categoriaNome,
+        fornecedorId, fornecedorNome,
+        anexoUrl, notas,
+        createdBy: currentUser.email,
+        createdAt: serverTimestamp()
+      });
+
+      $("lanc-desc").value = "";
+      $("lanc-valor").value = "";
+      $("lanc-link").value = "";
+      $("lanc-notas").value = "";
+    }
+
+    async function addAcerto(e){
+      e.preventDefault();
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+
+      const de = $("acerto-de").value;
+      const para = $("acerto-para").value;
+      const valor = parseNum($("acerto-valor").value);
+      const anexoUrl = $("acerto-link").value.trim();
+
+      if (de === para) return alert("De e Para devem ser diferentes.");
+      if (valor <= 0) return alert("Valor do acerto deve ser positivo.");
+
+      await addDoc(refs(OBRA_ID).acertosCol, {
+        de, para, valor, anexoUrl,
+        createdBy: currentUser.email,
+        createdAt: serverTimestamp()
+      });
+
+      $("acerto-valor").value = "";
+      $("acerto-link").value = "";
+    }
+
+    // ----- rateio state -----
+    let rateioDests = [];
+    function ensureRateioDefault(){
+      const units = state.unidades || [];
+      if (!units.length) return;
+      if (rateioDests.length) return;
+
+      const a = units.find(u => (u.nome||"").toLowerCase()==="casa a")?.id || units[0].id;
+      const b = units.find(u => (u.nome||"").toLowerCase()==="casa b")?.id || (units[1]?.id || units[0].id);
+      if (a && b && a !== b) rateioDests = [{ unidadeId:a, p:0.5 }, { unidadeId:b, p:0.5 }];
+      else rateioDests = [{ unidadeId:a, p:1.0 }];
+    }
+
+    function rateioAddDest(){
+      const u = state.unidades[0]?.id;
+      if (!u) return;
+      rateioDests.push({ unidadeId: u, p: 0.25 });
+      renderRateioDests();
+    }
+
+    function updateRateioStatus(){
+      const sum = rateioDests.reduce((s,d)=>s+(Number(d.p)||0),0);
+      $("rat-status").textContent = `Soma: ${(sum*100).toFixed(1)}%`;
+      $("rat-status").className = (sum>0.999 && sum<1.001) ? "ok text-sm font-black" : "danger text-sm font-black";
+    }
+
+    function renderRateioDests(){
+      const unitOpts = (selectedId) =>
+        state.unidades.map(u => `<option value="${u.id}" ${u.id===selectedId?"selected":""}>${escapeHtml(u.nome)}</option>`).join("");
+
+      $("rat-dests").innerHTML = rateioDests.map((d, idx) => `
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
+          <select data-idx="${idx}" class="rat-u select md:col-span-7">${unitOpts(d.unidadeId)}</select>
+          <input data-idx="${idx}" class="rat-p input md:col-span-4" type="number" step="0.01" min="0" max="1" value="${d.p}">
+          <button data-idx="${idx}" class="rat-del btn btn-danger md:col-span-1" type="button">X</button>
+        </div>
+      `).join("");
+
+      updateRateioStatus();
+    }
+
+    document.body.addEventListener("click", (e) => {
+      if (e.target.classList.contains("rat-del")){
+        const idx = Number(e.target.dataset.idx);
+        rateioDests.splice(idx, 1);
+        renderRateioDests();
+      }
+    });
+
+    document.body.addEventListener("input", (e) => {
+      if (e.target.classList.contains("rat-p")){
+        const idx = Number(e.target.dataset.idx);
+        rateioDests[idx].p = Number(e.target.value) || 0;
+        updateRateioStatus();
+      }
+    });
+
+    document.body.addEventListener("change", (e) => {
+      if (e.target.classList.contains("rat-u")){
+        const idx = Number(e.target.dataset.idx);
+        rateioDests[idx].unidadeId = e.target.value;
+        updateRateioStatus();
+      }
+    });
+
+    async function addRateio(){
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const desc = $("rat-desc").value.trim();
+      const valor = parseNum($("rat-valor").value);
+      const fromUnidadeId = $("rat-from").value;
+      const anexoUrl = $("rat-link").value.trim();
+
+      if (!desc) return alert("Descrição obrigatória.");
+      if (valor <= 0) return alert("Valor deve ser positivo.");
+      const sum = rateioDests.reduce((s,d)=>s+(Number(d.p)||0),0);
+      if (!(sum>0.999 && sum<1.001)) return alert("Soma dos percentuais precisa dar 100% (1.00).");
+
+      const ids = rateioDests.map(d=>d.unidadeId);
+      if (new Set(ids).size !== ids.length) return alert("Não repita unidade nos destinos.");
+
+      await addDoc(refs(OBRA_ID).rateiosCol, {
+        desc, valor, fromUnidadeId, anexoUrl,
+        destinos: rateioDests.map(d => ({ unidadeId:d.unidadeId, p:Number(d.p)||0 })),
+        createdBy: currentUser.email,
+        createdAt: serverTimestamp()
+      });
+
+      $("rat-desc").value = "";
+      $("rat-valor").value = "";
+      $("rat-link").value = "";
+    }
+
+    // ---------- calculations ----------
+    function viewLancamentos(){
+      let list = state.lancamentos || [];
+
+      if (VIEW !== "OBRA_TODA") list = list.filter(l => l.unidadeId === VIEW);
+
+      if (filterCategoria !== "TODAS") list = list.filter(l => l.categoriaId === filterCategoria);
+      if (filterFornecedor !== "TODOS") list = list.filter(l => l.fornecedorId === filterFornecedor);
+
+      if (filterText) {
+        list = list.filter(l => {
+          const hay = `${l.desc||""} ${l.notas||""}`.toLowerCase();
+          return hay.includes(filterText);
+        });
+      }
+
+      return list;
+    }
+
+    // aplica rateios para custo por unidade (para dashboard/lucro)
+    function computeCustosPorUnidade(){
+      const base = {};
+      for (const u of (state.unidades||[])) base[u.id] = 0;
+
+      // soma lançamentos por unidade
+      for (const l of (state.lancamentos||[])) {
+        base[l.unidadeId] = (base[l.unidadeId]||0) + (l.valor||0);
+      }
+
+      // rateio: subtrai origem, soma destinos
+      for (const r of (state.rateios||[])) {
+        const v = r.valor || 0;
+        if (r.fromUnidadeId) base[r.fromUnidadeId] = (base[r.fromUnidadeId]||0) - v;
+        for (const d of (r.destinos||[])) {
+          base[d.unidadeId] = (base[d.unidadeId]||0) + v*(d.p||0);
+        }
+      }
+
+      // se visão for unidade específica, devolve só ela, mas mantemos mapa completo pra lucro
+      return base;
+    }
+
+    function computeCustoVisao(){
+      const map = computeCustosPorUnidade();
+      if (VIEW === "OBRA_TODA") return Object.values(map).reduce((s,n)=>s+n,0);
+      return map[VIEW] || 0;
+    }
+
+    function computeEqualizacao(){
+      const a = state.config?.socioA || "Sócio A";
+      const b = state.config?.socioB || "Sócio B";
+
+      const lancs = viewLancamentos(); // equalização respeita visão + filtros? Aqui respeita visão, mas ignora filtros de categoria/forn? melhor: só visão
+      const byVisao = (VIEW==="OBRA_TODA") ? (state.lancamentos||[]) : (state.lancamentos||[]).filter(l=>l.unidadeId===VIEW);
+
+      const pagoA = byVisao.filter(l=>l.pagador===a).reduce((s,l)=>s+(l.valor||0),0);
+      const pagoB = byVisao.filter(l=>l.pagador===b).reduce((s,l)=>s+(l.valor||0),0);
+
+      const devA = byVisao.reduce((s,l)=>s+(l.valor||0)*(l.pA ?? 0.5),0);
+      const devB = byVisao.reduce((s,l)=>s+(l.valor||0)*(l.pB ?? 0.5),0);
+
+      const acertos = (state.acertos||[]);
+      const recebA = acertos.filter(x=>x.para===a).reduce((s,x)=>s+(x.valor||0),0);
+      const pagA   = acertos.filter(x=>x.de===a).reduce((s,x)=>s+(x.valor||0),0);
+      const saldoA = (pagoA - devA) - recebA + pagA;
+
+      const recebB = acertos.filter(x=>x.para===b).reduce((s,x)=>s+(x.valor||0),0);
+      const pagB   = acertos.filter(x=>x.de===b).reduce((s,x)=>s+(x.valor||0),0);
+      const saldoB = (pagoB - devB) - recebB + pagB;
+
+      if (Math.abs(saldoA) < 0.01 && Math.abs(saldoB) < 0.01) return "Saldos zerados.";
+      if (saldoA > 0.01) return `${b} paga ${fmt(saldoA)} para ${a}`;
+      if (saldoB > 0.01) return `${a} paga ${fmt(saldoB)} para ${b}`;
+      return "Saldos zerados.";
+    }
+
+    function computeTopCategorias(){
+      const list = viewLancamentos();
+      const agg = {};
+      for (const l of list){
+        const key = l.categoriaNome || "(sem categoria)";
+        agg[key] = (agg[key]||0) + (l.valor||0);
+      }
+      return Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    }
+
+    function computeTopFornecedores(){
+      const list = viewLancamentos();
+      const agg = {};
+      for (const l of list){
+        const key = l.fornecedorNome || "(sem fornecedor)";
+        agg[key] = (agg[key]||0) + (l.valor||0);
+      }
+      return Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    }
+
+    function computeLucro(){
+      const custosPorUnidade = computeCustosPorUnidade();
+      const deds = Array.isArray(state.config.deductions) ? state.config.deductions : [];
+
+      // lucro por unidade
+      const per = [];
+      for (const u of (state.unidades||[])) {
+        const vgv = Number(u.vgvPrevisto||0);
+        const custo = Number(custosPorUnidade[u.id]||0);
+        const dedTotal = deds.reduce((s,d)=>{
+          if (d.tipo === "percent") return s + (vgv * (Number(d.valor||0)/100));
+          return s + Number(d.valor||0);
+        },0);
+        per.push({ unidadeId:u.id, unidadeNome:u.nome, vgv, custo, dedTotal, lucro: vgv - custo - dedTotal });
+      }
+
+      // visão
+      if (VIEW === "OBRA_TODA") {
+        const totalLucro = per.reduce((s,x)=>s+x.lucro,0);
+        return { total: totalLucro, per };
+      } else {
+        const one = per.find(x=>x.unidadeId===VIEW);
+        return { total: one?.lucro || 0, per };
+      }
+    }
+
+    // ---------- rendering ----------
+    function catLabelById(id){
+      const c = (state.categorias||[]).find(x=>x.id===id);
+      if (!c) return "";
+      return `${c.grupo||"Outros"} / ${c.subgrupo||"Geral"}`;
+    }
+    function fornNomeById(id){
+      return (state.fornecedores||[]).find(x=>x.id===id)?.nome || "";
+    }
+
+    function rerender(){
+      // KPIs
+      $("kpi-custo").textContent = fmt(computeCustoVisao());
+      const lucro = computeLucro();
+      $("kpi-lucro").textContent = fmt(lucro.total);
+      $("kpi-equal").textContent = computeEqualizacao();
+
+      // top cats
+      const topC = computeTopCategorias();
+      $("top-cat-label").textContent = (VIEW==="OBRA_TODA" ? "obra" : (state.unidades.find(u=>u.id===VIEW)?.nome || "unidade"));
+      $("top-categorias").innerHTML = topC.length ? topC.map(([k,v]) => `
+        <div class="flex justify-between bg-slate-50 rounded-2xl p-2">
+          <div class="font-bold">${escapeHtml(k)}</div>
+          <div class="font-black">${fmt(v)}</div>
+        </div>
+      `).join("") : `<div class="muted text-sm">Sem dados.</div>`;
+
+      // top fornecedores
+      const topF = computeTopFornecedores();
+      $("top-forn-label").textContent = (VIEW==="OBRA_TODA" ? "obra" : (state.unidades.find(u=>u.id===VIEW)?.nome || "unidade"));
+      $("top-fornecedores").innerHTML = topF.length ? topF.map(([k,v]) => `
+        <div class="flex justify-between bg-slate-50 rounded-2xl p-2">
+          <div class="font-bold">${escapeHtml(k)}</div>
+          <div class="font-black">${fmt(v)}</div>
+        </div>
+      `).join("") : `<div class="muted text-sm">Sem dados.</div>`;
+
+      // filtros selects já hidratados; só garantir valores
+      $("filter-categoria").value = filterCategoria;
+      $("filter-fornecedor").value = filterFornecedor;
+
+      // balança
+      $("balanca").innerHTML = `<div class="font-black">Equalização</div><div class="text-lg font-black mt-1">${escapeHtml(computeEqualizacao())}</div>`;
+
+      // acertos list
+      const acs = (state.acertos||[]);
+      $("acertos-list").innerHTML = acs.length ? acs.map(a => {
+        const link = a.anexoUrl ? `<a class="text-blue-600 underline" target="_blank" href="${a.anexoUrl}">ver</a>` : `<span class="muted">—</span>`;
+        return `
+          <div class="bg-slate-50 rounded-2xl p-2 flex items-center justify-between gap-2">
+            <div>
+              <div><b>${escapeHtml(a.de)}</b> → <b>${escapeHtml(a.para)}</b> • ${fmt(a.valor)}</div>
+              <div class="text-xs muted">${link}</div>
+            </div>
+            <button class="a-del btn btn-danger" data-id="${a.id}" type="button">X</button>
+          </div>
+        `;
+      }).join("") : `<div class="muted">Nenhum acerto.</div>`;
+
+      // rateios list
+      const rs = (state.rateios||[]);
+      $("rateios-list").innerHTML = rs.length ? rs.map(r => {
+        const fromName = state.unidades.find(u=>u.id===r.fromUnidadeId)?.nome || "";
+        const destText = (r.destinos||[]).map(d => {
+          const nm = state.unidades.find(u=>u.id===d.unidadeId)?.nome || "";
+          return `${nm} ${(Number(d.p||0)*100).toFixed(0)}%`;
+        }).join(" • ");
+        const link = r.anexoUrl ? `<a class="text-blue-600 underline" target="_blank" href="${r.anexoUrl}">ver</a>` : `<span class="muted">—</span>`;
+        return `
+          <div class="bg-slate-50 rounded-2xl p-2 flex items-center justify-between gap-2">
+            <div>
+              <div class="font-bold">${escapeHtml(r.desc || "")} • ${fmt(r.valor || 0)}</div>
+              <div class="text-xs muted">Origem: ${escapeHtml(fromName)} • Destinos: ${escapeHtml(destText)} • ${link}</div>
+            </div>
+            <button class="r-del btn btn-danger" data-id="${r.id}" type="button">X</button>
+          </div>
+        `;
+      }).join("") : `<div class="muted">Nenhum rateio.</div>`;
+
+      // lançamentos table
+      const list = viewLancamentos();
+      $("lanc-tbody").innerHTML = list.length ? list.map(l => {
+        const link = l.anexoUrl ? `<a class="text-blue-600 underline" target="_blank" href="${l.anexoUrl}">ver</a>` : `<span class="muted">—</span>`;
+        return `
+          <tr class="border-b">
+            <td>${escapeHtml(l.dt||"")}</td>
+            <td>${escapeHtml(l.unidadeNome||"")}</td>
+            <td>${escapeHtml(l.categoriaNome||"")}</td>
+            <td>${escapeHtml(l.fornecedorNome||"")}</td>
+            <td>${escapeHtml(l.pagador||"")}</td>
+            <td>
+              <div class="font-bold">${escapeHtml(l.desc||"")}</div>
+              ${l.notas ? `<div class="text-xs muted">${escapeHtml(l.notas)}</div>` : ""}
+            </td>
+            <td>${link}</td>
+            <td class="font-black">${fmt(l.valor||0)}</td>
+            <td><button class="l-del btn btn-danger" data-id="${l.id}" type="button">X</button></td>
+          </tr>
+        `;
+      }).join("") : `<tr><td colspan="9" class="p-4 text-center muted">Nenhum lançamento.</td></tr>`;
+    }
+
+    // ---------- modals render ----------
+    function renderObrasModal(){
+      $("obras-list").innerHTML = (state.obras||[]).length ? state.obras.map(o => `
+        <div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between">
+          <div>
+            <div class="font-black">${escapeHtml(o.nome || o.id)}</div>
+            <div class="text-xs muted">${escapeHtml(o.id)}</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="obra-set btn btn-dark" data-id="${o.id}" type="button">Ativar</button>
+          </div>
+        </div>
+      `).join("") : `<div class="muted">Nenhuma obra.</div>`;
+    }
+
+    function renderUnidadesModal(){
+      const list = (state.unidades||[]);
+      $("unidades-list").innerHTML = list.length ? list.map(u => `
+        <div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between gap-3">
+          <div class="flex-1">
+            <div class="font-black">${escapeHtml(u.nome)}</div>
+            <div class="text-xs muted">VGV: ${fmt(u.vgvPrevisto||0)}</div>
+          </div>
+          <div class="w-[260px]">
+            <input class="input u-vgv" data-id="${u.id}" placeholder="Atualizar VGV (R$)" value="${(u.vgvPrevisto||0) ? String(u.vgvPrevisto).replace(".",",") : ""}">
+          </div>
+          <button class="btn btn-dark u-save" data-id="${u.id}" type="button">Salvar</button>
+        </div>
+      `).join("") : `<div class="muted">Sem unidades.</div>`;
+
+      // wire unit vgv save
+      $("unidades-list").querySelectorAll(".u-save").forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          const inp = $("unidades-list").querySelector(`.u-vgv[data-id="${id}"]`);
+          const v = parseNum(inp.value);
+          await updateDoc(doc(db,"obras",OBRA_ID,"unidades",id), { vgvPrevisto: v, updatedAt: serverTimestamp() });
+        };
+      });
+    }
+
+    function renderFornecedoresModal(){
+      const list = (state.fornecedores||[]);
+      $("forn-list").innerHTML = list.length ? list.map(f => `
+        <div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between gap-2">
+          <div>
+            <div class="font-black">${escapeHtml(f.nome)}</div>
+            <div class="text-xs muted">${escapeHtml(f.contato||"")} ${f.doc ? "• "+escapeHtml(f.doc) : ""}</div>
+          </div>
+          <button class="f-del btn btn-danger" data-id="${f.id}" type="button">X</button>
+        </div>
+      `).join("") : `<div class="muted">Nenhum fornecedor.</div>`;
+    }
+
+    function renderCategoriasModal(){
+      const list = (state.categorias||[]);
+      $("cats-list").innerHTML = list.length ? list.map(c => `
+        <div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between gap-2">
+          <div>
+            <div class="font-black">${escapeHtml(c.grupo)} / ${escapeHtml(c.subgrupo)}</div>
+            <div class="text-xs muted">${escapeHtml(c.id)}</div>
+          </div>
+          <button class="c-del btn btn-danger" data-id="${c.id}" type="button">X</button>
+        </div>
+      `).join("") : `<div class="muted">Nenhuma categoria.</div>`;
+    }
+
+    function renderLucroModal(){
+      const deds = Array.isArray(state.config.deductions) ? state.config.deductions : [];
+      $("deds-list").innerHTML = deds.length ? deds.map((d,idx) => {
+        const txt = d.tipo==="percent" ? `${Number(d.valor||0)}%` : fmt(Number(d.valor||0));
+        return `
+          <div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between gap-2">
+            <div><span class="font-black">${escapeHtml(d.nome)}</span> • <span class="muted">${escapeHtml(d.tipo)}</span> • <span class="font-black">${escapeHtml(txt)}</span></div>
+            <button class="d-del btn btn-danger" data-idx="${idx}" type="button">X</button>
+          </div>
+        `;
+      }).join("") : `<div class="muted">Sem deduções.</div>`;
+
+      // preview
+      const lucro = computeLucro();
+      $("lucro-preview").innerHTML = lucro.per.map(p => `
+        <div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between">
+          <div>
+            <div class="font-black">${escapeHtml(p.unidadeNome)}</div>
+            <div class="text-xs muted">VGV ${fmt(p.vgv)} • Custo ${fmt(p.custo)} • Deduções ${fmt(p.dedTotal)}</div>
+          </div>
+          <div class="text-right">
+            <div class="font-black ${p.lucro>=0 ? "ok":"danger"}">${fmt(p.lucro)}</div>
+            <div class="text-xs muted">lucro previsto</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    // ---------- PDF ----------
+    function exportPDF(){
+      if (!OBRA_ID) return alert("Selecione uma obra.");
+      const { jsPDF } = window.jspdf;
+      const docp = new jsPDF();
+
+      const obraNome = state.obras.find(o=>o.id===OBRA_ID)?.nome || OBRA_ID;
+      docp.setFontSize(16);
+      docp.text(`VG CONSTRUTORA — Relatório`, 14, 18);
+      docp.setFontSize(11);
+      docp.text(`Obra: ${obraNome}`, 14, 26);
+      docp.text(`Visão: ${VIEW==="OBRA_TODA" ? "Obra (consolidado)" : (state.unidades.find(u=>u.id===VIEW)?.nome||"Unidade")}`, 14, 32);
+      docp.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, 38);
+
+      const custo = computeCustoVisao();
+      const lucro = computeLucro().total;
+      const equal = computeEqualizacao();
+
+      docp.autoTable({
+        startY: 44,
+        head: [["Resumo", "Valor"]],
+        body: [
+          ["Custo (visão)", fmt(custo)],
+          ["Lucro previsto (visão)", fmt(lucro)],
+          ["Equalização", equal]
+        ],
+        theme: "striped"
+      });
+
+      const list = viewLancamentos().slice(0, 200); // limite prático
+      docp.autoTable({
+        startY: docp.lastAutoTable.finalY + 10,
+        head: [["Data","Unidade","Categoria","Fornecedor","Pagador","Descrição","Valor","Comprovante"]],
+        body: list.map(l => [
+          l.dt||"",
+          l.unidadeNome||"",
+          l.categoriaNome||"",
+          l.fornecedorNome||"",
+          l.pagador||"",
+          (l.desc||"").slice(0,60),
+          fmt(l.valor||0),
+          l.anexoUrl ? "sim" : "não"
+        ]),
+        theme: "grid",
+        styles: { fontSize: 8 }
+      });
+
+      docp.save(`vgconstrutora-${obraNome.replace(/\s+/g,"_")}-${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    // ---------- auth ----------
+    onAuthStateChanged(auth, (user) => {
+      if (user && ALLOW_EMAILS.has(user.email)) {
+        currentUser = user;
+
+        $("login-screen").classList.add("hidden");
+        $("app-wrapper").classList.remove("hidden");
+
+        $("user-photo").src = user.photoURL || "";
+        $("user-name").textContent = user.displayName || "";
+        $("user-email").textContent = user.email || "";
+
+        $("lanc-dt").valueAsDate = new Date();
+
+        wireUI();
+        subscribeObrasList();
+        if (OBRA_ID) subscribeObra();
+
+      } else {
+        if (user) signOut(auth);
+        currentUser = null;
+        unsubAll();
+        $("app-wrapper").classList.add("hidden");
+        $("login-screen").classList.remove("hidden");
+      }
+    });
+
+  </script>
+</body>
+</html>
