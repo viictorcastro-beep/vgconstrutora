@@ -711,11 +711,18 @@
       $("rat-save").onclick = () => { addRateio(); };
 
       $("login-btn").onclick = () => {
+        $("login-msg").textContent = "Aguarde...";
         signInWithPopup(auth, provider).catch(err => {
-          $("login-msg").textContent = err.code === "auth/unauthorized-domain"
-            ? "Domínio não autorizado no Firebase (adicione em Authorized domains)."
-            : "Erro no login.";
-          console.error(err);
+          console.error("Erro de login:", err);
+          if (err.code === "auth/unauthorized-domain") {
+            $("login-msg").textContent = "⚠️ Domínio não autorizado. Adicione o domínio nas configurações do Firebase (Authentication > Settings > Authorized domains).";
+          } else if (err.code === "auth/popup-blocked") {
+            $("login-msg").textContent = "⚠️ Popup bloqueado. Permita popups para este site.";
+          } else if (err.code === "auth/popup-closed-by-user") {
+            $("login-msg").textContent = "Login cancelado.";
+          } else {
+            $("login-msg").textContent = `Erro: ${err.code || err.message}`;
+          }
         });
       };
     }
