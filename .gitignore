@@ -2,3 +2,7 @@
 .firebase/
 .DS_Store
 .env
+
+# Firebase Service Account Keys (NUNCA COMMITAR!)
+serviceAccount-*.json
+serviceAccount.json

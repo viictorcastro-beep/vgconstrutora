@@ -1,0 +1,15 @@
+{
+  "name": "vgconstrutora-migration",
+  "version": "1.0.0",
+  "description": "Migração de dados Firebase qd61lt32 → qd20-lt2-a-b",
+  "type": "module",
+  "scripts": {
+    "migrate": "node scripts/migrate-qd61-to-new.mjs"
+  },
+  "keywords": ["firebase", "migration"],
+  "author": "VG Construtora",
+  "license": "MIT",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

@@ -893,9 +893,14 @@
     // SUBSCRIPTIONS
     function subscribeObrasList() {
       const r = refs("dummy").obrasCol;
-      listeners.push(onSnapshot(query(r, orderBy("createdAt", "desc")), (snap) => {
+      listeners.push(onSnapshot(r, (snap) => {
+        console.log("📊 Obras carregadas:", snap.size);
         state.obras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         hydrateObrasSelect();
+      }, (err) => {
+        console.error("❌ Erro ao carregar obras:", err);
+        showToast("Erro ao carregar obras", "error");
+        $("obra-select").innerHTML = `<option value="">Erro ao carregar</option>`;
       }));
     }
 
