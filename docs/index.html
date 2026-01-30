@@ -742,14 +742,19 @@
 
         <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
           <div class="font-bold text-purple-900 mb-3">👔 Sócios da Obra</div>
+          <div class="text-xs text-purple-700 mb-3">⚠️ Selecione os sócios cadastrados. <a href="#" onclick="openModal('modal-socios'); return false;" class="underline font-bold">Cadastrar novo sócio</a></div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <div class="text-xs muted mb-1">Nome do Sócio A</div>
-              <input id="obra-socio-a" type="text" class="input" placeholder="Ex: Victor Castro" />
+              <div class="text-xs muted mb-1">Sócio A</div>
+              <select id="obra-socio-a" class="input">
+                <option value="">Selecione o Sócio A</option>
+              </select>
             </div>
             <div>
-              <div class="text-xs muted mb-1">Nome do Sócio B</div>
-              <input id="obra-socio-b" type="text" class="input" placeholder="Ex: Gustavo Medeiros" />
+              <div class="text-xs muted mb-1">Sócio B (Opcional)</div>
+              <select id="obra-socio-b" class="input">
+                <option value="">Nenhum (Obra individual)</option>
+              </select>
             </div>
           </div>
         </div>
@@ -1407,6 +1412,7 @@
 
       $("criar-obra-btn").onclick = () => {
         resetarModalObra(); // Resetar para modo criação
+        hydrateSociosObraSelect(); // Popular dropdowns de sócios
         openModal("modal-obra");
       };
 
@@ -1503,6 +1509,7 @@
         state.socios = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.nome.localeCompare(b.nome));
         console.log("👔 Sócios carregados:", state.socios.length);
         hydrateSociosSelect();
+        hydrateSociosObraSelect();
         hydrateProprietarioSelect();
         renderListaSocios();
       }, (err) => {
@@ -1523,6 +1530,24 @@
       return `⚠️ Proprietário desconhecido (${proprietarioId})`;
     }
 
+    function hydrateSociosObraSelect() {
+      const selectA = $("obra-socio-a");
+      const selectB = $("obra-socio-b");
+      if (!selectA || !selectB) return;
+      
+      // Popular Sócio A
+      const currentA = selectA.value;
+      selectA.innerHTML = '<option value="">Selecione o Sócio A</option>' +
+        state.socios.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+      if (currentA) selectA.value = currentA;
+      
+      // Popular Sócio B
+      const currentB = selectB.value;
+      selectB.innerHTML = '<option value="">Nenhum (Obra individual)</option>' +
+        state.socios.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+      if (currentB) selectB.value = currentB;
+    }
+    
     function hydrateProprietarioSelect() {
       const select = $("unid-new-proprietario");
       if (!select) return;
@@ -2205,8 +2230,26 @@
       $("obra-endereco").value = obra.endereco || '';
       $("obra-data-inicio").value = obra.dataInicio || '';
       $("obra-data-recebimento").value = obra.dataRecebimento || '';
-      $("obra-socio-a").value = obra.socioA || '';
-      $("obra-socio-b").value = obra.socioB || '';
+      
+      // Preencher sócios (suporta novo formato com IDs e legado com nomes)
+      if (obra.socioAId) {
+        // Novo formato: usar ID
+        $("obra-socio-a").value = obra.socioAId;
+      } else if (obra.socioA) {
+        // Formato legado: tentar encontrar sócio pelo nome
+        const socioA = state.socios.find(s => s.nome === obra.socioA);
+        $("obra-socio-a").value = socioA ? socioA.id : '';
+      }
+      
+      if (obra.socioBId) {
+        // Novo formato: usar ID
+        $("obra-socio-b").value = obra.socioBId;
+      } else if (obra.socioB) {
+        // Formato legado: tentar encontrar sócio pelo nome
+        const socioB = state.socios.find(s => s.nome === obra.socioB);
+        $("obra-socio-b").value = socioB ? socioB.id : '';
+      }
+      
       $("obra-investimento-a").value = obra.investimentoA || 0;
       $("obra-investimento-b").value = obra.investimentoB || 0;
 
@@ -2230,8 +2273,8 @@
       const endereco = $("obra-endereco").value.trim();
       const dataInicio = $("obra-data-inicio").value;
       const dataRecebimento = $("obra-data-recebimento").value;
-      const socioA = $("obra-socio-a").value.trim();
-      const socioB = $("obra-socio-b").value.trim();
+      const socioAId = $("obra-socio-a").value;
+      const socioBId = $("obra-socio-b").value;
       const investimentoA = parseFloat($("obra-investimento-a").value) || 0;
       const investimentoB = parseFloat($("obra-investimento-b").value) || 0;
 
@@ -2239,23 +2282,36 @@
         showToast('Digite o nome da obra', 'warning');
         return;
       }
+      
+      if (!socioAId) {
+        showToast('⚠️ Selecione pelo menos o Sócio A', 'warning');
+        return;
+      }
 
       try {
+        // Pegar nomes dos sócios para compatibilidade
+        const socioA = state.socios.find(s => s.id === socioAId);
+        const socioB = socioBId ? state.socios.find(s => s.id === socioBId) : null;
+        
         const obraRef = doc(db, "obras", obraId);
         await updateDoc(obraRef, {
           nome,
           endereco: endereco || null,
           dataInicio: dataInicio || null,
           dataRecebimento: dataRecebimento || null,
-          socioA: socioA || 'Sócio A',
-          socioB: socioB || 'Sócio B',
+          // IDs dos sócios (novo formato)
+          socioAId: socioAId,
+          socioBId: socioBId || null,
+          // Nomes dos sócios (compatibilidade)
+          socioA: socioA ? socioA.nome : 'Sócio A',
+          socioB: socioB ? socioB.nome : null,
           investimentoA,
           investimentoB,
           updatedAt: serverTimestamp(),
           updatedBy: state.user.email
         });
 
-        showToast('Obra atualizada com sucesso!', 'success');
+        showToast('✅ Obra atualizada com sucesso!', 'success');
         closeModal("modal-obra");
         
         // Resetar modal para modo criação
@@ -4532,8 +4588,8 @@
       const endereco = $("obra-endereco").value.trim();
       const dataInicio = $("obra-data-inicio").value || null;
       const dataRecebimento = $("obra-data-recebimento").value || null;
-      const socioA = $("obra-socio-a").value.trim();
-      const socioB = $("obra-socio-b").value.trim();
+      const socioAId = $("obra-socio-a").value; // ID do sócio
+      const socioBId = $("obra-socio-b").value; // ID do sócio (pode ser vazio)
       const investimentoA = parseFloat($("obra-investimento-a").value) || 0;
       const investimentoB = parseFloat($("obra-investimento-b").value) || 0;
       
@@ -4541,15 +4597,28 @@
         showToast('Digite o nome da obra', 'warning');
         return;
       }
+      
+      if (!socioAId) {
+        showToast('⚠️ Selecione pelo menos o Sócio A', 'warning');
+        return;
+      }
 
       try {
+        // Pegar nomes dos sócios para compatibilidade
+        const socioA = state.socios.find(s => s.id === socioAId);
+        const socioB = socioBId ? state.socios.find(s => s.id === socioBId) : null;
+        
         await addDoc(refs("dummy").obrasCol, {
           nome,
           endereco: endereco || null,
           dataInicio,
           dataRecebimento,
-          socioA: socioA || 'Sócio A',
-          socioB: socioB || 'Sócio B',
+          // IDs dos sócios (novo formato)
+          socioAId: socioAId,
+          socioBId: socioBId || null,
+          // Nomes dos sócios (compatibilidade)
+          socioA: socioA ? socioA.nome : 'Sócio A',
+          socioB: socioB ? socioB.nome : null,
           investimentoA,
           investimentoB,
           createdAt: serverTimestamp(),
@@ -4557,7 +4626,7 @@
         });
         
         document.getElementById("obra-form").reset();
-        showToast('Obra criada com sucesso!', 'success');
+        showToast('🏗️ Obra criada com sucesso!', 'success');
         closeModal("modal-obra");
       } catch (err) {
         console.error(err);
