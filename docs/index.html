@@ -2094,6 +2094,9 @@
     }
 
     function renderObrasLista() {
+      console.log("🏗️ renderObrasLista chamado. Total de obras:", state.obras.length);
+      console.log("📋 Obras:", state.obras.map(o => o.nome));
+      
       if (state.obras.length === 0) {
         $("obras-lista").innerHTML = `
           <div class="col-span-2 text-center py-12">
@@ -2109,6 +2112,8 @@
       const html = state.obras.map(obra => {
         const dataInicio = obra.dataInicio ? new Date(obra.dataInicio).toLocaleDateString('pt-BR') : 'N/A';
         const totalInvest = (obra.investimentoA || 0) + (obra.investimentoB || 0);
+        
+        console.log(`  📦 Renderizando card: ${obra.nome} (${obra.id})`);
         
         return `
           <div class="card p-6 hover:shadow-xl transition-shadow cursor-pointer" onclick="window.selecionarObra('${obra.id}')">
@@ -2159,6 +2164,7 @@
       }).join('');
 
       $("obras-lista").innerHTML = html;
+      console.log("✅ obras-lista atualizado com HTML de", state.obras.length, "obras");
     }
 
     window.selecionarObra = (obraId) => {
