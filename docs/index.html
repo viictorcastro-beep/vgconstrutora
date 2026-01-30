@@ -2221,7 +2221,8 @@
         await salvarEdicaoObra(obraId);
       };
 
-      openModal("modal-obra");
+      // Modal já está aberto, não precisa chamar openModal()
+      console.log("✏️ Modo edição ativado para:", obra.nome);
     };
 
     async function salvarEdicaoObra(obraId) {
@@ -4366,13 +4367,22 @@
     }
 
     // MODALS
+    let modalObraAberto = false; // Flag para evitar loop infinito
+    
     function openModal(id) {
+      // Se o modal-obra já está aberto, NÃO reabrir
+      if (id === "modal-obra" && modalObraAberto) {
+        console.log("⚠️ Modal já aberto, ignorando...");
+        return;
+      }
+      
       console.log("🔓 Abrindo modal:", id);
       $(id).classList.remove("hidden");
       $(id).classList.add("flex");
       
       // Renderizar conteúdo específico do modal quando abrir
       if (id === "modal-obra") {
+        modalObraAberto = true; // Marcar como aberto
         console.log("  📋 Chamando renderObrasModal...");
         try {
           renderObrasModal();
@@ -4387,6 +4397,11 @@
     function closeModal(id) {
       $(id).classList.add("hidden");
       $(id).classList.remove("flex");
+      
+      // Resetar flag quando fechar modal-obra
+      if (id === "modal-obra") {
+        modalObraAberto = false;
+      }
     }
 
     function renderObrasModal() {
