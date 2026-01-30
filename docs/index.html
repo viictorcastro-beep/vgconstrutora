@@ -718,6 +718,19 @@
       console.error("✗ Erro redirect result:", error);
     });
 
+    // Setup login buttons (needs to be before auth state changes)
+    $("login-btn").onclick = handleLogin;
+    $("login-redirect-btn").onclick = async () => {
+      console.log("🔐 Login via redirect");
+      $("login-msg").textContent = "Redirecionando...";
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (err) {
+        console.error("✗ Erro redirect:", err);
+        showLoginError(err);
+      }
+    };
+
     function setupEventListeners() {
       // Modal triggers
       $("menu-obras").onclick = () => openModal("modal-obras");
@@ -786,19 +799,6 @@
       document.querySelectorAll("[data-close]").forEach(btn => {
         btn.onclick = () => closeModal(btn.dataset.close);
       });
-
-      // Login
-      $("login-btn").onclick = handleLogin;
-      $("login-redirect-btn").onclick = async () => {
-        console.log("🔐 Login via redirect");
-        $("login-msg").textContent = "Redirecionando...";
-        try {
-          await signInWithRedirect(auth, provider);
-        } catch (err) {
-          console.error("✗ Erro redirect:", err);
-          showLoginError(err);
-        }
-      };
     }
 
     async function handleLogin() {
