@@ -719,52 +719,58 @@
             <input id="obra-nome" type="text" class="input" placeholder="Ex: Residencial Solar" required />
           </div>
           <div>
-            <div class="text-xs muted mb-1">Data de Início *</div>
-            <input id="obra-inicio" type="date" class="input" required />
+            <div class="text-xs muted mb-1">Endereço</div>
+            <input id="obra-endereco" type="text" class="input" placeholder="QD 61 LT 32" />
           </div>
-        </div>
-
-        <div>
-          <div class="text-xs muted mb-1">Endereço</div>
-          <input id="obra-endereco" type="text" class="input" placeholder="Rua, número, bairro" />
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <div class="text-xs muted mb-1">Total Previsto de Unidades</div>
-            <input id="obra-total-unidades" type="number" class="input" placeholder="Ex: 4" />
+            <div class="text-xs muted mb-1">📅 Data de Início</div>
+            <input id="obra-data-inicio" type="date" class="input" />
+            <div class="text-xs text-gray-600 mt-1">Quando começou a construção</div>
           </div>
           <div>
-            <div class="text-xs muted mb-1">Prazo Estimado (meses)</div>
-            <input id="obra-prazo" type="number" class="input" placeholder="Ex: 18" />
+            <div class="text-xs muted mb-1">📅 Data de Recebimento</div>
+            <input id="obra-data-recebimento" type="date" class="input" />
+            <div class="text-xs text-gray-600 mt-1">Quando espera receber/vendeu</div>
+          </div>
+        </div>
+
+        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div class="font-bold text-purple-900 mb-3">👔 Sócios da Obra</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="text-xs muted mb-1">Nome do Sócio A</div>
+              <input id="obra-socio-a" type="text" class="input" placeholder="Ex: Victor Castro" />
+            </div>
+            <div>
+              <div class="text-xs muted mb-1">Nome do Sócio B</div>
+              <input id="obra-socio-b" type="text" class="input" placeholder="Ex: Gustavo Medeiros" />
+            </div>
           </div>
         </div>
 
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div class="font-bold text-blue-900 mb-3">💰 Investimentos dos Sócios</div>
+          <div class="font-bold text-blue-900 mb-3">💰 Investimentos Iniciais dos Sócios</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div class="text-xs muted mb-1">Total Investido por Sócio A (R$)</div>
-              <input id="obra-invest-a" type="number" step="0.01" class="input" placeholder="0.00" />
-              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes, etc.</div>
+              <input id="obra-investimento-a" type="number" step="0.01" class="input" placeholder="0.00" />
+              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes gerais</div>
             </div>
             <div>
               <div class="text-xs muted mb-1">Total Investido por Sócio B (R$)</div>
-              <input id="obra-invest-b" type="number" step="0.01" class="input" placeholder="0.00" />
-              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes, etc.</div>
+              <input id="obra-investimento-b" type="number" step="0.01" class="input" placeholder="0.00" />
+              <div class="text-xs text-gray-600 mt-1">Sinal, terreno, aportes gerais</div>
             </div>
           </div>
           <div class="text-xs text-gray-600 mt-2">
-            💡 Pode ser atualizado a qualquer momento conforme novos aportes
+            💡 Investimentos iniciais (não vinculados a unidades específicas)
           </div>
         </div>
 
-        <div>
-          <div class="text-xs muted mb-1">Observações</div>
-          <textarea id="obra-obs" class="input" rows="2" placeholder="Informações adicionais sobre a obra..."></textarea>
-        </div>
-
-        <button type="submit" class="btn btn-green w-full">Criar Obra</button>
+        <button id="obra-submit-btn" type="submit" class="btn btn-green w-full">Criar Obra</button>
       </form>
     </div>
   </div>
@@ -1324,7 +1330,8 @@
       };
 
       // CRUD buttons
-      $("obra-create").onclick = createObra;
+      $("obra-create").onclick = () => openModal("modal-obra");
+      document.getElementById("obra-form").onsubmit = createObra;
       $("unid-create").onclick = createUnidade;
       $("forn-create").onclick = createFornecedor;
       $("cat-create").onclick = createCategoria;
@@ -2162,10 +2169,85 @@
       showToast('Obra selecionada!', 'success');
     };
 
-    window.editarObra = (obraId) => {
-      // TODO: Implementar edição
-      showToast('Edição de obra em desenvolvimento', 'info');
+    window.editarObra = async (obraId) => {
+      const obra = state.obras.find(o => o.id === obraId);
+      if (!obra) {
+        showToast('Obra não encontrada', 'error');
+        return;
+      }
+
+      // Preencher modal com dados da obra
+      $("obra-nome").value = obra.nome || '';
+      $("obra-endereco").value = obra.endereco || '';
+      $("obra-data-inicio").value = obra.dataInicio || '';
+      $("obra-data-recebimento").value = obra.dataRecebimento || '';
+      $("obra-socio-a").value = obra.socioA || '';
+      $("obra-socio-b").value = obra.socioB || '';
+      $("obra-investimento-a").value = obra.investimentoA || 0;
+      $("obra-investimento-b").value = obra.investimentoB || 0;
+
+      // Mudar título do modal
+      document.querySelector("#modal-obra .font-black").textContent = "✏️ Editar Obra";
+      
+      // Mudar botão para "Salvar Alterações"
+      const btnSubmit = $("obra-submit-btn");
+      btnSubmit.textContent = "Salvar Alterações";
+      btnSubmit.onclick = async (e) => {
+        e.preventDefault();
+        await salvarEdicaoObra(obraId);
+      };
+
+      openModal("modal-obra");
     };
+
+    async function salvarEdicaoObra(obraId) {
+      const nome = $("obra-nome").value.trim();
+      const endereco = $("obra-endereco").value.trim();
+      const dataInicio = $("obra-data-inicio").value;
+      const dataRecebimento = $("obra-data-recebimento").value;
+      const socioA = $("obra-socio-a").value.trim();
+      const socioB = $("obra-socio-b").value.trim();
+      const investimentoA = parseFloat($("obra-investimento-a").value) || 0;
+      const investimentoB = parseFloat($("obra-investimento-b").value) || 0;
+
+      if (!nome) {
+        showToast('Digite o nome da obra', 'warning');
+        return;
+      }
+
+      try {
+        const obraRef = doc(db, "obras", obraId);
+        await updateDoc(obraRef, {
+          nome,
+          endereco: endereco || null,
+          dataInicio: dataInicio || null,
+          dataRecebimento: dataRecebimento || null,
+          socioA: socioA || 'Sócio A',
+          socioB: socioB || 'Sócio B',
+          investimentoA,
+          investimentoB,
+          updatedAt: serverTimestamp(),
+          updatedBy: state.user.email
+        });
+
+        showToast('Obra atualizada com sucesso!', 'success');
+        closeModal("modal-obra");
+        
+        // Resetar modal para modo criação
+        resetarModalObra();
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao atualizar obra', 'error');
+      }
+    }
+
+    function resetarModalObra() {
+      document.querySelector("#modal-obra .font-black").textContent = "🏗️ Nova Obra";
+      const btnSubmit = $("obra-submit-btn");
+      btnSubmit.textContent = "Criar Obra";
+      btnSubmit.onclick = null;
+      document.getElementById("obra-form").reset();
+    }
 
     window.deletarObra = async (obraId) => {
       if (!confirm('Tem certeza que deseja deletar esta obra? Todos os dados serão perdidos!')) return;
@@ -4374,10 +4456,17 @@
     }
 
     // CRUD FUNCTIONS
-    async function createObra() {
-      const nome = $("obra-new-nome").value.trim();
-      const dataInicio = $("obra-new-inicio").value || null;
-      const dataRecebimento = $("obra-new-recebimento").value || null;
+    async function createObra(e) {
+      if (e) e.preventDefault();
+      
+      const nome = $("obra-nome").value.trim();
+      const endereco = $("obra-endereco").value.trim();
+      const dataInicio = $("obra-data-inicio").value || null;
+      const dataRecebimento = $("obra-data-recebimento").value || null;
+      const socioA = $("obra-socio-a").value.trim();
+      const socioB = $("obra-socio-b").value.trim();
+      const investimentoA = parseFloat($("obra-investimento-a").value) || 0;
+      const investimentoB = parseFloat($("obra-investimento-b").value) || 0;
       
       if (!nome) {
         showToast('Digite o nome da obra', 'warning');
@@ -4387,15 +4476,20 @@
       try {
         await addDoc(refs("dummy").obrasCol, {
           nome,
+          endereco: endereco || null,
           dataInicio,
           dataRecebimento,
+          socioA: socioA || 'Sócio A',
+          socioB: socioB || 'Sócio B',
+          investimentoA,
+          investimentoB,
           createdAt: serverTimestamp(),
           createdBy: state.user.email
         });
-        $("obra-new-nome").value = "";
-        $("obra-new-inicio").value = "";
-        $("obra-new-recebimento").value = "";
+        
+        document.getElementById("obra-form").reset();
         showToast('Obra criada com sucesso!', 'success');
+        closeModal("modal-obra");
       } catch (err) {
         console.error(err);
         showToast('Erro ao criar obra', 'error');
