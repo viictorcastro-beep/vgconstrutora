@@ -1613,9 +1613,13 @@
         return;
       }
       sel.innerHTML = state.obras.map(o => `<option value="${o.id}">${escapeHtml(o.nome || o.id)}</option>`).join("");
-      if (!OBRA_ID) OBRA_ID = state.obras[0].id;
-      sel.value = OBRA_ID;
-      subscribeObra();
+      if (!OBRA_ID) {
+        OBRA_ID = state.obras[0].id;
+        subscribeObra(); // Só subscribe se for a primeira vez
+      } else {
+        sel.value = OBRA_ID;
+        // Não chamar subscribeObra() aqui - evita loop infinito
+      }
     }
 
     function subscribeObra() {
