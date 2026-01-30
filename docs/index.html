@@ -205,6 +205,9 @@
         <!-- KPIs -->
         <div id="kpis-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6"></div>
         
+        <!-- Métricas de Rentabilidade -->
+        <div id="roi-section" class="mb-6"></div>
+        
         <!-- Custo por m² -->
         <div id="custo-m2-section"></div>
         
@@ -531,13 +534,13 @@
               <input id="ded-nome" type="text" class="input text-sm" placeholder="Ex: IR, INSS, Corretagem" />
               
               <div class="grid grid-cols-2 gap-2">
-                <select id="ded-tipo" class="input text-sm">
+                <select id="ded-tipo" class="input text-sm" onchange="toggleDeducaoBase()">
                   <option value="percentual">Percentual (%)</option>
                   <option value="fixo">Valor Fixo (R$)</option>
                 </select>
                 <select id="ded-base" class="input text-sm">
                   <option value="lucro">Sobre Lucro Bruto</option>
-                  <option value="vgv">Sobre VGV</option>
+                  <option value="venda">Sobre Valor de Venda</option>
                 </select>
               </div>
               
@@ -561,18 +564,34 @@
 
   <!-- MODALS -->
   <div id="modal-obras" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-3xl">
+    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <div class="font-black text-xl">🏗️ Obras</div>
         <button data-close="modal-obras" class="btn btn-soft">Fechar</button>
       </div>
 
-      <div class="grid grid-cols-12 gap-3 mb-4">
-        <div class="col-span-9">
-          <div class="text-xs muted mb-1">Nome da Obra</div>
-          <input id="obra-new-nome" class="input" placeholder="Ex: Obra Residencial X" />
+      <div class="space-y-3 mb-4">
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-12">
+            <div class="text-xs muted mb-1">Nome da Obra</div>
+            <input id="obra-new-nome" class="input" placeholder="Ex: Obra Residencial X" />
+          </div>
         </div>
-        <div class="col-span-3 flex items-end">
+        
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-6">
+            <div class="text-xs muted mb-1">📅 Data de Início</div>
+            <input id="obra-new-inicio" type="date" class="input" />
+            <div class="text-xs muted mt-1">Quando começou a construção</div>
+          </div>
+          <div class="col-span-6">
+            <div class="text-xs muted mb-1">📅 Data de Recebimento</div>
+            <input id="obra-new-recebimento" type="date" class="input" />
+            <div class="text-xs muted mt-1">Quando espera receber/vendeu</div>
+          </div>
+        </div>
+        
+        <div class="flex items-end">
           <button id="obra-create" class="btn btn-dark w-full">Criar Obra</button>
         </div>
       </div>
@@ -764,6 +783,20 @@
       }, 3500);
     }
 
+    // Helper para desabilitar base quando valor é fixo
+    function toggleDeducaoBase() {
+      const tipo = $("ded-tipo").value;
+      const baseSelect = $("ded-base");
+      
+      if (tipo === "fixo") {
+        baseSelect.disabled = true;
+        baseSelect.classList.add("opacity-50", "cursor-not-allowed");
+      } else {
+        baseSelect.disabled = false;
+        baseSelect.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+    }
+
     // Global state
     let VIEW = "DASHBOARD";
     let OBRA_ID = null;
@@ -825,6 +858,10 @@
         
         subscribeObrasList();
         setupEventListeners();
+        
+        // Inicializar estado do formulário de deduções
+        toggleDeducaoBase();
+        
         showToast(`Bem-vindo, ${user.email}!`, 'success');
       } else {
         state.user = null;
@@ -894,6 +931,9 @@
       $("forn-create").onclick = createFornecedor;
       $("cat-create").onclick = createCategoria;
       $("ded-create").onclick = createDeducao;
+
+      // Deduções: controlar estado da base quando tipo mudar
+      $("ded-tipo").onchange = toggleDeducaoBase;
 
       $("socios-save").onclick = saveSocios;
       $("logout-btn").onclick = () => signOut(auth);
@@ -1265,6 +1305,9 @@
       `;
       $("kpis-grid").innerHTML = kpisHTML;
 
+      // Métricas de Rentabilidade
+      renderROISection(custoTotal, lucroData, totalRecebido);
+
       // Custo por m²
       renderCustoM2(lancs, rats);
 
@@ -1346,6 +1389,206 @@
       }
 
       container.innerHTML = html;
+    }
+
+    function renderROISection(custoTotal, lucroData, totalRecebido) {
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      if (!obra) {
+        $("roi-section").innerHTML = "";
+        return;
+      }
+
+      // Calcular valores reais vs previstos
+      const vgvPrevisto = state.unidades.reduce((sum, u) => sum + (u.vgvPrevisto || 0), 0);
+      const vgvReal = state.unidades.reduce((sum, u) => sum + (u.valorVenda || u.vgvPrevisto || 0), 0);
+      const diferencaVGV = vgvReal - vgvPrevisto;
+      const percentualVGV = vgvPrevisto > 0 ? ((vgvReal / vgvPrevisto - 1) * 100) : 0;
+
+      // Calcular tempo de operação
+      let diasOperacao = null;
+      let mesesOperacao = null;
+      let dataInicioFormatada = null;
+      let dataRecebimentoFormatada = null;
+
+      if (obra.dataInicio) {
+        const inicio = new Date(obra.dataInicio);
+        const fim = obra.dataRecebimento ? new Date(obra.dataRecebimento) : new Date();
+        diasOperacao = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24));
+        mesesOperacao = diasOperacao / 30;
+        
+        dataInicioFormatada = inicio.toLocaleDateString('pt-BR');
+        dataRecebimentoFormatada = obra.dataRecebimento 
+          ? new Date(obra.dataRecebimento).toLocaleDateString('pt-BR')
+          : "Em andamento";
+      }
+
+      // Calcular ROI
+      const lucroLiquidoReal = vgvReal - custoTotal - lucroData.valorDeducoes;
+      const roiPercentual = custoTotal > 0 ? ((lucroLiquidoReal / custoTotal) * 100) : 0;
+      const roiMensal = mesesOperacao > 0 ? (roiPercentual / mesesOperacao) : 0;
+
+      // Análise por sócio (assumindo 50/50)
+      const investimentoPorSocio = custoTotal / 2;
+      const lucroPorSocio = lucroLiquidoReal / 2;
+      const roiPorSocio = investimentoPorSocio > 0 ? ((lucroPorSocio / investimentoPorSocio) * 100) : 0;
+
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
+
+      const html = `
+        <div class="card p-6">
+          <div class="font-black text-lg mb-4">📈 Análise de Rentabilidade da Operação</div>
+          
+          <!-- VGV Previsto vs Real -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
+              <div class="text-xs font-bold text-blue-800 mb-1">💎 VGV PREVISTO</div>
+              <div class="text-2xl font-black text-blue-600">R$ ${vgvPrevisto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-xs text-blue-700 mt-1">Estimativa inicial</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
+              <div class="text-xs font-bold text-green-800 mb-1">💰 VALOR REAL DE VENDA</div>
+              <div class="text-2xl font-black text-green-600">R$ ${vgvReal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-xs text-green-700 mt-1">Valores negociados</div>
+            </div>
+            <div class="bg-gradient-to-br from-${diferencaVGV >= 0 ? 'green' : 'red'}-50 to-${diferencaVGV >= 0 ? 'green' : 'red'}-100 border border-${diferencaVGV >= 0 ? 'green' : 'red'}-200 rounded-lg p-4">
+              <div class="text-xs font-bold text-${diferencaVGV >= 0 ? 'green' : 'red'}-800 mb-1">${diferencaVGV >= 0 ? '📊' : '📉'} VARIAÇÃO</div>
+              <div class="text-2xl font-black text-${diferencaVGV >= 0 ? 'green' : 'red'}-600">${diferencaVGV >= 0 ? '+' : ''}${percentualVGV.toFixed(2)}%</div>
+              <div class="text-xs text-${diferencaVGV >= 0 ? 'green' : 'red'}-700 mt-1">R$ ${diferencaVGV >= 0 ? '+' : ''}${diferencaVGV.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            </div>
+          </div>
+
+          <!-- Tempo de Operação -->
+          ${diasOperacao !== null ? `
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <div class="text-xs font-bold text-purple-800 mb-1">📅 INÍCIO DA CONSTRUÇÃO</div>
+                  <div class="text-xl font-black text-purple-600">${dataInicioFormatada}</div>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-purple-800 mb-1">📅 RECEBIMENTO</div>
+                  <div class="text-xl font-black text-purple-600">${dataRecebimentoFormatada}</div>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-purple-800 mb-1">⏱️ TEMPO DE OPERAÇÃO</div>
+                  <div class="text-xl font-black text-purple-600">${diasOperacao} dias</div>
+                  <div class="text-xs text-purple-700 mt-1">(${mesesOperacao.toFixed(1)} meses)</div>
+                </div>
+              </div>
+            </div>
+          ` : `
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-center">
+              <p class="text-sm text-yellow-800">⚠️ Configure as datas de início e recebimento em <b>🏗️ Obras</b> para ver métricas de tempo</p>
+            </div>
+          `}
+
+          <!-- ROI Geral -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-4">
+              <div class="text-xs font-bold text-orange-800 mb-1">💰 INVESTIMENTO TOTAL</div>
+              <div class="text-xl font-black text-orange-600">R$ ${custoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-xs text-orange-700 mt-1">Custo da obra</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
+              <div class="text-xs font-bold text-green-800 mb-1">💵 LUCRO LÍQUIDO</div>
+              <div class="text-xl font-black text-green-600">R$ ${lucroLiquidoReal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-xs text-green-700 mt-1">Após deduções</div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
+              <div class="text-xs font-bold text-blue-800 mb-1">📊 ROI TOTAL</div>
+              <div class="text-3xl font-black text-blue-600">${roiPercentual.toFixed(2)}%</div>
+              <div class="text-xs text-blue-700 mt-1">Retorno sobre investimento</div>
+            </div>
+            <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-lg p-4">
+              <div class="text-xs font-bold text-indigo-800 mb-1">📈 ROI MENSAL</div>
+              <div class="text-3xl font-black text-indigo-600">${mesesOperacao > 0 ? roiMensal.toFixed(2) + '%' : '-'}</div>
+              <div class="text-xs text-indigo-700 mt-1">${mesesOperacao > 0 ? 'Rentabilidade ao mês' : 'Configure datas'}</div>
+            </div>
+          </div>
+
+          <!-- Análise por Sócio -->
+          <div class="border-t pt-4">
+            <div class="font-bold text-gray-800 mb-3">👥 Análise Individual por Sócio (50/50)</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Sócio A -->
+              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <h4 class="font-bold text-gray-800 mb-3 text-lg">👤 ${escapeHtml(socioA)}</h4>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">💰 Investimento:</span>
+                    <span class="font-bold">R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">💵 Lucro Líquido:</span>
+                    <span class="font-bold text-green-600">R$ ${lucroPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  <div class="flex justify-between border-t pt-2">
+                    <span class="text-gray-600">📊 ROI Individual:</span>
+                    <span class="font-bold text-blue-600 text-xl">${roiPorSocio.toFixed(2)}%</span>
+                  </div>
+                  ${mesesOperacao > 0 ? `
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">📈 ROI Mensal:</span>
+                      <span class="font-bold text-indigo-600">${roiMensal.toFixed(2)}%/mês</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💰 Lucro/Mês:</span>
+                      <span class="font-bold text-green-600">R$ ${(lucroPorSocio / mesesOperacao).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+
+              <!-- Sócio B -->
+              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <h4 class="font-bold text-gray-800 mb-3 text-lg">👤 ${escapeHtml(socioB)}</h4>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">💰 Investimento:</span>
+                    <span class="font-bold">R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">💵 Lucro Líquido:</span>
+                    <span class="font-bold text-green-600">R$ ${lucroPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  <div class="flex justify-between border-t pt-2">
+                    <span class="text-gray-600">📊 ROI Individual:</span>
+                    <span class="font-bold text-blue-600 text-xl">${roiPorSocio.toFixed(2)}%</span>
+                  </div>
+                  ${mesesOperacao > 0 ? `
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">📈 ROI Mensal:</span>
+                      <span class="font-bold text-indigo-600">${roiMensal.toFixed(2)}%/mês</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💰 Lucro/Mês:</span>
+                      <span class="font-bold text-green-600">R$ ${(lucroPorSocio / mesesOperacao).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          ${mesesOperacao > 0 ? `
+            <div class="mt-6 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-lg p-4">
+              <div class="text-center">
+                <div class="text-sm font-bold text-gray-700 mb-2">💡 Resumo da Operação</div>
+                <div class="text-lg text-gray-800">
+                  Investimento de <span class="font-black text-orange-600">R$ ${custoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span> 
+                  gerou lucro líquido de <span class="font-black text-green-600">R$ ${lucroLiquidoReal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span> 
+                  em <span class="font-black text-purple-600">${mesesOperacao.toFixed(1)} meses</span>, 
+                  representando <span class="font-black text-blue-600">${roiPercentual.toFixed(2)}%</span> de retorno total 
+                  (<span class="font-black text-indigo-600">${roiMensal.toFixed(2)}%/mês</span>)
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      $("roi-section").innerHTML = html;
     }
 
     function renderCustoM2(lancs, rats) {
@@ -2005,6 +2248,9 @@
     // CRUD FUNCTIONS
     async function createObra() {
       const nome = $("obra-new-nome").value.trim();
+      const dataInicio = $("obra-new-inicio").value || null;
+      const dataRecebimento = $("obra-new-recebimento").value || null;
+      
       if (!nome) {
         showToast('Digite o nome da obra', 'warning');
         return;
@@ -2013,10 +2259,14 @@
       try {
         await addDoc(refs("dummy").obrasCol, {
           nome,
+          dataInicio,
+          dataRecebimento,
           createdAt: serverTimestamp(),
           createdBy: state.user.email
         });
         $("obra-new-nome").value = "";
+        $("obra-new-inicio").value = "";
+        $("obra-new-recebimento").value = "";
         showToast('Obra criada com sucesso!', 'success');
       } catch (err) {
         console.error(err);
@@ -2651,7 +2901,8 @@
       if (!lancs) lancs = getLancamentosFiltrados();
       if (!rats) rats = getRateiosFiltrados();
 
-      const vgvTotal = state.unidades.reduce((sum, u) => sum + (u.vgvPrevisto || 0), 0);
+      // Usa valor real de venda quando disponível, senão usa VGV previsto
+      const vgvTotal = state.unidades.reduce((sum, u) => sum + (u.valorVenda || u.vgvPrevisto || 0), 0);
       const custoTotal = computeCustoTotal(lancs, rats);
       const lucroBruto = vgvTotal - custoTotal;
 
@@ -2666,10 +2917,10 @@
         
         if (tipo === 'percentual') {
           // Aplica percentual sobre a base escolhida
-          const baseCalculo = base === 'vgv' ? vgvTotal : lucroBruto;
+          const baseCalculo = base === 'venda' || base === 'vgv' ? vgvTotal : lucroBruto;
           valorDeducao = (valor / 100) * baseCalculo;
         } else {
-          // Valor fixo
+          // Valor fixo não precisa de cálculo
           valorDeducao = valor;
         }
         
@@ -2678,7 +2929,7 @@
           ...d, 
           valorDeducao,
           displayTipo: tipo === 'percentual' ? `${valor.toFixed(2)}%` : `R$ ${valor.toFixed(2)}`,
-          displayBase: base === 'lucro' ? 'Lucro Bruto' : 'VGV'
+          displayBase: base === 'lucro' ? 'Lucro Bruto' : 'Valor de Venda'
         });
       });
 
