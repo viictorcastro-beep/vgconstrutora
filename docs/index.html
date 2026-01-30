@@ -1105,10 +1105,10 @@
       $("acerto-form").onsubmit = addAcerto;
       $("acerto-sugerir").onclick = () => {
         const eq = computeEqualizacao();
-        if (eq) {
-          showToast(eq, 'info');
+        if (eq && eq.mensagem) {
+          showToast(eq.mensagem, 'info');
         } else {
-          showToast('Sem sugestão (saldos zerados)', 'info');
+          showToast('✅ Saldos equalizados! Não há acertos pendentes.', 'success');
         }
       };
 
@@ -2235,10 +2235,145 @@
     function renderEqualizacaoSection() {
       const eq = computeEqualizacao();
       if (!eq) {
-        $("equalizacao-section").innerHTML = '<p class="text-sm muted">Saldos zerados</p>';
+        $("equalizacao-section").innerHTML = '<p class="text-sm muted">Erro ao calcular equalização</p>';
         return;
       }
-      $("equalizacao-section").innerHTML = `<p class="text-lg">${eq}</p>`;
+
+      const html = `
+        <!-- Análise Detalhada de Fluxo de Caixa por Sócio -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <!-- Sócio A -->
+          <div class="border border-gray-200 rounded-lg p-6 bg-gradient-to-br from-blue-50 to-white">
+            <h4 class="font-bold text-gray-800 mb-4 text-xl flex items-center gap-2">
+              👤 ${escapeHtml(eq.socioA)}
+            </h4>
+            
+            <div class="space-y-3">
+              <div class="bg-white rounded-lg p-3 border border-blue-200">
+                <div class="text-xs font-bold text-blue-800 mb-1">💰 DINHEIRO QUE ENTROU (50%)</div>
+                <div class="text-2xl font-black text-blue-600">R$ ${eq.recebeuA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Sua parte dos recebimentos (${eq.totalRecebido > 0 ? '50%' : '0%'} de R$ ${eq.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+              </div>
+
+              <div class="bg-white rounded-lg p-3 border border-red-200">
+                <div class="text-xs font-bold text-red-800 mb-1">💸 DINHEIRO QUE PAGOU</div>
+                <div class="text-2xl font-black text-red-600">R$ ${eq.pagouA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Custos que você efetivamente pagou</div>
+              </div>
+
+              <div class="bg-white rounded-lg p-3 border border-orange-200">
+                <div class="text-xs font-bold text-orange-800 mb-1">📊 DEVERIA PAGAR (50%)</div>
+                <div class="text-2xl font-black text-orange-600">R$ ${eq.deveGastarA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Sua parte dos custos totais (50% de R$ ${eq.totalGasto.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-${eq.saldoCaixaA >= 0 ? 'green' : 'red'}-50 to-${eq.saldoCaixaA >= 0 ? 'green' : 'red'}-100 rounded-lg p-3 border-2 border-${eq.saldoCaixaA >= 0 ? 'green' : 'red'}-300">
+                <div class="text-xs font-bold text-${eq.saldoCaixaA >= 0 ? 'green' : 'red'}-900 mb-1">🏦 SALDO DE CAIXA</div>
+                <div class="text-2xl font-black text-${eq.saldoCaixaA >= 0 ? 'green' : 'red'}-700">R$ ${eq.saldoCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-${eq.saldoCaixaA >= 0 ? 'green' : 'red'}-800 mt-1">Recebeu - Pagou = ${eq.saldoCaixaA >= 0 ? 'Positivo' : 'Negativo'}</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-${eq.diferencaGastosA >= 0 ? 'purple' : 'yellow'}-50 to-white rounded-lg p-3 border-2 border-${eq.diferencaGastosA >= 0 ? 'purple' : 'yellow'}-300">
+                <div class="text-xs font-bold text-${eq.diferencaGastosA >= 0 ? 'purple' : 'yellow'}-900 mb-1">⚖️ DIFERENÇA NOS GASTOS</div>
+                <div class="text-2xl font-black text-${eq.diferencaGastosA >= 0 ? 'purple' : 'yellow'}-700">${eq.diferencaGastosA >= 0 ? '+' : ''}R$ ${eq.diferencaGastosA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-700 mt-1">${eq.diferencaGastosA >= 0 ? 'Você pagou MAIS que sua parte' : 'Você pagou MENOS que sua parte'}</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg p-3 border-2 border-indigo-400">
+                <div class="text-xs font-bold text-indigo-900 mb-1">🎯 SALDO FINAL (após acertos)</div>
+                <div class="text-3xl font-black text-indigo-700">${eq.saldoFinalA >= 0 ? '+' : ''}R$ ${eq.saldoFinalA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-indigo-800 mt-1">${eq.saldoFinalA >= 0 ? 'Tem a receber' : 'Tem a pagar'}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sócio B -->
+          <div class="border border-gray-200 rounded-lg p-6 bg-gradient-to-br from-green-50 to-white">
+            <h4 class="font-bold text-gray-800 mb-4 text-xl flex items-center gap-2">
+              👤 ${escapeHtml(eq.socioB)}
+            </h4>
+            
+            <div class="space-y-3">
+              <div class="bg-white rounded-lg p-3 border border-blue-200">
+                <div class="text-xs font-bold text-blue-800 mb-1">💰 DINHEIRO QUE ENTROU (50%)</div>
+                <div class="text-2xl font-black text-blue-600">R$ ${eq.recebeuB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Sua parte dos recebimentos (${eq.totalRecebido > 0 ? '50%' : '0%'} de R$ ${eq.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+              </div>
+
+              <div class="bg-white rounded-lg p-3 border border-red-200">
+                <div class="text-xs font-bold text-red-800 mb-1">💸 DINHEIRO QUE PAGOU</div>
+                <div class="text-2xl font-black text-red-600">R$ ${eq.pagouB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Custos que você efetivamente pagou</div>
+              </div>
+
+              <div class="bg-white rounded-lg p-3 border border-orange-200">
+                <div class="text-xs font-bold text-orange-800 mb-1">📊 DEVERIA PAGAR (50%)</div>
+                <div class="text-2xl font-black text-orange-600">R$ ${eq.deveGastarB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-600 mt-1">Sua parte dos custos totais (50% de R$ ${eq.totalGasto.toLocaleString('pt-BR', {minimumFractionDigits: 2})})</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-${eq.saldoCaixaB >= 0 ? 'green' : 'red'}-50 to-${eq.saldoCaixaB >= 0 ? 'green' : 'red'}-100 rounded-lg p-3 border-2 border-${eq.saldoCaixaB >= 0 ? 'green' : 'red'}-300">
+                <div class="text-xs font-bold text-${eq.saldoCaixaB >= 0 ? 'green' : 'red'}-900 mb-1">🏦 SALDO DE CAIXA</div>
+                <div class="text-2xl font-black text-${eq.saldoCaixaB >= 0 ? 'green' : 'red'}-700">R$ ${eq.saldoCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-${eq.saldoCaixaB >= 0 ? 'green' : 'red'}-800 mt-1">Recebeu - Pagou = ${eq.saldoCaixaB >= 0 ? 'Positivo' : 'Negativo'}</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-${eq.diferencaGastosB >= 0 ? 'purple' : 'yellow'}-50 to-white rounded-lg p-3 border-2 border-${eq.diferencaGastosB >= 0 ? 'purple' : 'yellow'}-300">
+                <div class="text-xs font-bold text-${eq.diferencaGastosB >= 0 ? 'purple' : 'yellow'}-900 mb-1">⚖️ DIFERENÇA NOS GASTOS</div>
+                <div class="text-2xl font-black text-${eq.diferencaGastosB >= 0 ? 'purple' : 'yellow'}-700">${eq.diferencaGastosB >= 0 ? '+' : ''}R$ ${eq.diferencaGastosB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-gray-700 mt-1">${eq.diferencaGastosB >= 0 ? 'Você pagou MAIS que sua parte' : 'Você pagou MENOS que sua parte'}</div>
+              </div>
+
+              <div class="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg p-3 border-2 border-indigo-400">
+                <div class="text-xs font-bold text-indigo-900 mb-1">🎯 SALDO FINAL (após acertos)</div>
+                <div class="text-3xl font-black text-indigo-700">${eq.saldoFinalB >= 0 ? '+' : ''}R$ ${eq.saldoFinalB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div class="text-xs text-indigo-800 mt-1">${eq.saldoFinalB >= 0 ? 'Tem a receber' : 'Tem a pagar'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sugestão de Acerto -->
+        ${eq.mensagem ? `
+          <div class="bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 border-2 border-orange-400 rounded-lg p-6 text-center">
+            <div class="text-2xl mb-2">💡</div>
+            <div class="text-lg font-bold text-gray-800 mb-2">Sugestão de Equalização</div>
+            <div class="text-2xl font-black text-orange-600">${eq.mensagem}</div>
+            <div class="text-sm text-gray-600 mt-3">
+              Use o formulário acima para registrar este acerto e zerar os saldos
+            </div>
+          </div>
+        ` : `
+          <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-lg p-6 text-center">
+            <div class="text-4xl mb-2">✅</div>
+            <div class="text-lg font-bold text-green-800">Saldos Equalizados!</div>
+            <div class="text-sm text-gray-600 mt-2">Não há acertos pendentes entre os sócios</div>
+          </div>
+        `}
+
+        <!-- Explicação do Cálculo -->
+        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div class="font-bold text-blue-900 mb-2">📚 Como funciona a equalização:</div>
+          <div class="text-sm text-blue-800 space-y-1">
+            <p>1️⃣ <strong>Dinheiro que Entrou:</strong> Cada sócio tem direito a 50% dos recebimentos (sinais, parcelas, etc)</p>
+            <p>2️⃣ <strong>Dinheiro que Pagou:</strong> O que cada um efetivamente desembolsou para pagar custos</p>
+            <p>3️⃣ <strong>Deveria Pagar:</strong> Cada sócio deve arcar com 50% dos custos totais</p>
+            <p>4️⃣ <strong>Saldo de Caixa:</strong> Recebeu - Pagou (mostra o fluxo real de cada um)</p>
+            <p>5️⃣ <strong>Diferença nos Gastos:</strong> Pagou - Deveria Pagar (quem pagou mais ou menos que sua parte)</p>
+            <p>6️⃣ <strong>Saldo Final:</strong> Após considerar os acertos já realizados</p>
+          </div>
+          <div class="mt-3 p-3 bg-white rounded border border-blue-300">
+            <div class="font-bold text-blue-900 text-sm mb-1">💡 Exemplo prático:</div>
+            <div class="text-xs text-gray-700">
+              Entrou R$ 10.000 (sinal) → R$ 5.000 para cada sócio<br>
+              Gustavo deveria pagar R$ 5.000 de custos, mas Victor pagou usando o dinheiro do caixa<br>
+              Resultado: Gustavo deve R$ 5.000 para Victor (usou o dinheiro dele que estava no caixa)
+            </div>
+          </div>
+        </div>
+      `;
+
+      $("equalizacao-section").innerHTML = html;
     }
 
     function hydrateFilterSelects() {
@@ -3410,7 +3545,12 @@
       const socioA = state.config.socioA || "Sócio A";
       const socioB = state.config.socioB || "Sócio B";
 
-      // Calcular quanto cada um pagou
+      // 1. RECEBIMENTOS (Dinheiro que entrou - dividido 50/50)
+      const totalRecebido = state.recebimentos.reduce((sum, r) => sum + r.valor, 0);
+      const recebeuA = totalRecebido / 2;  // 50% para A
+      const recebeuB = totalRecebido / 2;  // 50% para B
+
+      // 2. GASTOS (Dinheiro que saiu - quem efetivamente pagou)
       let pagouA = 0;
       let pagouB = 0;
 
@@ -3434,38 +3574,69 @@
       // Total de gastos
       const totalGasto = pagouA + pagouB;
 
-      // Cada um deveria pagar metade
-      const deveA = totalGasto / 2;
-      const deveB = totalGasto / 2;
+      // 3. CADA UM DEVERIA PAGAR METADE DOS GASTOS
+      const deveGastarA = totalGasto / 2;
+      const deveGastarB = totalGasto / 2;
 
-      // Saldo antes dos acertos
-      let saldoA = pagouA - deveA;  // Se positivo, A pagou a mais
-      let saldoB = pagouB - deveB;  // Se positivo, B pagou a mais
+      // 4. SALDO DE CAIXA POR SÓCIO
+      // Saldo = Recebeu - Gastou
+      const saldoCaixaA = recebeuA - pagouA;
+      const saldoCaixaB = recebeuB - pagouB;
 
-      // Aplicar acertos (transferências entre sócios)
+      // 5. DIFERENÇA DE GASTOS
+      // Se A pagou mais que devia, B deve para A
+      const diferencaGastosA = pagouA - deveGastarA;
+      const diferencaGastosB = pagouB - deveGastarB;
+
+      // 6. APLICAR ACERTOS (transferências entre sócios)
+      let saldoFinalA = diferencaGastosA;
+      let saldoFinalB = diferencaGastosB;
+
       state.acertos.forEach(a => {
         if (a.de === "A" && a.para === "B") {
           // A transferiu dinheiro para B
-          saldoA -= a.valor;  // A diminui saldo (deu dinheiro)
-          saldoB += a.valor;  // B aumenta saldo (recebeu dinheiro)
+          saldoFinalA -= a.valor;  // A diminui saldo (deu dinheiro)
+          saldoFinalB += a.valor;  // B aumenta saldo (recebeu dinheiro)
         } else if (a.de === "B" && a.para === "A") {
           // B transferiu dinheiro para A
-          saldoB -= a.valor;
-          saldoA += a.valor;
+          saldoFinalB -= a.valor;
+          saldoFinalA += a.valor;
         }
       });
 
-      // Resultado final
+      // Retornar dados completos para exibição
+      return {
+        socioA,
+        socioB,
+        recebeuA,
+        recebeuB,
+        pagouA,
+        pagouB,
+        deveGastarA,
+        deveGastarB,
+        saldoCaixaA,
+        saldoCaixaB,
+        diferencaGastosA,
+        diferencaGastosB,
+        saldoFinalA,
+        saldoFinalB,
+        totalRecebido,
+        totalGasto,
+        mensagem: getSugestaoEqualizacao(saldoFinalA, saldoFinalB, socioA, socioB)
+      };
+    }
+
+    function getSugestaoEqualizacao(saldoA, saldoB, nomeA, nomeB) {
       if (Math.abs(saldoA) < 1 && Math.abs(saldoB) < 1) {
         return null;
       }
 
       if (saldoA > 0) {
         // A pagou a mais, então B deve para A
-        return `${socioB} deve R$ ${Math.abs(saldoA).toFixed(2)} para ${socioA}`;
+        return `${nomeB} deve transferir R$ ${Math.abs(saldoA).toFixed(2)} para ${nomeA}`;
       } else {
         // A pagou a menos, então A deve para B
-        return `${socioA} deve R$ ${Math.abs(saldoA).toFixed(2)} para ${socioB}`;
+        return `${nomeA} deve transferir R$ ${Math.abs(saldoA).toFixed(2)} para ${nomeB}`;
       }
     }
 
