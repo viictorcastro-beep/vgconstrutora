@@ -203,7 +203,7 @@
         </div>
 
         <!-- KPIs -->
-        <div id="kpis-grid" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"></div>
+        <div id="kpis-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6"></div>
         
         <!-- Custo por m² -->
         <div id="custo-m2-section"></div>
@@ -1228,6 +1228,11 @@
       const custoTotal = computeCustoTotal(lancs, rats);
       const lucroData = computeLucro(lancs, rats);
       const equalizacao = computeEqualizacao();
+      
+      // Calcular recebimentos
+      const totalRecebido = state.recebimentos.reduce((sum, r) => sum + (r.valor || 0), 0);
+      const aReceber = lucroData.vgvTotal - totalRecebido;
+      const fluxoCaixa = totalRecebido - custoTotal;
 
       // KPIs
       const kpisHTML = `
@@ -1238,6 +1243,16 @@
         <div class="card p-6">
           <div class="text-xs muted mb-2">💎 VGV PREVISTO</div>
           <div class="text-3xl font-black">R$ ${lucroData.vgvTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+        </div>
+        <div class="card p-6">
+          <div class="text-xs muted mb-2">💵 RECEBIDO</div>
+          <div class="text-3xl font-black ok">R$ ${totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          <div class="text-xs muted mt-2">A receber: R$ ${aReceber.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+        </div>
+        <div class="card p-6">
+          <div class="text-xs muted mb-2">🏦 FLUXO DE CAIXA</div>
+          <div class="text-3xl font-black ${fluxoCaixa >= 0 ? 'ok' : 'danger'}">R$ ${fluxoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          <div class="text-xs muted mt-2">${fluxoCaixa >= 0 ? 'Positivo' : 'Negativo'}</div>
         </div>
         <div class="card p-6">
           <div class="text-xs muted mb-2">📊 LUCRO BRUTO</div>
