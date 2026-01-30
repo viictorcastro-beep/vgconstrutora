@@ -522,6 +522,8 @@
   </div>
 
   <script type="module">
+    console.log("🔥 SCRIPT CARREGOU - VG CONSTRUTORA v1");
+    
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
     import {
       getFirestore, collection, doc, addDoc, setDoc, deleteDoc, updateDoc,
@@ -531,6 +533,8 @@
       getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, 
       getRedirectResult, onAuthStateChanged, signOut
     } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+    console.log("✓ Firebase imports OK");
 
     // ✅ Seu Firebase Config (já preenchido)
     const firebaseConfig = {
@@ -542,6 +546,8 @@
       appId: "1:648174167866:web:98fb10be18b73fcc7a9203"
     };
 
+    console.log("✓ Config carregado:", firebaseConfig.projectId);
+
     // 🔒 Gate no front (conveniência). Segurança real = Firestore Rules.
     const ALLOW_EMAILS = new Set(["viictor.castro@gmail.com", "gcm.conceicao@gmail.com"]);
 
@@ -552,7 +558,13 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
+    auth.useDeviceLanguage();
+    
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    console.log("✓ Firebase app inicializado");
+    console.log("✓ Domínio atual:", window.location.hostname);
 
     let currentUser = null;
     let OBRA_ID = localStorage.getItem("obraId") || "";
@@ -724,49 +736,86 @@
       $("rat-add-dest").onclick = () => { rateioAddDest(); };
       $("rat-save").onclick = () => { addRateio(); };
 
-      $("login-btn").onclick = () => {
+      $("login-btn").onclick = async () => {
+        console.log("🔐 Tentando login...");
         $("login-btn-text").textContent = "Conectando...";
         $("login-msg").textContent = "";
+        $("login-msg").className = "text-xs text-slate-500 mt-4 min-h-[16px]";
         
-        signInWithPopup(auth, provider)
-          .then(() => {
-            $("login-msg").textContent = "✓ Login realizado!";
-            $("login-msg").className = "text-xs text-green-600 mt-4 min-h-[16px]";
-          })
-          .catch(err => {
-            $("login-btn-text").textContent = "Entrar com Google";
-            console.error("Erro de login (popup):", err);
-            
-            let msg = "";
-            if (err.code === "auth/unauthorized-domain") {
-              msg = "⚠️ Domínio não autorizado no Firebase.";
-            } else if (err.code === "auth/popup-blocked") {
-              msg = "⚠️ Popup bloqueado. Use o botão alternativo abaixo.";
-            } else if (err.code === "auth/popup-closed-by-user") {
-              msg = "Login cancelado.";
-            } else if (err.code === "auth/configuration-not-found") {
-              msg = "⚠️ Google Sign-In não configurado no Firebase. Vá em Authentication > Sign-in method > Google > Enable";
-            } else {
-              msg = `Erro: ${err.code || err.message}`;
+        try {
+          console.log("→ Tentando popup...");
+          const result = await signInWithPopup(auth, provider);
+          console.log("✓ Login popup OK:", result.user.email);
+          $("login-msg").textContent = "✓ Login realizado!";
+          $("login-msg").className = "text-xs text-green-600 mt-4 min-h-[16px]";
+        } catch (err) {
+          console.error("✗ Erro no popup:", err.code, err.message);
+          $("login-btn-text").textContent = "Entrar com Google";
+          
+          // Se popup foi bloqueado ou fechado, tenta redirect
+          if (err.code === "auth/popup-blocked" || err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
+            console.log("→ Popup falhou, tentando redirect...");
+            try {
+              await signInWithRedirect(auth, provider);
+              return; // redirect vai recarregar a página
+            } catch (err2) {
+              console.error("✗ Erro no redirect:", err2.code, err2.message);
+              showLoginError(err2);
+              return;
             }
-            
-            $("login-msg").textContent = msg;
-            $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
-            
-            // Debug info
-            $("debug-content").innerHTML = `
-              <div>• Code: ${err.code || 'N/A'}</div>
-              <div>• Message: ${err.message || 'N/A'}</div>
-              <div>• Domain: ${window.location.hostname}</div>
-            `;
-            $("debug-info").classList.remove("hidden");
-          });
+          }
+          
+          // Outros erros
+          showLoginError(err);
+        }
       };
 
-      $("login-redirect-btn").onclick = () => {
+      $("login-redirect-btn").onclick = async () => {
+        console.log("🔐 Login via redirect (método alternativo)");
         $("login-msg").textContent = "Redirecionando...";
-        signInWithRedirect(auth, provider);
+        $("login-msg").className = "text-xs text-slate-500 mt-4 min-h-[16px]";
+        try {
+          await signInWithRedirect(auth, provider);
+        } catch (err) {
+          console.error("✗ Erro no redirect:", err.code, err.message);
+          showLoginError(err);
+        }
       };
+
+      function showLoginError(err) {
+        let msg = "";
+        let debugInfo = "";
+        
+        if (err.code === "auth/unauthorized-domain") {
+          msg = "⚠️ Domínio não autorizado no Firebase.";
+          debugInfo = `Adicione "${window.location.hostname}" em Authentication > Settings > Authorized domains`;
+        } else if (err.code === "auth/operation-not-allowed") {
+          msg = "⚠️ Google Sign-In não está habilitado.";
+          debugInfo = "Vá em Firebase Console > Authentication > Sign-in method > Google > Enable";
+        } else if (err.code === "auth/popup-blocked") {
+          msg = "⚠️ Popup bloqueado. Use o botão alternativo abaixo.";
+        } else if (err.code === "auth/popup-closed-by-user") {
+          msg = "Login cancelado.";
+        } else if (err.code === "auth/invalid-api-key" || err.code === "auth/app-deleted") {
+          msg = "⚠️ Configuração do Firebase inválida.";
+          debugInfo = "Verifique firebaseConfig no código";
+        } else {
+          msg = `Erro: ${err.code || "desconhecido"}`;
+          debugInfo = err.message;
+        }
+        
+        $("login-msg").textContent = msg;
+        $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
+        
+        // Debug info
+        $("debug-content").innerHTML = `
+          <div>• Code: ${err.code || 'N/A'}</div>
+          <div>• Message: ${err.message || 'N/A'}</div>
+          <div>• Domain: ${window.location.hostname}</div>
+          ${debugInfo ? `<div class="mt-2 font-bold">→ ${debugInfo}</div>` : ''}
+        `;
+        $("debug-info").classList.remove("hidden");
+      }
     }
 
     // ---------- data subscriptions ----------
@@ -1528,10 +1577,28 @@
     }
 
     // ---------- auth ----------
+    console.log("🔒 Configurando autenticação...");
+    
+    // Captura resultado do redirect (se veio de redirect)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          console.log("✓ Login por redirect bem-sucedido:", result.user.email);
+        }
+      })
+      .catch((err) => {
+        console.error("✗ Erro no redirect result:", err.code, err.message);
+        if ($("login-msg")) {
+          $("login-msg").textContent = `Erro no redirect: ${err.code}`;
+          $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
+        }
+      });
+    
     onAuthStateChanged(auth, (user) => {
-      console.log("Auth state changed:", user ? user.email : "no user");
+      console.log("🔄 Auth state changed:", user ? user.email : "no user");
       
       if (user && ALLOW_EMAILS.has(user.email)) {
+        console.log("✓ Usuário autorizado:", user.email);
         currentUser = user;
 
         $("login-screen").classList.add("hidden");
@@ -1549,9 +1616,11 @@
 
       } else {
         if (user) {
-          console.log("Usuário não autorizado:", user.email);
-          $("login-msg").textContent = `❌ Acesso negado para: ${user.email}`;
-          $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
+          console.warn("✗ Usuário não autorizado:", user.email);
+          if ($("login-msg")) {
+            $("login-msg").textContent = `❌ Acesso negado para: ${user.email}`;
+            $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
+          }
           signOut(auth);
         }
         currentUser = null;
@@ -1561,18 +1630,7 @@
       }
     });
 
-    // Verifica redirect result (para login alternativo)
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          console.log("Login por redirect bem-sucedido:", result.user.email);
-        }
-      })
-      .catch((err) => {
-        console.error("Erro no redirect:", err);
-        $("login-msg").textContent = `Erro no redirect: ${err.code}`;
-        $("login-msg").className = "text-xs text-red-600 mt-4 min-h-[16px]";
-      });
+    console.log("✓ Sistema inicializado e pronto!");
 
   </script>
 </body>
