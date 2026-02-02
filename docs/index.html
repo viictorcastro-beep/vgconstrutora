@@ -210,8 +210,13 @@
       <!-- BALANÇO GLOBAL VIEW -->
       <div id="view-BALANCO_GLOBAL" class="view-content hidden">
         <div class="card p-6 mb-6">
-          <h2 class="font-black text-3xl mb-2">💼 Balanço Global por Sócio</h2>
-          <p class="text-gray-600 mb-6">Consolidação de investimentos, custos e receitas de todas as obras</p>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-black text-3xl mb-2">💼 Balanço Global por Sócio</h2>
+              <p class="text-gray-600">Consolidação de investimentos, custos e receitas de todas as obras</p>
+            </div>
+            <button onclick="migrarProprietariosParaIDs()" class="btn btn-blue">🔄 Migrar Sistema Antigo</button>
+          </div>
           
           <!-- Filtros de Período -->
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
@@ -2184,6 +2189,70 @@
       $("balanco-data-inicio").value = '';
       $("balanco-data-fim").value = '';
       renderBalancoGlobal();
+    }
+    
+    // Migração: Converter proprietarios antigos (A/B/ambos) para IDs de sócios
+    window.migrarProprietariosParaIDs = async function() {
+      if (!confirm('🔄 Migrar unidades do formato antigo (A/B/ambos) para IDs de sócios?\n\nIsso vai atualizar todas as unidades de todas as obras.')) {
+        return;
+      }
+      
+      showToast('🔄 Iniciando migração...', 'info');
+      let totalMigrado = 0;
+      
+      try {
+        for (const obra of state.obras) {
+          console.log(`🔄 Migrando obra: ${obra.nome}`);
+          
+          // Pegar IDs dos sócios dessa obra
+          const socioAId = obra.socioAId || null;
+          const socioBId = obra.socioBId || null;
+          
+          if (!socioAId && !socioBId) {
+            console.log(`  ⚠️ Obra sem sócios vinculados, pulando...`);
+            continue;
+          }
+          
+          // Carregar unidades
+          const unidadesSnap = await getDocs(collection(db, "obras", obra.id, "unidades"));
+          
+          for (const unidadeDoc of unidadesSnap.docs) {
+            const unidade = unidadeDoc.data();
+            const proprietarioAtual = unidade.proprietario;
+            let novoProprietario = null;
+            
+            // Converter formato antigo para novo
+            if (proprietarioAtual === 'A' && socioAId) {
+              novoProprietario = socioAId;
+            } else if (proprietarioAtual === 'B' && socioBId) {
+              novoProprietario = socioBId;
+            } else if (proprietarioAtual === 'ambos') {
+              // Se for "ambos", vamos colocar o sócio A como padrão
+              novoProprietario = socioAId || socioBId;
+            }
+            
+            // Atualizar se mudou
+            if (novoProprietario && novoProprietario !== proprietarioAtual) {
+              await updateDoc(doc(db, "obras", obra.id, "unidades", unidadeDoc.id), {
+                proprietario: novoProprietario
+              });
+              console.log(`  ✅ Unidade "${unidade.nome}": ${proprietarioAtual} → ${novoProprietario}`);
+              totalMigrado++;
+            }
+          }
+        }
+        
+        showToast(`✅ Migração concluída! ${totalMigrado} unidades atualizadas.`, 'success');
+        
+        // Recarregar balanço
+        setTimeout(() => {
+          renderBalancoGlobal();
+        }, 1000);
+        
+      } catch (err) {
+        console.error('❌ Erro na migração:', err);
+        showToast('❌ Erro ao migrar. Veja o console.', 'error');
+      }
     }
               total: 0
             };
