@@ -404,7 +404,7 @@
               </div>
               <div>
                 <div class="text-xs muted mb-1">Pagador (Sócio) *</div>
-                <select id="lanc-pagador" class="select" required>
+                <select id="lanc-pagador" class="select" data-socio-select required>
                   <!-- Populado dinamicamente -->
                 </select>
               </div>
@@ -563,9 +563,8 @@
               </div>
               <div>
                 <div class="text-xs muted mb-1">👤 Recebido por *</div>
-                <select id="receb-recebido-por" class="select" required>
+                <select id="receb-recebido-por" class="select" data-socio-select required>
                   <!-- Populado dinamicamente -->
-                  <option value="ambos">Ambos (50/50)</option>
                 </select>
               </div>
             </div>
@@ -597,13 +596,13 @@
               </div>
               <div>
                 <div class="text-xs muted mb-1">De (Sócio) *</div>
-                <select id="ac-de" class="select" required>
+                <select id="ac-de" class="select" data-socio-select required>
                   <!-- Populado dinamicamente -->
                 </select>
               </div>
               <div>
                 <div class="text-xs muted mb-1">Para (Sócio) *</div>
-                <select id="ac-para" class="select" required>
+                <select id="ac-para" class="select" data-socio-select required>
                   <!-- Populado dinamicamente -->
                 </select>
               </div>
@@ -844,7 +843,7 @@
           </div>
           <div>
             <div class="text-xs muted mb-1">Sócio</div>
-            <select id="add-usuario-socio" class="input" required>
+            <select id="add-usuario-socio" class="input" data-socio-select required>
               <option value="">Selecione...</option>
               <!-- Populado dinamicamente com sócios cadastrados -->
             </select>
@@ -1510,7 +1509,20 @@
       listeners.push(onSnapshot(r, (snap) => {
         state.socios = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.nome.localeCompare(b.nome));
         console.log("👔 Sócios carregados:", state.socios.length);
-        populateSocioSelects(); // Popular dropdowns com nomes reais
+        
+        // Mapear sócios para estrutura A/B/C
+        state.config.socios = state.socios.map((socio, index) => ({
+          id: String.fromCharCode(65 + index), // A, B, C...
+          nome: socio.nome,
+          firestoreId: socio.id
+        }));
+        
+        console.log("✓ Mapeamento de sócios:", state.config.socios);
+        
+        // Atualizar TODOS os selects de sócio
+        atualizarTodosSelectsDeSocio();
+        
+        // Manter funções legadas por compatibilidade
         hydrateSociosSelect();
         hydrateSociosObraSelect();
         hydrateProprietarioSelect();
