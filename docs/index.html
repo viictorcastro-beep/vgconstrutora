@@ -1932,9 +1932,7 @@
 
       // Para cada obra, carregar dados e calcular
       for (const obra of state.obras) {
-        // Aplicar filtro de data se existir
-        if (dataInicio && obra.dataInicio && obra.dataInicio < dataInicio) continue;
-        if (dataFim && obra.dataInicio && obra.dataInicio > dataFim) continue;
+        console.log(`🏗️ Processando obra: ${obra.nome}`);
         
         const obraInfo = {
           nome: obra.nome,
@@ -2021,6 +2019,48 @@
             obraInfo.custos += custoUnidade;
             obraInfo.receitas += receitaUnidade;
             obraInfo.vgv += vgvUnidade;
+          });
+
+          // ✅ Processar lançamentos sem unidade vinculada (obra geral)
+          // Esses lançamentos precisam ser distribuídos entre os sócios baseado nos percentuais
+          const lancamentosSemUnidade = lancamentos.filter(l => !l.unidadeId);
+          console.log(`  🔄 ${lancamentosSemUnidade.length} lançamentos sem unidade (rateio por sócio)`);
+          
+          lancamentosSemUnidade.forEach(lanc => {
+            // Aplicar filtro de data no lançamento
+            if (dataInicio && lanc.data && lanc.data < dataInicio) return;
+            if (dataFim && lanc.data && lanc.data > dataFim) return;
+            
+            const valor = lanc.valor || 0;
+            console.log(`    💳 Lançamento geral: R$ ${valor} (${lanc.descricao})`);
+            
+            // Buscar IDs dos sócios da obra
+            const socioAId = obra.socioAId;
+            const socioBId = obra.socioBId;
+            
+            if (!socioAId && !socioBId) {
+              console.log(`      ⚠️ Obra sem sócios vinculados, ignorando lançamento`);
+              return;
+            }
+            
+            // Usar percentuais do lançamento ou 50/50 por padrão
+            const percentA = lanc.victorPercent || lanc.percentualA || 50;
+            const percentB = lanc.gustavoPercent || lanc.percentualB || 50;
+            
+            const valorA = (percentA / 100) * valor;
+            const valorB = (percentB / 100) * valor;
+            
+            if (socioAId && balancoPorSocio[socioAId]) {
+              balancoPorSocio[socioAId].totalInvestido += valorA;
+              console.log(`      👤 Sócio A: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
+            }
+            
+            if (socioBId && balancoPorSocio[socioBId]) {
+              balancoPorSocio[socioBId].totalInvestido += valorB;
+              console.log(`      👤 Sócio B: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
+            }
+            
+            obraInfo.custos += valor;
           });
 
           // ✅ MIGRAÇÃO: Adicionar investimentos iniciais da obra (sistema antigo)
