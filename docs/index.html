@@ -1997,12 +1997,12 @@
                   
                   if (socioAId && balancoPorSocio[socioAId]) {
                     balancoPorSocio[socioAId].totalInvestido += valorA;
-                    console.log(`        👤 Sócio A: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
+                    console.log(`        👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
                   }
                   
                   if (socioBId && balancoPorSocio[socioBId]) {
                     balancoPorSocio[socioBId].totalInvestido += valorB;
-                    console.log(`        👤 Sócio B: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
+                    console.log(`        👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
                   }
                   
                   obraInfo.custos += valor;
@@ -2023,12 +2023,12 @@
                   
                   if (socioAId && balancoPorSocio[socioAId]) {
                     balancoPorSocio[socioAId].totalRecebido += valorA;
-                    console.log(`        👤 Sócio A: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
+                    console.log(`        👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
                   }
                   
                   if (socioBId && balancoPorSocio[socioBId]) {
                     balancoPorSocio[socioBId].totalRecebido += valorB;
-                    console.log(`        👤 Sócio B: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
+                    console.log(`        👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
                   }
                   
                   obraInfo.receitas += valor;
@@ -2115,12 +2115,12 @@
             
             if (socioAId && balancoPorSocio[socioAId]) {
               balancoPorSocio[socioAId].totalInvestido += valorA;
-              console.log(`      👤 Sócio A: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
+              console.log(`      👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
             }
             
             if (socioBId && balancoPorSocio[socioBId]) {
               balancoPorSocio[socioBId].totalInvestido += valorB;
-              console.log(`      👤 Sócio B: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
+              console.log(`      👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
             }
             
             obraInfo.custos += valor;
@@ -2156,12 +2156,12 @@
             
             if (socioAId && balancoPorSocio[socioAId]) {
               balancoPorSocio[socioAId].totalRecebido += valorA;
-              console.log(`      👤 Sócio A: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
+              console.log(`      👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
             }
             
             if (socioBId && balancoPorSocio[socioBId]) {
               balancoPorSocio[socioBId].totalRecebido += valorB;
-              console.log(`      👤 Sócio B: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
+              console.log(`      👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
             }
             
             obraInfo.receitas += valor;
@@ -2170,14 +2170,14 @@
           // ✅ MIGRAÇÃO: Adicionar investimentos iniciais da obra (sistema antigo)
           if (obra.investimentoA && obra.socioAId && balancoPorSocio[obra.socioAId]) {
             const investA = obra.investimentoA || 0;
-            console.log(`  💰 Investimento Inicial Sócio A: R$ ${investA}`);
+            console.log(`  💰 Investimento Inicial ${balancoPorSocio[obra.socioAId].nome}: R$ ${investA}`);
             balancoPorSocio[obra.socioAId].totalInvestido += investA;
             obraInfo.custos += investA;
           }
           
           if (obra.investimentoB && obra.socioBId && balancoPorSocio[obra.socioBId]) {
             const investB = obra.investimentoB || 0;
-            console.log(`  💰 Investimento Inicial Sócio B: R$ ${investB}`);
+            console.log(`  💰 Investimento Inicial ${balancoPorSocio[obra.socioBId].nome}: R$ ${investB}`);
             balancoPorSocio[obra.socioBId].totalInvestido += investB;
             obraInfo.custos += investB;
           }
