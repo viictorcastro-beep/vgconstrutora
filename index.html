@@ -2063,6 +2063,47 @@
             obraInfo.custos += valor;
           });
 
+          // ✅ Processar recebimentos sem unidade vinculada (sinais, vendas gerais)
+          const recebimentosSemUnidade = recebimentos.filter(r => !r.unidadeId);
+          console.log(`  💰 ${recebimentosSemUnidade.length} recebimentos sem unidade (rateio por sócio)`);
+          
+          recebimentosSemUnidade.forEach(receb => {
+            // Aplicar filtro de data no recebimento
+            if (dataInicio && receb.data && receb.data < dataInicio) return;
+            if (dataFim && receb.data && receb.data > dataFim) return;
+            
+            const valor = receb.valor || 0;
+            console.log(`    💵 Recebimento geral: R$ ${valor} (${receb.descricao || receb.tipo})`);
+            
+            // Buscar IDs dos sócios da obra
+            const socioAId = obra.socioAId;
+            const socioBId = obra.socioBId;
+            
+            if (!socioAId && !socioBId) {
+              console.log(`      ⚠️ Obra sem sócios vinculados, ignorando recebimento`);
+              return;
+            }
+            
+            // Usar percentuais do recebimento ou 50/50 por padrão
+            const percentA = receb.victorPercent || receb.percentualA || 50;
+            const percentB = receb.gustavoPercent || receb.percentualB || 50;
+            
+            const valorA = (percentA / 100) * valor;
+            const valorB = (percentB / 100) * valor;
+            
+            if (socioAId && balancoPorSocio[socioAId]) {
+              balancoPorSocio[socioAId].totalRecebido += valorA;
+              console.log(`      👤 Sócio A: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
+            }
+            
+            if (socioBId && balancoPorSocio[socioBId]) {
+              balancoPorSocio[socioBId].totalRecebido += valorB;
+              console.log(`      👤 Sócio B: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
+            }
+            
+            obraInfo.receitas += valor;
+          });
+
           // ✅ MIGRAÇÃO: Adicionar investimentos iniciais da obra (sistema antigo)
           if (obra.investimentoA && obra.socioAId && balancoPorSocio[obra.socioAId]) {
             const investA = obra.investimentoA || 0;
