@@ -4799,7 +4799,8 @@
                   <button onclick="window.deleteAcerto('${a.id}')" class="text-red-600 hover:underline">🗑️</button>
                 </td>
               </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
       `;
@@ -5206,7 +5207,6 @@
         showToast('Erro ao salvar sócios', 'error');
       }
       */
-    }
     }
 
     async function addLancamento(e) {
@@ -5958,6 +5958,9 @@
     function exportPDF() {
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // Buscar obra uma única vez
+      const obra = state.obras.find(o => o.id === OBRA_ID);
 
       // Header com logo e título
       pdf.setFillColor(15, 23, 42);
@@ -5968,8 +5971,6 @@
       pdf.text("🏗️ VG CONSTRUTORA", 105, 15, { align: 'center' });
       pdf.setFontSize(14);
       pdf.text("RELATÓRIO GERENCIAL COMPLETO", 105, 25, { align: 'center' });
-
-      const obra = state.obras.find(o => o.id === OBRA_ID);
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(11);
       pdf.text(`Obra: ${obra?.nome || "N/A"}`, 14, 45);
@@ -6074,7 +6075,7 @@
       const investimentoPorSocio = custoTotal / 2;
       const lucroPorSocio = lucroData.lucroLiquido / 2;
 
-      const obra = state.obras.find(o => o.id === OBRA_ID);
+      // Buscar nomes dos sócios (obra já foi declarado no início da função)
       const socioANome = obra?.socioAId ? socioNome(obra.socioAId) : 'Sócio A';
       const socioBNome = obra?.socioBId ? socioNome(obra.socioBId) : 'Sócio B';
 
