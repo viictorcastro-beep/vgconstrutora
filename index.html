@@ -405,8 +405,7 @@
               <div>
                 <div class="text-xs muted mb-1">Pagador (Sócio) *</div>
                 <select id="lanc-pagador" class="select" required>
-                  <option value="A">Sócio A</option>
-                  <option value="B">Sócio B</option>
+                  <!-- Populado dinamicamente -->
                 </select>
               </div>
             </div>
@@ -565,8 +564,7 @@
               <div>
                 <div class="text-xs muted mb-1">👤 Recebido por *</div>
                 <select id="receb-recebido-por" class="select" required>
-                  <option value="A">Sócio A</option>
-                  <option value="B">Sócio B</option>
+                  <!-- Populado dinamicamente -->
                   <option value="ambos">Ambos (50/50)</option>
                 </select>
               </div>
@@ -600,15 +598,13 @@
               <div>
                 <div class="text-xs muted mb-1">De (Sócio) *</div>
                 <select id="ac-de" class="select" required>
-                  <option value="A">Sócio A</option>
-                  <option value="B">Sócio B</option>
+                  <!-- Populado dinamicamente -->
                 </select>
               </div>
               <div>
                 <div class="text-xs muted mb-1">Para (Sócio) *</div>
                 <select id="ac-para" class="select" required>
-                  <option value="A">Sócio A</option>
-                  <option value="B">Sócio B</option>
+                  <!-- Populado dinamicamente -->
                 </select>
               </div>
             </div>
@@ -850,11 +846,7 @@
             <div class="text-xs muted mb-1">Sócio</div>
             <select id="add-usuario-socio" class="input" required>
               <option value="">Selecione...</option>
-              <option value="A">Sócio A</option>
-              <option value="B">Sócio B</option>
-              <option value="C">Sócio C</option>
-              <option value="D">Sócio D</option>
-              <option value="E">Sócio E</option>
+              <!-- Populado dinamicamente com sócios cadastrados -->
             </select>
           </div>
           <div>
@@ -1518,6 +1510,7 @@
       listeners.push(onSnapshot(r, (snap) => {
         state.socios = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.nome.localeCompare(b.nome));
         console.log("👔 Sócios carregados:", state.socios.length);
+        populateSocioSelects(); // Popular dropdowns com nomes reais
         hydrateSociosSelect();
         hydrateSociosObraSelect();
         hydrateProprietarioSelect();
@@ -1902,6 +1895,47 @@
       }
 
       return rats;
+    }
+
+    // Função para popular dropdowns de sócios com nomes reais
+    function populateSocioSelects() {
+      const selects = [
+        'lanc-pagador',
+        'receb-recebido-por', 
+        'ac-de',
+        'ac-para',
+        'uni-proprietario',
+        'add-usuario-socio'
+      ];
+      
+      selects.forEach(selectId => {
+        const select = $(selectId);
+        if (!select) return;
+        
+        // Guardar opção "ambos" se existir
+        const hasAmbos = select.querySelector('option[value="ambos"]');
+        const ambosOption = hasAmbos ? hasAmbos.outerHTML : '';
+        
+        // Limpar e adicionar opção vazia se necessário
+        if (selectId === 'add-usuario-socio') {
+          select.innerHTML = '<option value="">Selecione...</option>';
+        } else {
+          select.innerHTML = '';
+        }
+        
+        // Adicionar sócios
+        state.socios.forEach(socio => {
+          const option = document.createElement('option');
+          option.value = socio.id;
+          option.textContent = socio.nome;
+          select.appendChild(option);
+        });
+        
+        // Re-adicionar "ambos" se tinha
+        if (ambosOption) {
+          select.innerHTML += ambosOption;
+        }
+      });
     }
 
     // VIEW DE BALANÇO GLOBAL
