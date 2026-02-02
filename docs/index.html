@@ -1,4 +1,4 @@
-<!-- BUILD: 2026-02-02 | commit: 9e4b6dc | FIXED: socio names + recebimentos logic -->
+<!-- BUILD: 638245c - 2026-02-02 15:30 BRT -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -6,18 +6,21 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>VG CONSTRUTORA — Gestor de Obras</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🏗️</text></svg>">
+  
+  <!-- BUILD STAMP - SE ISSO NÃO APARECER NO CONSOLE, PAGES ESTÁ SERVINDO ARQUIVO ANTIGO -->
+  <script>console.log("%c🔨 BUILD: 638245c | docs/index.html carregado em " + new Date().toISOString(), "color: #22c55e; font-weight: bold; font-size: 16px;");</script>
 
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- PDF export -->
-  <script src="../assets/vendor/jspdf.umd.min.js?v=1770048957"></script>
-  <script src="../assets/vendor/jspdf.plugin.autotable.min.js?v=1770048957"></script>
+  <!-- PDF export - USANDO CDN até corrigir paths locais -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   
   <!-- Charts -->
-  <script src="../assets/vendor/chart.umd.min.js?v=1770048957"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   
   <!-- Excel Export -->
-  <script src="../assets/vendor/xlsx.full.min.js?v=1770048957"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body { background:#f1f5f9; }
@@ -1008,9 +1011,14 @@
       appId: "1:648174167866:web:98fb10be18b73fcc7a9203"
     };
 
-    // BUILD STAMP
-    console.log("%c🔨 BUILD: 2026-02-02 | commit: 9e4b6dc", "color: #22c55e; font-weight: bold; font-size: 14px;");
-    console.log("%c✓ FIXED: socio names display + recebimentos 50/50 logic + acertos automáticos", "color: #10b981;");
+    // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
+    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
+    console.log("%c🔨 BUILD: 638245c (2026-02-02 15:30 BRT)", "color: #22c55e; font-weight: bold; font-size: 16px;");
+    console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
+    console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
+    console.log("%c✓ FIXED: acertos automáticos com netting", "color: #10b981;");
+    console.log("%c✓ FIXED: vendors via CDN (sem 404s)", "color: #10b981;");
+    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
 
     // Initialize
     console.log("🔥 Inicializando Firebase...");
