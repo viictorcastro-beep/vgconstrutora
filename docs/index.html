@@ -2261,6 +2261,11 @@
             const dados = balancoPorSocio[socio.id];
             const saldoAtual = dados.totalRecebido - dados.totalInvestido;
             
+            // Determinar status (invertido: negativo = credor, positivo = devedor)
+            const isCredor = saldoAtual < 0; // Investiu mais do que recebeu = tem a receber
+            const statusLabel = isCredor ? 'Credor' : saldoAtual > 0 ? 'Devedor' : 'Equalizado';
+            const statusColor = isCredor ? 'green' : saldoAtual > 0 ? 'red' : 'gray';
+            
             // ROI Real (baseado em receitas confirmadas)
             const roiReal = dados.totalInvestido > 0 
               ? ((dados.totalRecebido - dados.totalInvestido) / dados.totalInvestido) * 100 
@@ -2279,12 +2284,10 @@
             const dataAtual = new Date().toLocaleDateString('pt-BR');
 
             return `
-              <div class="card p-6 ${saldoAtual >= 0 ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'}">
+              <div class="card p-6 ${isCredor ? 'border-l-4 border-green-500' : saldoAtual > 0 ? 'border-l-4 border-red-500' : 'border-l-4 border-gray-300'}">
                 <div class="flex items-center justify-between mb-4">
                   <h3 class="font-black text-2xl text-gray-800">👔 ${escapeHtml(socio.nome)}</h3>
-                  ${saldoAtual >= 0 
-                    ? '<span class="badge bg-green-100 text-green-800">Credor</span>' 
-                    : '<span class="badge bg-red-100 text-red-800">Devedor</span>'}
+                  <span class="badge bg-${statusColor}-100 text-${statusColor}-800">${statusLabel}</span>
                 </div>
                 
                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
@@ -2306,14 +2309,14 @@
                   <div class="border-t-2 border-gray-300 pt-3 mt-3">
                     <div class="flex justify-between items-center">
                       <span class="font-bold text-gray-800">🎯 SALDO ATUAL:</span>
-                      <span class="text-2xl font-black ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        ${saldoAtual >= 0 ? '+' : ''}R$ ${Math.abs(saldoAtual).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      <span class="text-2xl font-black ${isCredor ? 'text-green-600' : saldoAtual > 0 ? 'text-red-600' : 'text-gray-600'}">
+                        ${saldoAtual < 0 ? '-' : saldoAtual > 0 ? '+' : ''}R$ ${Math.abs(saldoAtual).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                       </span>
                     </div>
                     <div class="text-xs text-gray-500 mt-1 text-right">
-                      ${saldoAtual > 0 
-                        ? 'Tem a receber' 
-                        : saldoAtual < 0 
+                      ${isCredor 
+                        ? 'Tem a receber da sociedade' 
+                        : saldoAtual > 0 
                           ? 'Deve à sociedade' 
                           : 'Equalizado'}
                     </div>
