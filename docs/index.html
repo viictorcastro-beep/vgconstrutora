@@ -1944,6 +1944,25 @@
       return socio.nome;
     }
     
+    // Resolve nome por QUALQUER ID - letra (A/B/C) OU firestoreId (PnOR7C...)
+    function socioNomePorQualquerId(valor) {
+      if (!valor) return "";
+      const socios = state?.config?.socios || [];
+      
+      const v = String(valor);
+      
+      // 1) Se vier A/B/C... (busca por id de letra)
+      let socio = socios.find(s => String(s.id) === v);
+      if (socio?.nome) return socio.nome;
+      
+      // 2) Se vier firestoreId (PnOR7C..., yjjHz2i..., etc)
+      socio = socios.find(s => String(s.firestoreId) === v);
+      if (socio?.nome) return socio.nome;
+      
+      // 3) Fallback: mascara sem poluir (últimos 4 chars)
+      return `Sócio •••${v.slice(-4)}`;
+    }
+    
     // Preenche select com sócios da obra (função centralizada)
     function preencherSelectSociosDaObra(selectEl, obra, opcoes = {}) {
       if (!selectEl) return;
@@ -1960,15 +1979,15 @@
         items.push({ value: "", label: "Selecione..." });
       }
       
-      // Sócios da obra
-      if (socioAId) items.push({ value: socioAId, label: socioNome(socioAId) });
-      if (socioBId) items.push({ value: socioBId, label: socioNome(socioBId) });
+      // Sócios da obra - usa socioNomePorQualquerId para resolver QUALQUER formato
+      if (socioAId) items.push({ value: socioAId, label: socioNomePorQualquerId(socioAId) });
+      if (socioBId) items.push({ value: socioBId, label: socioNomePorQualquerId(socioBId) });
       
-      // Opção Ambos
+      // Opção Ambos - mostra nomes reais
       if (incluirAmbos && socioAId && socioBId) {
         items.push({
           value: "AMBOS",
-          label: `Ambos (50/50) — ${socioNome(socioAId)} + ${socioNome(socioBId)}`
+          label: `Ambos (50/50) — ${socioNomePorQualquerId(socioAId)} + ${socioNomePorQualquerId(socioBId)}`
         });
       }
       
@@ -2909,7 +2928,7 @@
         <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
           <div class="flex-1">
             <div class="font-bold text-gray-800">${escapeHtml(u.email)}</div>
-            <div class="text-sm text-gray-600">${escapeHtml(socioNome)} • ${u.role || 'socio'}</div>
+            <div class="text-sm text-gray-600">${escapeHtml(socioNomePorQualquerId(u.socioId))} • ${u.role || 'socio'}</div>
           </div>
           <button onclick="window.removerUsuario(${idx})" class="btn btn-danger text-sm">
             🗑️ Remover
@@ -3177,8 +3196,8 @@
       const roiPorSocio = investimentoPorSocio > 0 ? ((lucroPorSocio / investimentoPorSocio) * 100) : 0;
 
       // Buscar nomes reais dos sócios da obra (obra já foi declarado no início da função)
-      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
+      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
 
       const html = `
         <div class="card p-6">
@@ -3634,8 +3653,8 @@
 
     function renderAnaliseDetalhada(lancs, rats) {
       const obra = state.obras.find(o => o.id === OBRA_ID);
-      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
+      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
 
       // Verificar permissões
       const meuSocioId = getSocioIdForUser(OBRA_ID);
@@ -4143,8 +4162,8 @@
 
     function renderLucroSection(lucroData) {
       const obra = state.obras.find(o => o.id === OBRA_ID);
-      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
+      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
 
       let html = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -4721,11 +4740,11 @@
                 outro: '📝 Outro'
               };
               
-              // Resolver nome do sócio que recebeu
+              // Resolver nome do sócio que recebeu - funciona com letra (A/B) ou firestoreId
               const recebidoPorId = normalizarSocioValor(r.recebidoPor, obra);
               let recebidoPorLabel = '👥 Ambos';
               if (recebidoPorId && recebidoPorId !== 'AMBOS') {
-                recebidoPorLabel = `👤 ${socioNome(recebidoPorId)}`;
+                recebidoPorLabel = `👤 ${socioNomePorQualquerId(recebidoPorId)}`;
               }
               
               return `
@@ -4791,8 +4810,8 @@
               return `
               <tr>
                 <td>${new Date(a.data).toLocaleDateString('pt-BR')}</td>
-                <td>${escapeHtml(socioNome(deId))}</td>
-                <td>${escapeHtml(socioNome(paraId))}</td>
+                <td>${escapeHtml(socioNomePorQualquerId(deId))}</td>
+                <td>${escapeHtml(socioNomePorQualquerId(paraId))}</td>
                 <td class="font-bold">R$ ${a.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>${escapeHtml(a.descricao)}</td>
                 <td>
@@ -5800,8 +5819,8 @@
     function computeEqualizacao() {
       // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
       const obra = state.obras.find(o => o.id === OBRA_ID);
-      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
+      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
       const investimentoA = obra?.investimentoA || 0;
       const investimentoB = obra?.investimentoB || 0;
 
@@ -6076,8 +6095,8 @@
       const lucroPorSocio = lucroData.lucroLiquido / 2;
 
       // Buscar nomes dos sócios (obra já foi declarado no início da função)
-      const socioANome = obra?.socioAId ? socioNome(obra.socioAId) : 'Sócio A';
-      const socioBNome = obra?.socioBId ? socioNome(obra.socioBId) : 'Sócio B';
+      const socioANome = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : 'Sócio A';
+      const socioBNome = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : 'Sócio B';
 
       pdf.text(`👤 ${socioANome}`, 14, y);
       pdf.text(`Investimento: R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 6);
