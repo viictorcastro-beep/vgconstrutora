@@ -2060,6 +2060,55 @@
         `;
         return;
       }
+      
+      // Calcular acertos consolidados
+      const acertosConsolidados = [];
+      if (state.socios.length >= 2) {
+        for (let i = 0; i < state.socios.length; i++) {
+          for (let j = i + 1; j < state.socios.length; j++) {
+            const socioA = state.socios[i];
+            const socioB = state.socios[j];
+            const dadosA = balancoPorSocio[socioA.id];
+            const dadosB = balancoPorSocio[socioB.id];
+            
+            const investidoA = dadosA.totalInvestido;
+            const investidoB = dadosB.totalInvestido;
+            const totalInvestido = investidoA + investidoB;
+            const deveriaInvestirCada = totalInvestido / 2;
+            const diferencaA = investidoA - deveriaInvestirCada;
+            const diferencaB = investidoB - deveriaInvestirCada;
+            
+            let acertoValor = 0;
+            let pagador = '';
+            let recebedor = '';
+            
+            if (diferencaA > 0) {
+              acertoValor = diferencaA;
+              recebedor = socioA.nome;
+              pagador = socioB.nome;
+            } else if (diferencaB > 0) {
+              acertoValor = diferencaB;
+              recebedor = socioB.nome;
+              pagador = socioA.nome;
+            }
+            
+            if (acertoValor > 0) {
+              acertosConsolidados.push({
+                pagador,
+                recebedor,
+                valor: acertoValor,
+                investidoA,
+                investidoB,
+                deveriaInvestirCada,
+                socioANome: socioA.nome,
+                socioBNome: socioB.nome
+              });
+            }
+          }
+        }
+      }
+
+      // Renderizar HTML
 
       const html = `
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2173,128 +2222,60 @@
           }).join('')}
         </div>
         
-        ${state.socios.length >= 2 ? `
+        ${acertosConsolidados.length > 0 ? `
           <div class="card p-6 mt-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300">
             <h3 class="font-black text-2xl mb-4 text-blue-900">💡 Acerto Sugerido Consolidado</h3>
             <p class="text-sm text-gray-700 mb-4">Equalização considerando TODAS as obras</p>
             
-            ${(() => {
-              // Calcular acerto entre todos os sócios (assumindo 50/50)
-              const acertos = [];
-              
-              for (let i = 0; i < state.socios.length; i++) {
-                for (let j = i + 1; j < state.socios.length; j++) {
-                  const socioA = state.socios[i];
-                  const socioB = state.socios[j];
-                  const dadosA = balancoPorSocio[socioA.id];
-                  const dadosB = balancoPorSocio[socioB.id];
+            ${acertosConsolidados.map(acerto => `
+              <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-4">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="text-2xl font-black text-gray-800">
+                    ${acerto.pagador} → ${acerto.recebedor}
+                  </div>
+                  <div class="text-3xl font-black text-blue-600">
+                    R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                  </div>
+                </div>
+                
+                <div class="bg-blue-50 rounded-lg p-4 space-y-2 text-sm">
+                  <div class="font-bold text-blue-900 mb-2">📊 Cálculo detalhado:</div>
                   
-                  // Quanto cada um investiu
-                  const investidoA = dadosA.totalInvestido;
-                  const investidoB = dadosB.totalInvestido;
-                  
-                  // Quanto cada um recebeu
-                  const recebidoA = dadosA.totalRecebido;
-                  const recebidoB = dadosB.totalRecebido;
-                  
-                  // Total investido por ambos
-                  const totalInvestido = investidoA + investidoB;
-                  
-                  // Quanto cada um DEVERIA ter investido (50/50)
-                  const deveriaInvestirCada = totalInvestido / 2;
-                  
-                  // Diferença (quem investiu mais, quem investiu menos)
-                  const diferencaA = investidoA - deveriaInvestirCada;
-                  const diferencaB = investidoB - deveriaInvestirCada;
-                  
-                  // Acerto necessário
-                  let acertoValor = 0;
-                  let pagador = '';
-                  let recebedor = '';
-                  
-                  if (diferencaA > 0) {
-                    // A investiu mais, B deve pagar para A
-                    acertoValor = diferencaA;
-                    recebedor = socioA.nome;
-                    pagador = socioB.nome;
-                  } else if (diferencaB > 0) {
-                    // B investiu mais, A deve pagar para B
-                    acertoValor = diferencaB;
-                    recebedor = socioB.nome;
-                    pagador = socioA.nome;
-                  }
-                  
-                  if (acertoValor > 0) {
-                    acertos.push({
-                      pagador,
-                      recebedor,
-                      valor: acertoValor,
-                      detalhes: {
-                        investidoA,
-                        investidoB,
-                        deveriaInvestirCada,
-                        socioANome: socioA.nome,
-                        socioBNome: socioB.nome
-                      }
-                    });
-                  }
-                }
-              }
-              
-              if (acertos.length === 0) {
-                return '<div class="text-center py-6 text-gray-600">✅ Contas equalizadas! Nenhum acerto necessário.</div>';
-              }
-              
-              return acertos.map(acerto => `
-                <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-4">
-                  <div class="flex items-center justify-between mb-4">
-                    <div class="text-2xl font-black text-gray-800">
-                      ${acerto.pagador} → ${acerto.recebedor}
-                    </div>
-                    <div class="text-3xl font-black text-blue-600">
-                      R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                    </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">💳 ${acerto.socioANome} investiu:</span>
+                    <span class="font-bold text-red-600">R$ ${acerto.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                   </div>
                   
-                  <div class="bg-blue-50 rounded-lg p-4 space-y-2 text-sm">
-                    <div class="font-bold text-blue-900 mb-2">📊 Cálculo detalhado:</div>
-                    
-                    <div class="flex justify-between">
-                      <span class="text-gray-700">💳 ${acerto.detalhes.socioANome} investiu:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.detalhes.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    
-                    <div class="flex justify-between">
-                      <span class="text-gray-700">💳 ${acerto.detalhes.socioBNome} investiu:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.detalhes.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    
-                    <div class="border-t border-blue-200 pt-2 mt-2"></div>
-                    
-                    <div class="flex justify-between">
-                      <span class="text-gray-700">💰 Total investido (ambos):</span>
-                      <span class="font-bold text-purple-600">R$ ${(acerto.detalhes.investidoA + acerto.detalhes.investidoB).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    
-                    <div class="flex justify-between">
-                      <span class="text-gray-700">⚖️ Cada um deveria ter investido (50/50):</span>
-                      <span class="font-bold text-blue-600">R$ ${acerto.detalhes.deveriaInvestirCada.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    
-                    <div class="border-t border-blue-200 pt-2 mt-2"></div>
-                    
-                    <div class="bg-yellow-100 border border-yellow-300 rounded p-3 mt-3">
-                      <div class="font-bold text-yellow-900 mb-1">💡 Como equalizar:</div>
-                      <div class="text-yellow-800">
-                        <strong>${acerto.pagador}</strong> deve transferir 
-                        <strong class="text-xl">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                        para <strong>${acerto.recebedor}</strong>
-                      </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">💳 ${acerto.socioBNome} investiu:</span>
+                    <span class="font-bold text-red-600">R$ ${acerto.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  
+                  <div class="border-t border-blue-200 pt-2 mt-2"></div>
+                  
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">💰 Total investido (ambos):</span>
+                    <span class="font-bold text-purple-600">R$ ${(acerto.investidoA + acerto.investidoB).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">⚖️ Cada um deveria ter investido (50/50):</span>
+                    <span class="font-bold text-blue-600">R$ ${acerto.deveriaInvestirCada.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  
+                  <div class="border-t border-blue-200 pt-2 mt-2"></div>
+                  
+                  <div class="bg-yellow-100 border border-yellow-300 rounded p-3 mt-3">
+                    <div class="font-bold text-yellow-900 mb-1">💡 Como equalizar:</div>
+                    <div class="text-yellow-800">
+                      <strong>${acerto.pagador}</strong> deve transferir 
+                      <strong class="text-xl">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                      para <strong>${acerto.recebedor}</strong>
                     </div>
                   </div>
                 </div>
-              `).join('');
-            })()}
+              </div>
+            `).join('')}
           </div>
         ` : ''}
         
