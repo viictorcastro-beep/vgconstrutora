@@ -1513,13 +1513,27 @@
         console.log("👔 Sócios carregados:", state.socios.length);
         
         // Mapear sócios para estrutura A/B/C (manter compatibilidade)
-        state.config.socios = state.socios.map((socio, index) => ({
-          id: String.fromCharCode(65 + index), // A, B, C...
-          nome: socio.nome,
-          firestoreId: socio.id
-        }));
+        // IMPORTANTE: priorizar firestoreId real, não socio.id que pode ter virado "A/B"
+        state.config.socios = state.socios.map((socio, index) => {
+          // Buscar o ID real do Firestore (não a letra A/B que pode estar em socio.id)
+          const firestoreId = socio.firestoreId || socio.firestoreID || socio.uid || socio.id;
+          
+          return {
+            id: String.fromCharCode(65 + index), // A, B, C...
+            nome: socio.nome,
+            firestoreId: firestoreId
+          };
+        });
         
-        console.log("✓ Mapeamento de sócios:", state.config.socios);
+        console.log("✓ Mapeamento de sócios (corrigido):", state.config.socios);
+        console.log("🔍 DIAGNÓSTICO - Testando resolve de IDs:");
+        if (state.config.socios.length > 0) {
+          state.config.socios.forEach(s => {
+            console.log(`  - Letra "${s.id}" → Nome: "${s.nome}" | FirestoreId: "${s.firestoreId}"`);
+            console.log(`    Teste por letra: "${socioNomePorQualquerId(s.id)}"`);
+            console.log(`    Teste por firestoreId: "${socioNomePorQualquerId(s.firestoreId)}"`);
+          });
+        }
         
         // Atualizar TODOS os selects de sócio
         atualizarTodosSelectsDeSocio();
@@ -1947,19 +1961,31 @@
     // Resolve nome por QUALQUER ID - letra (A/B/C) OU firestoreId (PnOR7C...)
     function socioNomePorQualquerId(valor) {
       if (!valor) return "";
+      
       const socios = state?.config?.socios || [];
+      if (socios.length === 0) {
+        console.warn("⚠️ socioNomePorQualquerId: config.socios está vazio");
+        return `Sócio •••${String(valor).slice(-4)}`;
+      }
       
       const v = String(valor);
       
       // 1) Se vier A/B/C... (busca por id de letra)
       let socio = socios.find(s => String(s.id) === v);
-      if (socio?.nome) return socio.nome;
+      if (socio?.nome) {
+        console.log(`✓ Encontrado por letra "${v}": ${socio.nome}`);
+        return socio.nome;
+      }
       
       // 2) Se vier firestoreId (PnOR7C..., yjjHz2i..., etc)
       socio = socios.find(s => String(s.firestoreId) === v);
-      if (socio?.nome) return socio.nome;
+      if (socio?.nome) {
+        console.log(`✓ Encontrado por firestoreId "${v}": ${socio.nome}`);
+        return socio.nome;
+      }
       
       // 3) Fallback: mascara sem poluir (últimos 4 chars)
+      console.warn(`⚠️ Não encontrado ID "${v}" em config.socios:`, socios);
       return `Sócio •••${v.slice(-4)}`;
     }
     
@@ -2090,8 +2116,54 @@
       return valor; // Já é um ID
     }
 
+    // Garante que state.config.socios está válido antes de renderizar
+    function garantirSociosMapeados() {
+      // Se config.socios está vazio mas temos socios, mapear
+      if ((!state.config?.socios || state.config.socios.length === 0) && state.socios.length > 0) {
+        console.log("🔄 Remapeando sócios antes de renderizar...");
+        
+        state.config.socios = state.socios.map((socio, index) => {
+          const firestoreId = socio.firestoreId || socio.firestoreID || socio.uid || socio.id;
+          
+          return {
+            id: String.fromCharCode(65 + index),
+            nome: socio.nome,
+            firestoreId: firestoreId
+          };
+        });
+        
+        console.log("✓ Remapeamento concluído:", state.config.socios);
+      }
+      
+      // Validar integridade: garantir que nenhum firestoreId seja "A" ou "B"
+      if (state.config?.socios) {
+        let temProblema = false;
+        state.config.socios.forEach(s => {
+          if (s.firestoreId && s.firestoreId.length === 1 && s.firestoreId >= 'A' && s.firestoreId <= 'Z') {
+            console.error(`❌ ERRO: firestoreId "${s.firestoreId}" é uma letra, não um ID real!`);
+            temProblema = true;
+          }
+        });
+        
+        if (temProblema) {
+          console.error("❌ state.config.socios está corrompido. Será necessário remapear do Firestore.");
+          // Forçar reload dos sócios
+          if (state.socios.length > 0) {
+            state.config.socios = state.socios.map((socio, index) => ({
+              id: String.fromCharCode(65 + index),
+              nome: socio.nome,
+              firestoreId: socio.id // Usar o ID do documento original
+            }));
+            console.log("✓ Remapeamento forçado concluído:", state.config.socios);
+          }
+        }
+      }
+    }
+
     // VIEW DE BALANÇO GLOBAL
     async function renderBalancoGlobal() {
+      garantirSociosMapeados(); // Garantir antes de processar
+      
       const container = $("balanco-global-content");
       if (!container) return;
       
@@ -3145,6 +3217,8 @@
 
     // DASHBOARD
     function renderDashboard() {
+      garantirSociosMapeados(); // Garantir antes de renderizar
+      
       renderAlertasVencimento();
       
       const lancs = getLancamentosFiltrados();
@@ -4824,6 +4898,8 @@
 
     // RECEBIMENTOS VIEW
     function renderRecebimentosView() {
+      garantirSociosMapeados(); // Garantir antes de renderizar
+      
       // Hydrate unidade select
       const unidSel = $("receb-unidade");
       unidSel.innerHTML = '<option value="">Selecione...</option>' +
@@ -4905,6 +4981,8 @@
 
     // ACERTOS VIEW
     function renderAcertosView() {
+      garantirSociosMapeados(); // Garantir antes de renderizar
+      
       // Acertos são preenchidos dinamicamente com os sócios da obra via data-socio-select
       renderAcertosList();
     }
