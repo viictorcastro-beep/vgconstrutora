@@ -3176,8 +3176,7 @@
       const lucroPorSocio = lucroLiquidoReal / 2;
       const roiPorSocio = investimentoPorSocio > 0 ? ((lucroPorSocio / investimentoPorSocio) * 100) : 0;
 
-      // Buscar nomes reais dos sócios da obra
-      const obra = state.obras.find(o => o.id === OBRA_ID);
+      // Buscar nomes reais dos sócios da obra (obra já foi declarado no início da função)
       const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
       const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
 
