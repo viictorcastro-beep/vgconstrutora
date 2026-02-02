@@ -1510,7 +1510,7 @@
         state.socios = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.nome.localeCompare(b.nome));
         console.log("👔 Sócios carregados:", state.socios.length);
         
-        // Mapear sócios para estrutura A/B/C
+        // Mapear sócios para estrutura A/B/C (manter compatibilidade)
         state.config.socios = state.socios.map((socio, index) => ({
           id: String.fromCharCode(65 + index), // A, B, C...
           nome: socio.nome,
@@ -1518,6 +1518,7 @@
         }));
         
         console.log("✓ Mapeamento de sócios:", state.config.socios);
+        console.log("✓ Teste getSocioById:", state.socios.map(s => `${s.id} → ${socioNome(s.id)}`));
         
         // Atualizar TODOS os selects de sócio
         atualizarTodosSelectsDeSocio();
@@ -1735,6 +1736,9 @@
         scheduleRerender();
       }));
 
+      // Atualizar selects de sócio quando trocar de obra
+      atualizarTodosSelectsDeSocio();
+      
       rerender();
     }
 
@@ -1909,45 +1913,107 @@
       return rats;
     }
 
-    // Função para popular dropdowns de sócios com nomes reais
-    function populateSocioSelects() {
-      const selects = [
-        'lanc-pagador',
-        'receb-recebido-por', 
-        'ac-de',
-        'ac-para',
-        'uni-proprietario',
-        'add-usuario-socio'
-      ];
+    // ========== SISTEMA UNIVERSAL DE MAPEAMENTO DE SÓCIOS ==========
+    
+    // Busca sócio por ID (tenta em config.socios e socios)
+    function getSocioById(socioId) {
+      if (!socioId) return null;
+      const socios = (state?.config?.socios || state?.socios || []);
+      return socios.find(s => String(s.id) === String(socioId)) || null;
+    }
+    
+    // Retorna nome do sócio ou fallback
+    function socioNome(socioId, fallback = null) {
+      const socio = getSocioById(socioId);
+      return socio?.nome || socio?.name || socio?.apelido || fallback || `Sócio ${socioId}`;
+    }
+    
+    // Retorna label formatado com nome e letra (ex: "Victor Castro (A)")
+    function socioLabel(socioId) {
+      const socio = getSocioById(socioId);
+      if (!socio) return `Sócio ${socioId}`;
       
-      selects.forEach(selectId => {
-        const select = $(selectId);
-        if (!select) return;
-        
-        // Guardar opção "ambos" se existir
-        const hasAmbos = select.querySelector('option[value="ambos"]');
-        const ambosOption = hasAmbos ? hasAmbos.outerHTML : '';
-        
-        // Limpar e adicionar opção vazia se necessário
-        if (selectId === 'add-usuario-socio') {
-          select.innerHTML = '<option value="">Selecione...</option>';
-        } else {
-          select.innerHTML = '';
-        }
-        
-        // Adicionar sócios
-        state.socios.forEach(socio => {
-          const option = document.createElement('option');
-          option.value = socio.id;
-          option.textContent = socio.nome;
-          select.appendChild(option);
+      // Se existe mapeamento de letra em config.socios
+      const mapeado = (state?.config?.socios || []).find(s => s.firestoreId === socioId);
+      if (mapeado && mapeado.id) {
+        return `${socio.nome} (${mapeado.id})`;
+      }
+      
+      return socio.nome;
+    }
+    
+    // Preenche select com sócios da obra (função centralizada)
+    function preencherSelectSociosDaObra(selectEl, obra, opcoes = {}) {
+      if (!selectEl) return;
+      
+      const { incluirAmbos = true, incluirVazio = false } = opcoes;
+      const socioAId = obra?.socioAId;
+      const socioBId = obra?.socioBId;
+      
+      const valorAtual = selectEl.value;
+      const items = [];
+      
+      // Opção vazia
+      if (incluirVazio) {
+        items.push({ value: "", label: "Selecione..." });
+      }
+      
+      // Sócios da obra
+      if (socioAId) items.push({ value: socioAId, label: socioNome(socioAId) });
+      if (socioBId) items.push({ value: socioBId, label: socioNome(socioBId) });
+      
+      // Opção Ambos
+      if (incluirAmbos && socioAId && socioBId) {
+        items.push({
+          value: "AMBOS",
+          label: `Ambos (50/50) — ${socioNome(socioAId)} + ${socioNome(socioBId)}`
         });
-        
-        // Re-adicionar "ambos" se tinha
-        if (ambosOption) {
-          select.innerHTML += ambosOption;
-        }
+      }
+      
+      // Renderizar
+      selectEl.innerHTML = items
+        .map(o => `<option value="${String(o.value)}">${escapeHtml(o.label)}</option>`)
+        .join("");
+      
+      // Restaurar valor se ainda existir
+      if (valorAtual && [...selectEl.options].some(opt => opt.value === valorAtual)) {
+        selectEl.value = valorAtual;
+      }
+    }
+    
+    // Atualiza TODOS os selects marcados com data-socio-select
+    function atualizarTodosSelectsDeSocio() {
+      if (!OBRA_ID) return;
+      
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      if (!obra) return;
+      
+      document.querySelectorAll("[data-socio-select]").forEach(sel => {
+        const incluirVazio = sel.id === 'add-usuario-socio' || sel.id === 'uni-proprietario' || sel.id === 'unid-new-proprietario';
+        const incluirAmbos = sel.id !== 'ac-de' && sel.id !== 'ac-para';
+        preencherSelectSociosDaObra(sel, obra, { incluirAmbos, incluirVazio });
       });
+    }
+    
+    // Normaliza valores antigos ("Sócio A" → ID do socioA da obra)
+    function normalizarSocioValor(valor, obra) {
+      if (!valor) return valor;
+      
+      // Já é "AMBOS" normalizado
+      if (String(valor).toUpperCase() === "AMBOS") return "AMBOS";
+      
+      // Detecta "ambos" em português
+      if (String(valor).toLowerCase().includes("ambos")) return "AMBOS";
+      
+      // Extrai letra de "Sócio A" e mapeia para ID
+      const m = String(valor).match(/s[oó]cio\s*([A-Z])/i);
+      if (m && obra) {
+        const letra = m[1].toUpperCase();
+        if (letra === 'A') return obra.socioAId;
+        if (letra === 'B') return obra.socioBId;
+      }
+      
+      return valor; // Já é um ID
     }
 
     // VIEW DE BALANÇO GLOBAL
@@ -4616,6 +4682,7 @@
         return;
       }
 
+      const obra = state.obras.find(o => o.id === OBRA_ID);
       const sorted = [...state.recebimentos].sort((a, b) => 
         new Date(b.data || 0) - new Date(a.data || 0)
       );
@@ -4643,11 +4710,14 @@
                 quitacao: '✅ Quitação',
                 outro: '📝 Outro'
               };
-              const recebidoLabels = {
-                A: '👤 Sócio A',
-                B: '👤 Sócio B',
-                ambos: '👥 50/50'
-              };
+              
+              // Resolver nome do sócio que recebeu
+              const recebidoPorId = normalizarSocioValor(r.recebidoPor, obra);
+              let recebidoPorLabel = '👥 Ambos';
+              if (recebidoPorId && recebidoPorId !== 'AMBOS') {
+                recebidoPorLabel = `👤 ${socioNome(recebidoPorId)}`;
+              }
+              
               return `
                 <tr>
                   <td>${new Date(r.data).toLocaleDateString('pt-BR')}</td>
@@ -4655,7 +4725,7 @@
                   <td>${tipoLabels[r.tipo] || r.tipo}</td>
                   <td class="font-bold ok">R$ ${r.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td>${escapeHtml(r.formaPagamento || 'N/A')}</td>
-                  <td><span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">${recebidoLabels[r.recebidoPor || 'ambos']}</span></td>
+                  <td><span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">${recebidoPorLabel}</span></td>
                   <td class="text-xs muted">${escapeHtml(r.observacoes || '-')}</td>
                   <td>
                     <button onclick="window.deleteRecebimento('${r.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
@@ -4678,19 +4748,7 @@
 
     // ACERTOS VIEW
     function renderAcertosView() {
-      const socioA = state.config.socioA || "Sócio A";
-      const socioB = state.config.socioB || "Sócio B";
-
-      $("ac-de").innerHTML = `
-        <option value="A">${escapeHtml(socioA)}</option>
-        <option value="B">${escapeHtml(socioB)}</option>
-      `;
-
-      $("ac-para").innerHTML = `
-        <option value="A">${escapeHtml(socioA)}</option>
-        <option value="B">${escapeHtml(socioB)}</option>
-      `;
-
+      // Acertos são preenchidos dinamicamente com os sócios da obra via data-socio-select
       renderAcertosList();
     }
 
@@ -4701,9 +4759,8 @@
         return;
       }
 
-      const socioA = state.config.socioA || "Sócio A";
-      const socioB = state.config.socioB || "Sócio B";
-
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      
       const html = `
         <table class="table w-full">
           <thead>
@@ -4717,11 +4774,15 @@
             </tr>
           </thead>
           <tbody>
-            ${state.acertos.map(a => `
+            ${state.acertos.map(a => {
+              const deId = normalizarSocioValor(a.de, obra);
+              const paraId = normalizarSocioValor(a.para, obra);
+              
+              return `
               <tr>
                 <td>${new Date(a.data).toLocaleDateString('pt-BR')}</td>
-                <td>${escapeHtml(a.de === 'A' ? socioA : socioB)}</td>
-                <td>${escapeHtml(a.para === 'A' ? socioA : socioB)}</td>
+                <td>${escapeHtml(socioNome(deId))}</td>
+                <td>${escapeHtml(socioNome(paraId))}</td>
                 <td class="font-bold">R$ ${a.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>${escapeHtml(a.descricao)}</td>
                 <td>
