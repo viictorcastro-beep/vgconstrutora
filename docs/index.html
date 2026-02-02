@@ -2017,6 +2017,21 @@
             obraInfo.vgv += vgvUnidade;
           });
 
+          // ✅ MIGRAÇÃO: Adicionar investimentos iniciais da obra (sistema antigo)
+          if (obra.investimentoA && obra.socioAId && balancoPorSocio[obra.socioAId]) {
+            const investA = obra.investimentoA || 0;
+            console.log(`  💰 Investimento Inicial Sócio A: R$ ${investA}`);
+            balancoPorSocio[obra.socioAId].totalInvestido += investA;
+            obraInfo.custos += investA;
+          }
+          
+          if (obra.investimentoB && obra.socioBId && balancoPorSocio[obra.socioBId]) {
+            const investB = obra.investimentoB || 0;
+            console.log(`  💰 Investimento Inicial Sócio B: R$ ${investB}`);
+            balancoPorSocio[obra.socioBId].totalInvestido += investB;
+            obraInfo.custos += investB;
+          }
+
           // Adicionar obra no detalhamento
           Object.values(balancoPorSocio).forEach(socio => {
             if (obraInfo.custos > 0 || obraInfo.receitas > 0) {
