@@ -1963,6 +1963,53 @@
       return `Sócio •••${v.slice(-4)}`;
     }
     
+    // Resolve QUALQUER formato de ID para o canonical "A"/"B"/"C"
+    function resolveSocioCanonicalId(valor) {
+      if (!valor) return null;
+      const socios = state?.config?.socios || [];
+      
+      const v = String(valor);
+      
+      // Se já for A/B/C, retorna direto
+      if (v.length === 1 && v >= 'A' && v <= 'Z') {
+        return socios.some(s => s.id === v) ? v : null;
+      }
+      
+      // Se for firestoreId, busca e retorna a letra
+      const socio = socios.find(s => String(s.firestoreId) === v);
+      return socio ? socio.id : null;
+    }
+    
+    // Infere alocações de um recebimento (rateio 50/50 ou custom)
+    function inferirAlocacoesRecebimento(recebimento, obra) {
+      // Se já tem alocações explícitas, usar
+      if (recebimento.alocacoes && Array.isArray(recebimento.alocacoes)) {
+        return recebimento.alocacoes;
+      }
+      
+      // Inferir baseado na obra
+      const socioAId = resolveSocioCanonicalId(obra?.socioAId);
+      const socioBId = resolveSocioCanonicalId(obra?.socioBId);
+      
+      if (!socioAId) return [];
+      
+      const valor = recebimento.valor || 0;
+      
+      // Se obra tem só um sócio, tudo para ele
+      if (!socioBId) {
+        return [{ socioId: socioAId, valor: valor }];
+      }
+      
+      // Rateio 50/50 default (mesmo que recebidoPor seja só um)
+      const percentA = recebimento.percentualA || 50;
+      const percentB = recebimento.percentualB || 50;
+      
+      return [
+        { socioId: socioAId, valor: (percentA / 100) * valor },
+        { socioId: socioBId, valor: (percentB / 100) * valor }
+      ];
+    }
+    
     // Preenche select com sócios da obra (função centralizada)
     function preencherSelectSociosDaObra(selectEl, obra, opcoes = {}) {
       if (!selectEl) return;
@@ -2199,11 +2246,28 @@
               }
             });
 
-            // Receitas da unidade (recebimentos confirmados)
+            // Receitas da unidade (recebimentos confirmados) - USAR ALOCAÇÕES REAIS
             recebimentos.forEach(rec => {
               if (rec.unidadeId === unidade.id) {
-                receitaUnidade += rec.valor || 0;
-                console.log(`      💰 Recebimento: R$ ${rec.valor}`);
+                const valor = rec.valor || 0;
+                receitaUnidade += valor;
+                
+                // Inferir alocações (quem tem DIREITO ao valor, não quem recebeu fisicamente)
+                const alocacoes = inferirAlocacoesRecebimento(rec, obra);
+                
+                console.log(`      💰 Recebimento: R$ ${valor} (Recebido por: ${rec.recebidoPor || 'N/A'})`);
+                
+                // Distribuir pelos sócios conforme alocações
+                alocacoes.forEach(aloc => {
+                  const canonicalId = resolveSocioCanonicalId(aloc.socioId);
+                  if (canonicalId) {
+                    const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
+                    if (socioFirestoreId && balancoPorSocio[socioFirestoreId]) {
+                      balancoPorSocio[socioFirestoreId].totalRecebido += aloc.valor;
+                      console.log(`        👤 ${balancoPorSocio[socioFirestoreId].nome}: +R$ ${aloc.valor.toFixed(2)}`);
+                    }
+                  }
+                });
               }
             });
 
@@ -2275,33 +2339,22 @@
             if (dataFim && receb.data && receb.data > dataFim) return;
             
             const valor = receb.valor || 0;
-            console.log(`    💵 Recebimento geral: R$ ${valor} (${receb.descricao || receb.tipo})`);
+            console.log(`    💵 Recebimento geral: R$ ${valor} (Recebido por: ${receb.recebidoPor || 'N/A'})`);
             
-            // Buscar IDs dos sócios da obra
-            const socioAId = obra.socioAId;
-            const socioBId = obra.socioBId;
+            // Inferir alocações (quem tem DIREITO, não quem recebeu)
+            const alocacoes = inferirAlocacoesRecebimento(receb, obra);
             
-            if (!socioAId && !socioBId) {
-              console.log(`      ⚠️ Obra sem sócios vinculados, ignorando recebimento`);
-              return;
-            }
-            
-            // Usar percentuais do recebimento ou 50/50 por padrão
-            const percentA = receb.victorPercent || receb.percentualA || 50;
-            const percentB = receb.gustavoPercent || receb.percentualB || 50;
-            
-            const valorA = (percentA / 100) * valor;
-            const valorB = (percentB / 100) * valor;
-            
-            if (socioAId && balancoPorSocio[socioAId]) {
-              balancoPorSocio[socioAId].totalRecebido += valorA;
-              console.log(`      👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
-            }
-            
-            if (socioBId && balancoPorSocio[socioBId]) {
-              balancoPorSocio[socioBId].totalRecebido += valorB;
-              console.log(`      👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
-            }
+            // Distribuir pelos sócios conforme alocações
+            alocacoes.forEach(aloc => {
+              const canonicalId = resolveSocioCanonicalId(aloc.socioId);
+              if (canonicalId) {
+                const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
+                if (socioFirestoreId && balancoPorSocio[socioFirestoreId]) {
+                  balancoPorSocio[socioFirestoreId].totalRecebido += aloc.valor;
+                  console.log(`      👤 ${balancoPorSocio[socioFirestoreId].nome}: +R$ ${aloc.valor.toFixed(2)}`);
+                }
+              }
+            });
             
             obraInfo.receitas += valor;
           });
@@ -2637,6 +2690,10 @@
         
         showToast(`✅ Migração concluída! ${totalMigrado} unidades atualizadas.`, 'success');
         
+        // Executar equalização final
+        showToast('🔄 Processando equalização de recebimentos...', 'info');
+        await finalizeMigracaoEqualizacao();
+        
         // Recarregar balanço
         setTimeout(() => {
           renderBalancoGlobal();
@@ -2647,6 +2704,77 @@
         showToast('❌ Erro ao migrar. Veja o console.', 'error');
       }
     };
+    
+    // Finaliza migração gerando acertos automáticos baseados em recebimentos
+    async function finalizeMigracaoEqualizacao() {
+      try {
+        let totalAcertosCriados = 0;
+        
+        for (const obra of state.obras) {
+          console.log(`🔄 Equalizando recebimentos da obra: ${obra.nome}`);
+          
+          // Carregar recebimentos
+          const recebimentosSnap = await getDocs(collection(db, "obras", obra.id, "recebimentos"));
+          const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          
+          // Carregar acertos existentes para evitar duplicação
+          const acertosSnap = await getDocs(collection(db, "obras", obra.id, "acertos"));
+          const acertosExistentes = acertosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          
+          // Para cada recebimento, verificar se precisa de acerto
+          for (const recebimento of recebimentos) {
+            // Pular se já foi processado (tem recebimentoOrigemId em algum acerto)
+            const jaProcessado = acertosExistentes.some(a => a.recebimentoOrigemId === recebimento.id);
+            if (jaProcessado) {
+              console.log(`  ⏭️ Recebimento ${recebimento.id} já processado`);
+              continue;
+            }
+            
+            // Inferir alocações
+            const alocacoes = inferirAlocacoesRecebimento(recebimento, obra);
+            const recebidoPorCanonical = resolveSocioCanonicalId(recebimento.recebidoPor);
+            
+            if (!recebidoPorCanonical || alocacoes.length === 0) continue;
+            
+            // Para cada sócio que tem direito mas NÃO recebeu
+            for (const aloc of alocacoes) {
+              const socioComDireito = resolveSocioCanonicalId(aloc.socioId);
+              
+              if (socioComDireito && socioComDireito !== recebidoPorCanonical && aloc.valor > 0) {
+                // Criar acerto pendente
+                const descricao = `Equalização migração: ${socioNomePorQualquerId(recebidoPorCanonical)} recebeu R$ ${recebimento.valor.toFixed(2)} mas R$ ${aloc.valor.toFixed(2)} pertence a ${socioNomePorQualquerId(socioComDireito)}`;
+                
+                await addDoc(collection(db, "obras", obra.id, "acertos"), {
+                  data: recebimento.data || new Date().toISOString().split('T')[0],
+                  de: recebidoPorCanonical,
+                  para: socioComDireito,
+                  valor: aloc.valor,
+                  descricao: descricao,
+                  status: 'pendente',
+                  recebimentoOrigemId: recebimento.id,
+                  migracaoAuto: true,
+                  createdAt: serverTimestamp(),
+                  createdBy: state.user?.email || 'sistema'
+                });
+                
+                totalAcertosCriados++;
+                console.log(`  ✅ Acerto criado: ${socioNomePorQualquerId(recebidoPorCanonical)} → ${socioNomePorQualquerId(socioComDireito)}: R$ ${aloc.valor.toFixed(2)}`);
+              }
+            }
+          }
+        }
+        
+        if (totalAcertosCriados > 0) {
+          showToast(`✅ ${totalAcertosCriados} acertos criados automaticamente`, 'success');
+        } else {
+          showToast('✅ Nenhum acerto pendente necessário', 'success');
+        }
+        
+      } catch (err) {
+        console.error('❌ Erro na equalização:', err);
+        showToast('⚠️ Erro ao processar equalização', 'warning');
+      }
+    }
 
     let editandoObraId = null; // Flag para evitar loop infinito
     
@@ -5421,6 +5549,68 @@
       }
     }
 
+    // Gera acerto automático quando recebimento precisa ser redistribuído
+    async function gerarAcertoAutomatico(recebimentoId, recebimento) {
+      try {
+        const obra = state.obras.find(o => o.id === OBRA_ID);
+        if (!obra) return;
+        
+        // Inferir alocações (quem tem DIREITO ao dinheiro)
+        const alocacoes = inferirAlocacoesRecebimento(recebimento, obra);
+        
+        // Descobrir quem recebeu FISICAMENTE
+        const recebidoPorCanonical = resolveSocioCanonicalId(recebimento.recebidoPor);
+        
+        if (!recebidoPorCanonical || alocacoes.length === 0) return;
+        
+        // Para cada sócio que tem direito ao dinheiro mas NÃO recebeu
+        for (const aloc of alocacoes) {
+          const socioComDireito = resolveSocioCanonicalId(aloc.socioId);
+          
+          // Se quem tem direito é diferente de quem recebeu, gerar acerto
+          if (socioComDireito && socioComDireito !== recebidoPorCanonical && aloc.valor > 0) {
+            
+            // Buscar acertos pendentes existentes no sentido INVERSO (netting)
+            const acertosInversos = state.acertos.filter(a => 
+              resolveSocioCanonicalId(a.de) === socioComDireito &&
+              resolveSocioCanonicalId(a.para) === recebidoPorCanonical &&
+              (!a.status || a.status === 'pendente')
+            );
+            
+            const totalInverso = acertosInversos.reduce((sum, a) => sum + (a.valor || 0), 0);
+            
+            // Netting: compensar dívidas opostas
+            let valorLiquido = aloc.valor - totalInverso;
+            
+            if (valorLiquido > 0) {
+              // Criar acerto: quem recebeu deve passar para quem tem direito
+              const descricao = `Repasse automático: ${socioNomePorQualquerId(recebidoPorCanonical)} recebeu ${recebimento.tipo || 'valor'} de R$ ${recebimento.valor.toFixed(2)} mas parte pertence a ${socioNomePorQualquerId(socioComDireito)} (${((aloc.valor / recebimento.valor) * 100).toFixed(0)}%)`;
+              
+              await addDoc(refs(OBRA_ID).acertosCol, {
+                data: recebimento.data,
+                de: recebidoPorCanonical,
+                para: socioComDireito,
+                valor: valorLiquido,
+                descricao: descricao,
+                status: 'pendente',
+                recebimentoOrigemId: recebimentoId,
+                createdAt: serverTimestamp(),
+                createdBy: state.user.email
+              });
+              
+              console.log(`✅ Acerto automático criado: ${socioNomePorQualquerId(recebidoPorCanonical)} → ${socioNomePorQualquerId(socioComDireito)}: R$ ${valorLiquido.toFixed(2)}`);
+            } else if (totalInverso > aloc.valor) {
+              // Marcar acertos inversos como parcialmente compensados
+              console.log(`💰 Netting aplicado: dívida compensada em R$ ${aloc.valor.toFixed(2)}`);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('❌ Erro ao gerar acerto automático:', err);
+        // Não bloquear o fluxo principal
+      }
+    }
+
     async function addRecebimento(e) {
       e.preventDefault();
 
@@ -5438,7 +5628,7 @@
       }
 
       try {
-        await addDoc(refs(OBRA_ID).recebimentosCol, {
+        const recebimentoRef = await addDoc(refs(OBRA_ID).recebimentosCol, {
           data,
           unidadeId,
           tipo,
@@ -5449,8 +5639,20 @@
           createdAt: serverTimestamp(),
           createdBy: state.user.email
         });
+        
         $("receb-form").reset();
         showToast('Recebimento registrado com sucesso!', 'success');
+        
+        // Gerar acerto automático se necessário
+        await gerarAcertoAutomatico(recebimentoRef.id, {
+          data,
+          unidadeId,
+          tipo,
+          valor,
+          recebidoPor,
+          observacoes
+        });
+        
       } catch (err) {
         console.error(err);
         showToast('Erro ao registrar recebimento', 'error');
