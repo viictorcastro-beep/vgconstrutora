@@ -3176,8 +3176,10 @@
       const lucroPorSocio = lucroLiquidoReal / 2;
       const roiPorSocio = investimentoPorSocio > 0 ? ((lucroPorSocio / investimentoPorSocio) * 100) : 0;
 
-      const socioA = state.config.socioA || "Sócio A";
-      const socioB = state.config.socioB || "Sócio B";
+      // Buscar nomes reais dos sócios da obra
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
 
       const html = `
         <div class="card p-6">
@@ -3632,9 +3634,9 @@
     }
 
     function renderAnaliseDetalhada(lancs, rats) {
-      const socioA = state.config.socioA || "Sócio A";
-      const socioB = state.config.socioB || "Sócio B";
       const obra = state.obras.find(o => o.id === OBRA_ID);
+      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
 
       // Verificar permissões
       const meuSocioId = getSocioIdForUser(OBRA_ID);
@@ -4141,8 +4143,9 @@
     }
 
     function renderLucroSection(lucroData) {
-      const socioA = state.config.socioA || "Sócio A";
-      const socioB = state.config.socioB || "Sócio B";
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
 
       let html = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -4807,8 +4810,19 @@
 
     // CONFIG VIEW
     function renderConfigView() {
-      $("socio-a").value = state.config.socioA || "";
-      $("socio-b").value = state.config.socioB || "";
+      // Sistema de sócios migrado para coleção global - estes campos são legacy
+      // Desabilitar campos para evitar confusão
+      const socioAInput = $("socio-a");
+      const socioBInput = $("socio-b");
+      
+      if (socioAInput) {
+        socioAInput.value = "Use o botão '👔 Sócios' no topo";
+        socioAInput.disabled = true;
+      }
+      if (socioBInput) {
+        socioBInput.value = "Use o botão '👔 Sócios' no topo";
+        socioBInput.disabled = true;
+      }
 
       renderDeducoesList();
     }
@@ -5172,6 +5186,12 @@
     }
 
     async function saveSocios() {
+      // Sistema migrado para coleção global de sócios
+      // Use o botão "👔 Sócios" no topo para gerenciar sócios
+      showToast('⚠️ Sistema migrado! Use o botão "👔 Sócios" no topo da tela', 'warning');
+      return;
+      
+      /* Código obsoleto - manter comentado por compatibilidade
       const socioA = $("socio-a").value.trim() || "Sócio A";
       const socioB = $("socio-b").value.trim() || "Sócio B";
 
@@ -5186,6 +5206,8 @@
         console.error(err);
         showToast('Erro ao salvar sócios', 'error');
       }
+      */
+    }
     }
 
     async function addLancamento(e) {
@@ -5777,11 +5799,10 @@
     }
 
     function computeEqualizacao() {
-      const socioA = state.config.socioA || "Sócio A";
-      const socioB = state.config.socioB || "Sócio B";
-
       // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
       const obra = state.obras.find(o => o.id === OBRA_ID);
+      const socioA = obra?.socioAId ? socioNome(obra.socioAId) : "Sócio A";
+      const socioB = obra?.socioBId ? socioNome(obra.socioBId) : "Sócio B";
       const investimentoA = obra?.investimentoA || 0;
       const investimentoB = obra?.investimentoB || 0;
 
@@ -6054,7 +6075,11 @@
       const investimentoPorSocio = custoTotal / 2;
       const lucroPorSocio = lucroData.lucroLiquido / 2;
 
-      pdf.text(`👤 ${state.config.socioA || 'Sócio A'}`, 14, y);
+      const obra = state.obras.find(o => o.id === OBRA_ID);
+      const socioANome = obra?.socioAId ? socioNome(obra.socioAId) : 'Sócio A';
+      const socioBNome = obra?.socioBId ? socioNome(obra.socioBId) : 'Sócio B';
+
+      pdf.text(`👤 ${socioANome}`, 14, y);
       pdf.text(`Investimento: R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 6);
       pdf.setFont(undefined, 'bold');
       pdf.setTextColor(5, 150, 105);
@@ -6063,7 +6088,7 @@
       pdf.setFont(undefined, 'normal');
 
       y += 22;
-      pdf.text(`👤 ${state.config.socioB || 'Sócio B'}`, 14, y);
+      pdf.text(`👤 ${socioBNome}`, 14, y);
       pdf.text(`Investimento: R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 6);
       pdf.setFont(undefined, 'bold');
       pdf.setTextColor(5, 150, 105);
