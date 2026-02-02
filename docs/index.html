@@ -1177,7 +1177,9 @@
       rateios: [],
       recebimentos: [],
       acertos: [],
-      config: {}
+      config: {
+        socios: []  // Inicializar como array vazio
+      }
     };
 
     const listeners = [];
@@ -1518,7 +1520,6 @@
         }));
         
         console.log("✓ Mapeamento de sócios:", state.config.socios);
-        console.log("✓ Teste getSocioById:", state.socios.map(s => `${s.id} → ${socioNome(s.id)}`));
         
         // Atualizar TODOS os selects de sócio
         atualizarTodosSelectsDeSocio();
@@ -1918,6 +1919,7 @@
     // Busca sócio por ID (tenta em config.socios e socios)
     function getSocioById(socioId) {
       if (!socioId) return null;
+      if (!state) return null;
       const socios = (state?.config?.socios || state?.socios || []);
       return socios.find(s => String(s.id) === String(socioId)) || null;
     }
@@ -1987,6 +1989,12 @@
       
       const obra = state.obras.find(o => o.id === OBRA_ID);
       if (!obra) return;
+      
+      // Garantir que config.socios existe
+      if (!state.config || !state.config.socios || state.config.socios.length === 0) {
+        console.log("⚠️ atualizarTodosSelectsDeSocio: config.socios ainda não inicializado");
+        return;
+      }
       
       document.querySelectorAll("[data-socio-select]").forEach(sel => {
         const incluirVazio = sel.id === 'add-usuario-socio' || sel.id === 'uni-proprietario' || sel.id === 'unid-new-proprietario';
