@@ -2284,12 +2284,20 @@
      * }
      */
     async function calcularPosicaoGlobalConsolidada() {
-      console.log('\n🔍 [EQ GLOBAL] Iniciando cálculo...');
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔍 [EQ GLOBAL] Iniciando cálculo da Posição Global Consolidada...');
+      console.log(`📊 Total de sócios: ${state.socios.length}`);
+      console.log(`🏗️ Total de obras: ${state.obras.length}`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      
+      // 🔥 CRÍTICO: Garantir que os sócios estão mapeados antes de processar!
+      garantirSociosMapeados();
       
       const posicoes = {};
 
       // Inicializar para cada sócio usando Firestore ID
       state.socios.forEach(socio => {
+        console.log(`  ✅ Inicializando sócio: ${socio.nome} (ID: ${socio.id})`);
         posicoes[socio.id] = {
           id: socio.id,
           nome: socio.nome,
@@ -2312,7 +2320,11 @@
       // Iterar por TODAS as obras
       for (const obra of state.obras) {
         const obraId = obra.id;
-        console.log(`  📊 Processando obra: ${obra.nome}`);
+        console.log(`\n  📊 Processando obra: ${obra.nome} (ID: ${obraId})`);
+        console.log(`     socioAId: "${obra.socioAId}", socioBId: "${obra.socioBId}"`);
+        console.log(`     posicoes keys: [${Object.keys(posicoes).join(', ')}]`);
+        console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[obra.socioAId]}`);
+        console.log(`     Obra tem socioBId em posicoes? ${!!posicoes[obra.socioBId]}`);
 
         try {
           // Carregar dados da obra
@@ -2326,6 +2338,7 @@
           const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
           // 1️⃣ PROCESSAR LANÇAMENTOS (CUSTOS/INVESTIMENTOS)
+          console.log(`     💳 ${lancamentos.length} lançamentos encontrados`);
           lancamentos.forEach(l => {
             const valor = l.valor || 0;
             const percentA = l.victorPercent || l.percentualA || 50;
@@ -2337,15 +2350,21 @@
             if (obra.socioAId && posicoes[obra.socioAId]) {
               posicoes[obra.socioAId].detalheCaixa.pagoFisico += valorA;
               posicoes[obra.socioAId].detalheDireito.custoPorAlocacao += valorA;
+            } else if (obra.socioAId) {
+              console.warn(`     ⚠️ socioAId "${obra.socioAId}" não encontrado em posicoes!`);
             }
             
             if (obra.socioBId && posicoes[obra.socioBId]) {
               posicoes[obra.socioBId].detalheCaixa.pagoFisico += valorB;
               posicoes[obra.socioBId].detalheDireito.custoPorAlocacao += valorB;
+            } else if (obra.socioBId) {
+              console.warn(`     ⚠️ socioBId "${obra.socioBId}" não encontrado em posicoes!`);
             }
           });
+          console.log(`     ✅ Lançamentos processados`);
 
           // 2️⃣ PROCESSAR RECEBIMENTOS
+          console.log(`     💰 ${recebimentos.length} recebimentos encontrados`);
           recebimentos.forEach(rec => {
             const valor = rec.valor || 0;
             
