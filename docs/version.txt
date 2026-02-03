@@ -1,0 +1,4 @@
+VERSION: CAIXA-COMPETENCIA-FIX
+TIMESTAMP: 2026-02-02 22:35:00
+COMMIT: f1fa091
+FEATURE: Separacao completa de Caixa vs Direito no Balanco Global
