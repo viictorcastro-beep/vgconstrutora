@@ -2561,6 +2561,28 @@
             });
           });
 
+          // 2.5️⃣ PROCESSAR ACERTOS (transferências entre sócios)
+          const acertosSnap = await getDocs(collection(db, "obras", obraId, "acertos"));
+          acertosSnap.forEach(doc => {
+            const a = doc.data();
+            const valor = Number(a.valor || 0);
+            if (!valor) return;
+
+            const deNorm = normalizarSocioValor(a.de, obra);
+            const paraNorm = normalizarSocioValor(a.para, obra);
+            const deId = resolveSocioFirestoreId(deNorm) || resolveSocioFirestoreId(a.de);
+            const paraId = resolveSocioFirestoreId(paraNorm) || resolveSocioFirestoreId(a.para);
+
+            if (deId && posicoes[deId]) {
+              posicoes[deId].detalheCaixa.pagoFisico += valor;
+              addDetalheObra(deId, 'pagoFisico', valor);
+            }
+            if (paraId && posicoes[paraId]) {
+              posicoes[paraId].detalheCaixa.recebidoFisico += valor;
+              addDetalheObra(paraId, 'recebidoFisico', valor);
+            }
+          });
+
           // 3️⃣ CONTAS A RECEBER (opcional, para modo estratégico)
           const crSnap = await getDocs(collection(db, "obras", obraId, "contasReceber"));
           crSnap.forEach(doc => {
