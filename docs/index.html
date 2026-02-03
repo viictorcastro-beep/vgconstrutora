@@ -2714,7 +2714,7 @@
             
             // Acumular no sócio
             balancoPorSocio[proprietarioId].totalInvestido += custoUnidade;
-            balancoPorSocio[proprietarioId].totalRecebido += receitaUnidade;
+            // ❌ REMOVIDO: totalRecebido (já processado em recebidoCaixa + direitoCompetencia)
             balancoPorSocio[proprietarioId].vgvPrevisto += vgvUnidade;
             balancoPorSocio[proprietarioId].vendasConfirmadas += receitaUnidade;
             
