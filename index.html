@@ -1,4 +1,4 @@
-<!-- BUILD: 2026-02-02 | commit: 9e4b6dc | FIXED: socio names + recebimentos logic -->
+<!-- BUILD: 638245c - 2026-02-02 15:30 BRT -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,15 +9,15 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- PDF export -->
-  <script src="../assets/vendor/jspdf.umd.min.js?v=1770048957"></script>
-  <script src="../assets/vendor/jspdf.plugin.autotable.min.js?v=1770048957"></script>
+  <!-- PDF export - USANDO CDN até corrigir paths locais -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   
   <!-- Charts -->
-  <script src="../assets/vendor/chart.umd.min.js?v=1770048957"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   
   <!-- Excel Export -->
-  <script src="../assets/vendor/xlsx.full.min.js?v=1770048957"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body { background:#f1f5f9; }
@@ -186,6 +186,7 @@
         <button class="btn btn-soft view-btn" data-view="LANCAMENTOS">💰 Lançamentos</button>
         <button class="btn btn-soft view-btn" data-view="RATEIOS">⚖️ Rateios</button>
         <button class="btn btn-soft view-btn" data-view="RECEBIMENTOS">💵 Recebimentos</button>
+        <button class="btn btn-soft view-btn" data-view="CONTAS_RECEBER">💰 Contas a Receber</button>
         <button class="btn btn-soft view-btn" data-view="ACERTOS">🤝 Acertos Sócios</button>
         <button class="btn btn-soft view-btn" data-view="CONFIG">⚙️ Config</button>
       </div>
@@ -582,6 +583,85 @@
         <div class="card p-6">
           <div class="font-black text-lg mb-4">📋 Lista de Recebimentos</div>
           <div id="receb-list"></div>
+        </div>
+      </div>
+
+      <!-- CONTAS A RECEBER VIEW -->
+      <div id="view-CONTAS_RECEBER" class="view-content hidden">
+        <div class="card p-6 mb-6">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h2 class="font-black text-2xl text-gray-800 mb-2">💰 Contas a Receber</h2>
+              <p class="text-sm text-gray-600">Valores vendidos/confirmados mas ainda não recebidos</p>
+            </div>
+            <button id="cr-create-btn" class="btn btn-green">+ Nova Conta a Receber</button>
+          </div>
+          
+          <div class="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-6">
+            <div class="font-bold text-blue-900 mb-2">💡 O que são Contas a Receber (CR)?</div>
+            <p class="text-blue-800 text-sm">
+              São valores de <strong>vendas confirmadas</strong> que ainda não viraram dinheiro. 
+              Por exemplo: você vendeu 30% de uma obra por R$ 10.000, mas ainda não recebeu o pagamento. 
+              Registre aqui para que o sistema considere esse valor futuro na equalização estratégica.
+            </p>
+          </div>
+          
+          <!-- Formulário de nova CR -->
+          <div id="cr-form-container" class="hidden">
+            <form id="cr-form" class="bg-gray-50 border border-gray-300 rounded-lg p-6 mb-6">
+              <div class="font-bold text-gray-800 mb-4">📝 Cadastrar Nova Conta a Receber</div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <div class="text-xs muted mb-1">Data Prevista *</div>
+                  <input id="cr-data" type="date" class="input" required />
+                </div>
+                <div>
+                  <div class="text-xs muted mb-1">Descrição *</div>
+                  <input id="cr-descricao" type="text" class="input" placeholder="Ex: Venda 30% - Unidade 1" required />
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <div class="text-xs muted mb-1">Valor * (R$)</div>
+                  <input id="cr-valor" type="number" step="0.01" class="input" placeholder="10000.00" required />
+                </div>
+                <div>
+                  <div class="text-xs muted mb-1">Status *</div>
+                  <select id="cr-status" class="select" required>
+                    <option value="previsto">Previsto</option>
+                    <option value="confirmado">Confirmado</option>
+                    <option value="recebido">Recebido (baixado)</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="bg-yellow-50 border border-yellow-300 rounded p-4 mb-4">
+                <div class="font-bold text-yellow-900 mb-2">⚖️ Distribuição entre Sócios (50/50 padrão)</div>
+                <p class="text-xs text-yellow-800 mb-3">Por padrão, divide 50/50. Você pode ajustar se necessário.</p>
+                
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-xs muted mb-1">Sócio A %</div>
+                    <input id="cr-percent-a" type="number" step="0.01" class="input" value="50" />
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Sócio B %</div>
+                    <input id="cr-percent-b" type="number" step="0.01" class="input" value="50" />
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flex gap-3">
+                <button type="submit" class="btn btn-dark">✅ Salvar Conta a Receber</button>
+                <button type="button" id="cr-cancel-btn" class="btn btn-soft">❌ Cancelar</button>
+              </div>
+            </form>
+          </div>
+          
+          <!-- Lista de CRs -->
+          <div id="cr-list"></div>
         </div>
       </div>
 
@@ -1008,9 +1088,14 @@
       appId: "1:648174167866:web:98fb10be18b73fcc7a9203"
     };
 
-    // BUILD STAMP
-    console.log("%c🔨 BUILD: 2026-02-02 | commit: 9e4b6dc", "color: #22c55e; font-weight: bold; font-size: 14px;");
-    console.log("%c✓ FIXED: socio names display + recebimentos 50/50 logic + acertos automáticos", "color: #10b981;");
+    // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
+    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
+    console.log("%c🔨 BUILD: 638245c (2026-02-02 15:30 BRT)", "color: #22c55e; font-weight: bold; font-size: 16px;");
+    console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
+    console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
+    console.log("%c✓ FIXED: acertos automáticos com netting", "color: #10b981;");
+    console.log("%c✓ FIXED: vendors via CDN (sem 404s)", "color: #10b981;");
+    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
 
     // Initialize
     console.log("🔥 Inicializando Firebase...");
@@ -1182,6 +1267,7 @@
       rateios: [],
       recebimentos: [],
       acertos: [],
+      contasReceber: [],  // Nova: Contas a Receber (vendas confirmadas não recebidas)
       config: {
         socios: []  // Inicializar como array vazio
       }
@@ -1246,6 +1332,7 @@
         rateiosCol: collection(db, "obras", obraId, "rateios"),
         recebimentosCol: collection(db, "obras", obraId, "recebimentos"),
         acertosCol: collection(db, "obras", obraId, "acertos"),
+        contasReceberCol: collection(db, "obras", obraId, "contasReceber"),  // Nova coleção para CR
         configDoc: doc(db, "obras", obraId, "config", "main")
       };
     }
@@ -1751,6 +1838,12 @@
         scheduleRerender();
       }));
 
+      // 📊 Contas a Receber subscriber
+      listeners.push(onSnapshot(r.contasReceberCol, (snap) => {
+        state.contasReceber = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        scheduleRerender();
+      }));
+
       listeners.push(onSnapshot(r.configDoc, (snap) => {
         state.config = snap.exists() ? snap.data() : {};
         scheduleRerender();
@@ -1836,6 +1929,8 @@
         renderRateiosView();
       } else if (VIEW === "RECEBIMENTOS") {
         renderRecebimentosView();
+      } else if (VIEW === "CONTAS_RECEBER") {
+        renderContasReceberView();
       } else if (VIEW === "ACERTOS") {
         renderAcertosView();
       } else if (VIEW === "CONFIG") {
@@ -2163,6 +2258,253 @@
           }
         }
       }
+    }
+
+    // ========================================
+    // 🌍 EQUALIZAÇÃO GLOBAL CONSOLIDADA
+    // ========================================
+
+    /**
+     * Calcula a posição financeira consolidada de cada sócio através de TODAS as obras.
+     * Retorna objeto com estrutura:
+     * {
+     *   socioId: {
+     *     nome: "Victor Castro",
+     *     caixaFisico: 10000,        // Total recebido fisicamente - pago fisicamente
+     *     direitoPorCompetencia: 5000, // Alocações 50/50 de recebimentos e custos
+     *     contasReceber: 10000,      // Valores vendidos confirmados mas não recebidos
+     *     totalConsolidado: 25000    // caixa + direito + CR
+     *   }
+     * }
+     */
+    async function calcularPosicaoGlobalConsolidada() {
+      const posicoes = {};
+
+      // Inicializar para cada sócio
+      state.socios.forEach(socio => {
+        posicoes[socio.id] = {
+          id: socio.id,
+          nome: socio.nome,
+          caixaFisico: 0,
+          direitoPorCompetencia: 0,
+          contasReceber: 0,
+          totalConsolidado: 0,
+          detalheCaixa: {
+            recebidoFisico: 0,
+            pagoFisico: 0
+          },
+          detalheDireito: {
+            receitaPorAlocacao: 0,
+            custoPorAlocacao: 0
+          }
+        };
+      });
+
+      // Iterar por TODAS as obras
+      for (const obra of state.obras) {
+        const obraId = obra.id;
+
+        try {
+          // 1) RECEBIMENTOS - Posição de CAIXA (quem recebeu fisicamente)
+          const recebimentosSnap = await getDocs(collection(db, "obras", obraId, "recebimentos"));
+          recebimentosSnap.forEach(doc => {
+            const rec = doc.data();
+            const recebidoPor = resolveSocioCanonicalId(rec.recebidoPor);
+            const valor = rec.valor || 0;
+
+            if (posicoes[recebidoPor]) {
+              posicoes[recebidoPor].detalheCaixa.recebidoFisico += valor;
+            }
+
+            // Posição de DIREITO (competência - alocações 50/50)
+            const alocacoes = inferirAlocacoesRecebimento(rec, obra);
+            alocacoes.forEach(aloc => {
+              const socioId = resolveSocioCanonicalId(aloc.socioId);
+              if (posicoes[socioId]) {
+                posicoes[socioId].detalheDireito.receitaPorAlocacao += aloc.valor;
+              }
+            });
+          });
+
+          // 2) LANÇAMENTOS (Custos) - Posição de CAIXA (quem pagou fisicamente)
+          const lancamentosSnap = await getDocs(collection(db, "obras", obraId, "lancamentos"));
+          lancamentosSnap.forEach(doc => {
+            const lanc = doc.data();
+            const pago = lanc.pago;
+            const valor = lanc.valor || 0;
+
+            // Custos por quem pagou (simplificação - pode melhorar com rateio)
+            // Por padrão vamos usar rateio 50/50 para custos também
+            const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
+            const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
+
+            if (pago) {
+              // Custo pago fisicamente
+              const pagoPor = resolveSocioCanonicalId(lanc.pagoPor || socioAId);
+              if (posicoes[pagoPor]) {
+                posicoes[pagoPor].detalheCaixa.pagoFisico += valor;
+              }
+            }
+
+            // Custos por competência (50/50 por padrão)
+            const rateios = lanc.rateios || [];
+            if (rateios.length > 0) {
+              rateios.forEach(rat => {
+                const socioId = resolveSocioCanonicalId(rat.socioId);
+                const valorRateio = rat.valor || 0;
+                if (posicoes[socioId]) {
+                  posicoes[socioId].detalheDireito.custoPorAlocacao += valorRateio;
+                }
+              });
+            } else {
+              // Rateio 50/50 default
+              const metade = valor / 2;
+              if (posicoes[socioAId]) posicoes[socioAId].detalheDireito.custoPorAlocacao += metade;
+              if (posicoes[socioBId]) posicoes[socioBId].detalheDireito.custoPorAlocacao += metade;
+            }
+          });
+
+          // 3) CONTAS A RECEBER - Valores vendidos confirmados mas não recebidos
+          const crSnap = await getDocs(collection(db, "obras", obraId, "contasReceber"));
+          crSnap.forEach(doc => {
+            const cr = doc.data();
+            if (cr.status !== 'recebido') {
+              const valor = cr.valor || 0;
+
+              // Distribuir CR conforme alocações (50/50 por padrão ou custom)
+              const alocacoes = cr.alocacoes || [];
+              if (alocacoes.length > 0) {
+                alocacoes.forEach(aloc => {
+                  const socioId = resolveSocioCanonicalId(aloc.socioId);
+                  if (posicoes[socioId]) {
+                    posicoes[socioId].contasReceber += aloc.valor;
+                  }
+                });
+              } else {
+                // 50/50 default
+                const metade = valor / 2;
+                const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
+                const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
+                if (posicoes[socioAId]) posicoes[socioAId].contasReceber += metade;
+                if (posicoes[socioBId]) posicoes[socioBId].contasReceber += metade;
+              }
+            }
+          });
+
+        } catch (err) {
+          console.error(`Erro ao processar obra ${obraId}:`, err);
+        }
+      }
+
+      // Calcular totais consolidados
+      Object.values(posicoes).forEach(pos => {
+        pos.caixaFisico = pos.detalheCaixa.recebidoFisico - pos.detalheCaixa.pagoFisico;
+        pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
+        pos.totalConsolidado = pos.caixaFisico + pos.direitoPorCompetencia + pos.contasReceber;
+      });
+
+      return posicoes;
+    }
+
+    /**
+     * Calcula a equalização global entre sócios (quem deve transferir para quem).
+     * Retorna dois modos:
+     * - modoA (Caixa): Equalizar apenas posição de caixa físico (curto prazo)
+     * - modoB (Estratégico): Equalizar caixa + contas a receber (visão futura)
+     */
+    async function calcularEqualizacaoGlobal() {
+      const posicoes = await calcularPosicaoGlobalConsolidada();
+      const socioIds = Object.keys(posicoes);
+
+      if (socioIds.length !== 2) {
+        return {
+          erro: 'Sistema suporta apenas 2 sócios no momento',
+          posicoes
+        };
+      }
+
+      const [socioA, socioB] = socioIds;
+      const posA = posicoes[socioA];
+      const posB = posicoes[socioB];
+
+      // MODO A: Equalização por Caixa (imediata)
+      const mediaCaixa = (posA.caixaFisico + posB.caixaFisico) / 2;
+      const saldoACaixa = posA.caixaFisico - mediaCaixa;
+      const saldoBCaixa = posB.caixaFisico - mediaCaixa;
+
+      let modoA = {
+        tipo: 'Caixa Físico',
+        descricao: 'Equalização imediata baseada em quem recebeu/pagou de fato',
+        mediaCaixa,
+        transferencia: null
+      };
+
+      if (Math.abs(saldoACaixa) > 0.01) {
+        if (saldoACaixa > 0) {
+          // A tem excesso de caixa, deve repassar para B
+          modoA.transferencia = {
+            de: socioA,
+            deNome: posA.nome,
+            para: socioB,
+            paraNome: posB.nome,
+            valor: Math.abs(saldoACaixa)
+          };
+        } else {
+          // B tem excesso de caixa, deve repassar para A
+          modoA.transferencia = {
+            de: socioB,
+            deNome: posB.nome,
+            para: socioA,
+            paraNome: posA.nome,
+            valor: Math.abs(saldoBCaixa)
+          };
+        }
+      }
+
+      // MODO B: Equalização Estratégica (Caixa + CR)
+      const totalA = posA.caixaFisico + posA.contasReceber;
+      const totalB = posB.caixaFisico + posB.contasReceber;
+      const mediaTotal = (totalA + totalB) / 2;
+      const saldoATotal = totalA - mediaTotal;
+      const saldoBTotal = totalB - mediaTotal;
+
+      let modoB = {
+        tipo: 'Caixa + Contas a Receber',
+        descricao: 'Equalização estratégica considerando valores a receber futuros',
+        mediaTotal,
+        transferencia: null
+      };
+
+      if (Math.abs(saldoATotal) > 0.01) {
+        if (saldoATotal > 0) {
+          // A tem excesso total, deve repassar para B
+          modoB.transferencia = {
+            de: socioA,
+            deNome: posA.nome,
+            para: socioB,
+            paraNome: posB.nome,
+            valor: Math.abs(saldoATotal)
+          };
+        } else {
+          // B tem excesso total, deve repassar para A
+          modoB.transferencia = {
+            de: socioB,
+            deNome: posB.nome,
+            para: socioA,
+            paraNome: posA.nome,
+            valor: Math.abs(saldoBTotal)
+          };
+        }
+      }
+
+      return {
+        posicoes,
+        modoA,
+        modoB,
+        diferenca: modoA.transferencia && modoB.transferencia 
+          ? Math.abs((modoA.transferencia.valor || 0) - (modoB.transferencia.valor || 0))
+          : 0
+      };
     }
 
     // VIEW DE BALANÇO GLOBAL
@@ -2639,6 +2981,24 @@
           }).join('')}
         </div>
         
+        <!-- 🌍 NOVA SEÇÃO: EQUALIZAÇÃO GLOBAL CONSOLIDADA -->
+        <div class="mt-8" id="equalizacao-global-section">
+          <div class="card p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-300">
+            <h2 class="font-black text-3xl mb-2 text-purple-900">🌍 Equalização Global Consolidada</h2>
+            <p class="text-sm text-gray-700 mb-6">Análise consolidada de TODAS as obras com diferentes modos de equalização</p>
+            
+            <div class="bg-white rounded-lg border border-purple-200 p-4 mb-6">
+              <button id="calcular-equalizacao-global" class="btn btn-dark w-full">
+                🔄 Calcular Equalização Global
+              </button>
+            </div>
+            
+            <div id="equalizacao-global-result" class="hidden">
+              <!-- Resultado será inserido aqui via JS -->
+            </div>
+          </div>
+        </div>
+        
         ${acertosConsolidados.length > 0 ? `
           <div class="card p-6 mt-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300">
             <h3 class="font-black text-2xl mb-4 text-blue-900">💡 Acerto Sugerido Consolidado</h3>
@@ -2706,6 +3066,253 @@
       `;
 
       container.innerHTML = html;
+      
+      // 🌍 Adicionar listener para botão de Equalização Global
+      const btnEqualizacao = $("calcular-equalizacao-global");
+      if (btnEqualizacao) {
+        btnEqualizacao.onclick = async () => {
+          btnEqualizacao.disabled = true;
+          btnEqualizacao.innerHTML = '<div class="loader inline-block mr-2"></div> Calculando...';
+          
+          try {
+            const resultado = await calcularEqualizacaoGlobal();
+            renderEqualizacaoGlobalResult(resultado);
+          } catch (err) {
+            console.error('Erro ao calcular equalização global:', err);
+            showToast('❌ Erro ao calcular equalização global', 'error');
+          } finally {
+            btnEqualizacao.disabled = false;
+            btnEqualizacao.innerHTML = '🔄 Recalcular Equalização Global';
+          }
+        };
+      }
+    }
+    
+    /**
+     * Renderiza o resultado da Equalização Global nos dois modos
+     */
+    function renderEqualizacaoGlobalResult(resultado) {
+      const container = $("equalizacao-global-result");
+      if (!container) return;
+      
+      if (resultado.erro) {
+        container.innerHTML = `
+          <div class="bg-red-50 border border-red-300 rounded-lg p-4 text-red-800">
+            ❌ ${resultado.erro}
+          </div>
+        `;
+        container.classList.remove("hidden");
+        return;
+      }
+      
+      const { posicoes, modoA, modoB, diferenca } = resultado;
+      
+      // Converter posicoes object para array
+      const posArray = Object.values(posicoes);
+      
+      let html = `
+        <!-- Resumo de Posições Consolidadas -->
+        <div class="bg-white rounded-lg border-2 border-purple-400 p-6 mb-6">
+          <h3 class="font-black text-xl mb-4 text-purple-900">📊 Posição Consolidada por Sócio</h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${posArray.map(pos => `
+              <div class="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-300 rounded-lg p-4">
+                <div class="font-black text-lg text-gray-800 mb-3">👤 ${escapeHtml(pos.nome)}</div>
+                
+                <div class="space-y-2 text-sm">
+                  <div class="bg-white rounded p-2">
+                    <div class="font-bold text-green-700 mb-1">💵 Caixa Físico</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Recebido:</span>
+                      <span class="font-bold text-green-600">+R$ ${pos.detalheCaixa.recebidoFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Pago:</span>
+                      <span class="font-bold text-red-600">-R$ ${pos.detalheCaixa.pagoFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-300 pt-1 mt-1">
+                      <span class="font-bold">Saldo Caixa:</span>
+                      <span class="font-black text-lg ${pos.caixaFisico >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${pos.caixaFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-white rounded p-2">
+                    <div class="font-bold text-blue-700 mb-1">📋 Direito (Competência)</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Receita alocada:</span>
+                      <span class="font-bold text-green-600">+R$ ${pos.detalheDireito.receitaPorAlocacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Custo alocado:</span>
+                      <span class="font-bold text-red-600">-R$ ${pos.detalheDireito.custoPorAlocacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-300 pt-1 mt-1">
+                      <span class="font-bold">Saldo Direito:</span>
+                      <span class="font-black text-lg ${pos.direitoPorCompetencia >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${pos.direitoPorCompetencia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-yellow-50 border border-yellow-300 rounded p-2">
+                    <div class="font-bold text-yellow-800 mb-1">💰 Contas a Receber</div>
+                    <div class="text-2xl font-black text-yellow-700">
+                      R$ ${pos.contasReceber.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </div>
+                    <div class="text-xs text-yellow-600">Vendas confirmadas não recebidas</div>
+                  </div>
+                  
+                  <div class="bg-purple-100 border-2 border-purple-400 rounded p-2">
+                    <div class="font-bold text-purple-900 mb-1">🎯 Total Consolidado</div>
+                    <div class="text-2xl font-black text-purple-700">
+                      R$ ${pos.totalConsolidado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <!-- Modo A: Caixa Puro -->
+        <div class="bg-white rounded-lg border-2 border-green-400 p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-black text-xl text-green-900">💵 MODO A: Equalização por Caixa (Imediata)</h3>
+              <p class="text-sm text-gray-600 mt-1">${modoA.descricao}</p>
+            </div>
+            <span class="badge bg-green-100 text-green-800 text-lg px-4 py-2">Curto Prazo</span>
+          </div>
+          
+          ${modoA.transferencia ? `
+            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-500 rounded-lg p-6">
+              <div class="flex items-center justify-between mb-4">
+                <div class="text-2xl font-black text-gray-800">
+                  ${escapeHtml(modoA.transferencia.deNome)} → ${escapeHtml(modoA.transferencia.paraNome)}
+                </div>
+                <div class="text-4xl font-black text-green-600">
+                  R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </div>
+              </div>
+              
+              <div class="bg-white rounded p-4 text-sm">
+                <div class="font-bold text-green-900 mb-2">📊 Explicação:</div>
+                <p class="text-gray-700">
+                  <strong>${escapeHtml(modoA.transferencia.deNome)}</strong> recebeu mais dinheiro fisicamente do que 
+                  <strong>${escapeHtml(modoA.transferencia.paraNome)}</strong>. Para equalizar o caixa entre os sócios, 
+                  é necessário transferir <strong class="text-green-600">R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                  AGORA.
+                </p>
+              </div>
+            </div>
+          ` : `
+            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
+              <div class="text-4xl mb-3">✅</div>
+              <div class="font-bold text-gray-800 text-xl">Caixa Equalizado!</div>
+              <p class="text-gray-600 mt-2">Ambos os sócios têm saldo de caixa equivalente.</p>
+            </div>
+          `}
+        </div>
+        
+        <!-- Modo B: Caixa + CR -->
+        <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-black text-xl text-blue-900">🎯 MODO B: Equalização Estratégica (Caixa + CR)</h3>
+              <p class="text-sm text-gray-600 mt-1">${modoB.descricao}</p>
+            </div>
+            <span class="badge bg-blue-100 text-blue-800 text-lg px-4 py-2">Visão Futura</span>
+          </div>
+          
+          ${modoB.transferencia ? `
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-500 rounded-lg p-6">
+              <div class="flex items-center justify-between mb-4">
+                <div class="text-2xl font-black text-gray-800">
+                  ${escapeHtml(modoB.transferencia.deNome)} → ${escapeHtml(modoB.transferencia.paraNome)}
+                </div>
+                <div class="text-4xl font-black text-blue-600">
+                  R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </div>
+              </div>
+              
+              <div class="bg-white rounded p-4 text-sm">
+                <div class="font-bold text-blue-900 mb-2">📊 Explicação:</div>
+                <p class="text-gray-700">
+                  Considerando <strong>caixa atual + valores a receber futuros</strong>, 
+                  <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> está com mais recursos consolidados. 
+                  Para equalizar a posição estratégica, deve transferir 
+                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>.
+                </p>
+                <p class="text-gray-600 mt-2 text-xs">
+                  💡 Este valor é menor que o Modo A porque considera receitas futuras que vão equilibrar naturalmente.
+                </p>
+              </div>
+            </div>
+          ` : `
+            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
+              <div class="text-4xl mb-3">✅</div>
+              <div class="font-bold text-gray-800 text-xl">Posição Estratégica Equalizada!</div>
+              <p class="text-gray-600 mt-2">Considerando valores futuros, não há necessidade de repasse imediato.</p>
+            </div>
+          `}
+        </div>
+        
+        <!-- Comparação entre Modos -->
+        ${modoA.transferencia && modoB.transferencia && diferenca > 0.01 ? `
+          <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg p-6">
+            <h3 class="font-black text-lg text-purple-900 mb-3">🔍 Comparação entre Modos</h3>
+            
+            <div class="bg-white rounded p-4">
+              <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-700">Diferença entre modos:</span>
+                <span class="text-2xl font-black text-purple-600">
+                  R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </span>
+              </div>
+              
+              <div class="bg-yellow-50 border border-yellow-300 rounded p-3">
+                <div class="font-bold text-yellow-900 mb-2">💡 O que isso significa?</div>
+                <p class="text-yellow-800 text-sm">
+                  A diferença de <strong>R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                  representa o impacto das <strong>Contas a Receber</strong> na equalização. 
+                  Se vocês esperarem receber os valores pendentes, o repasse necessário diminui em aproximadamente esse montante.
+                </p>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        
+        <!-- Recomendações -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 rounded-lg p-6 mt-6">
+          <h3 class="font-black text-lg text-amber-900 mb-3">💡 Recomendações</h3>
+          
+          <div class="space-y-3 text-sm">
+            <div class="bg-white rounded p-3 border-l-4 border-green-500">
+              <div class="font-bold text-green-900">✅ Use o MODO A (Caixa) se:</div>
+              <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
+                <li>Precisam equalizar rapidamente</li>
+                <li>Um sócio está com fluxo de caixa apertado</li>
+                <li>Querem manter justiça imediata</li>
+              </ul>
+            </div>
+            
+            <div class="bg-white rounded p-3 border-l-4 border-blue-500">
+              <div class="font-bold text-blue-900">🎯 Use o MODO B (Estratégico) se:</div>
+              <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
+                <li>Têm valores confirmados a receber em breve</li>
+                <li>Querem evitar movimentações desnecessárias</li>
+                <li>Confiam que os recebimentos futuros vão equilibrar naturalmente</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      container.innerHTML = html;
+      container.classList.remove("hidden");
     }
     
     function limparFiltrosBalanco() {
@@ -4984,6 +5591,213 @@
       container.innerHTML = html;
     }
 
+    // CONTAS A RECEBER VIEW
+    function renderContasReceberView() {
+      garantirSociosMapeados();
+      renderContasReceberList();
+      
+      // Handlers
+      const btnCreate = $("cr-create-btn");
+      const btnCancel = $("cr-cancel-btn");
+      const formContainer = $("cr-form-container");
+      const form = $("cr-form");
+      
+      if (btnCreate) {
+        btnCreate.onclick = () => {
+          formContainer.classList.remove("hidden");
+          $("cr-data").value = new Date().toISOString().split('T')[0];
+        };
+      }
+      
+      if (btnCancel) {
+        btnCancel.onclick = () => {
+          formContainer.classList.add("hidden");
+          form.reset();
+        };
+      }
+      
+      if (form) {
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          
+          const data = $("cr-data").value;
+          const descricao = $("cr-descricao").value.trim();
+          const valor = parseFloat($("cr-valor").value) || 0;
+          const status = $("cr-status").value;
+          const percentA = parseFloat($("cr-percent-a").value) || 50;
+          const percentB = parseFloat($("cr-percent-b").value) || 50;
+          
+          if (!data || !descricao || valor <= 0) {
+            showToast('Preencha todos os campos obrigatórios', 'warning');
+            return;
+          }
+          
+          if (Math.abs(percentA + percentB - 100) > 0.01) {
+            showToast('A soma dos percentuais deve ser 100%', 'warning');
+            return;
+          }
+          
+          try {
+            const obra = state.obras.find(o => o.id === OBRA_ID);
+            const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
+            const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
+            
+            const alocacoes = [
+              { socioId: socioAId, valor: (percentA / 100) * valor },
+              { socioId: socioBId, valor: (percentB / 100) * valor }
+            ];
+            
+            await addDoc(refs(OBRA_ID).contasReceberCol, {
+              data,
+              descricao,
+              valor,
+              status,
+              alocacoes,
+              createdAt: serverTimestamp(),
+              createdBy: state.user.email
+            });
+            
+            showToast('✅ Conta a Receber cadastrada!', 'success');
+            formContainer.classList.add("hidden");
+            form.reset();
+          } catch (err) {
+            console.error(err);
+            showToast('❌ Erro ao cadastrar', 'error');
+          }
+        };
+      }
+    }
+    
+    function renderContasReceberList() {
+      const container = $("cr-list");
+      if (!container) return;
+      
+      if (state.contasReceber.length === 0) {
+        container.innerHTML = '<p class="text-center muted py-8">Nenhuma Conta a Receber cadastrada</p>';
+        return;
+      }
+      
+      // Calcular totais
+      const totalPrevisto = state.contasReceber.filter(cr => cr.status === 'previsto').reduce((sum, cr) => sum + (cr.valor || 0), 0);
+      const totalConfirmado = state.contasReceber.filter(cr => cr.status === 'confirmado').reduce((sum, cr) => sum + (cr.valor || 0), 0);
+      const totalRecebido = state.contasReceber.filter(cr => cr.status === 'recebido').reduce((sum, cr) => sum + (cr.valor || 0), 0);
+      
+      let html = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="card p-4 bg-yellow-50 border-yellow-300">
+            <div class="text-sm text-yellow-700 mb-1">⏳ Previsto</div>
+            <div class="text-2xl font-black text-yellow-800">R$ ${totalPrevisto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+          <div class="card p-4 bg-blue-50 border-blue-300">
+            <div class="text-sm text-blue-700 mb-1">✅ Confirmado</div>
+            <div class="text-2xl font-black text-blue-800">R$ ${totalConfirmado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+          <div class="card p-4 bg-green-50 border-green-300">
+            <div class="text-sm text-green-700 mb-1">💰 Recebido</div>
+            <div class="text-2xl font-black text-green-800">R$ ${totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+        </div>
+        
+        <div class="space-y-3">
+          ${state.contasReceber.map(cr => {
+            const statusColors = {
+              previsto: 'yellow',
+              confirmado: 'blue',
+              recebido: 'green'
+            };
+            const statusLabels = {
+              previsto: '⏳ Previsto',
+              confirmado: '✅ Confirmado',
+              recebido: '💰 Recebido'
+            };
+            const color = statusColors[cr.status] || 'gray';
+            const label = statusLabels[cr.status] || cr.status;
+            
+            const alocacoesHtml = (cr.alocacoes || []).map(aloc => {
+              const nome = socioNomePorQualquerId(aloc.socioId);
+              const percent = (aloc.valor / cr.valor * 100).toFixed(1);
+              return `${nome}: R$ ${aloc.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${percent}%)`;
+            }).join(' | ');
+            
+            return `
+              <div class="card p-4 border-l-4 border-${color}-500 hover:shadow-lg transition-shadow">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex-1">
+                    <div class="font-bold text-gray-800">${escapeHtml(cr.descricao)}</div>
+                    <div class="text-sm text-gray-600 mt-1">📅 ${new Date(cr.data).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-2xl font-black text-${color}-600">R$ ${(cr.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                    <span class="badge bg-${color}-100 text-${color}-800">${label}</span>
+                  </div>
+                </div>
+                
+                ${alocacoesHtml ? `
+                  <div class="bg-gray-50 rounded p-2 text-xs text-gray-700 mt-2">
+                    <strong>Distribuição:</strong> ${alocacoesHtml}
+                  </div>
+                ` : ''}
+                
+                <div class="flex gap-2 mt-3">
+                  ${cr.status !== 'recebido' ? `
+                    <button onclick="baixarContaReceber('${cr.id}')" class="btn btn-sm btn-green">
+                      ✅ Marcar como Recebido
+                    </button>
+                  ` : ''}
+                  <button onclick="editarContaReceber('${cr.id}')" class="btn btn-sm btn-soft">
+                    ✏️ Editar
+                  </button>
+                  <button onclick="deletarContaReceber('${cr.id}')" class="btn btn-sm btn-soft text-red-600">
+                    🗑️ Excluir
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+      
+      container.innerHTML = html;
+    }
+    
+    // Funções auxiliares para CR
+    window.baixarContaReceber = async function(crId) {
+      if (!confirm('Marcar esta Conta a Receber como recebida?\n\nIsso atualizará o status para "Recebido".')) {
+        return;
+      }
+      
+      try {
+        await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId), {
+          status: 'recebido',
+          dataRecebimento: new Date().toISOString().split('T')[0]
+        });
+        
+        showToast('✅ Conta a Receber baixada!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('❌ Erro ao baixar CR', 'error');
+      }
+    };
+    
+    window.editarContaReceber = async function(crId) {
+      // Implementação simplificada - pode melhorar depois
+      showToast('💡 Funcionalidade de edição em desenvolvimento', 'info');
+    };
+    
+    window.deletarContaReceber = async function(crId) {
+      if (!confirm('Tem certeza que deseja excluir esta Conta a Receber?')) {
+        return;
+      }
+      
+      try {
+        await deleteDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId));
+        showToast('✅ Conta a Receber excluída!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('❌ Erro ao excluir', 'error');
+      }
+    };
+
     // ACERTOS VIEW
     function renderAcertosView() {
       garantirSociosMapeados(); // Garantir antes de renderizar
@@ -5694,6 +6508,51 @@
       }
     }
 
+    /**
+     * Tenta baixar automaticamente uma Conta a Receber quando um recebimento é registrado.
+     * Procura por CRs confirmadas com valor similar e sugere baixa.
+     */
+    async function tentarBaixarCRAutomatica(valorRecebido, unidadeId, tipoRecebimento) {
+      try {
+        // Buscar CRs não recebidas (previstas ou confirmadas)
+        const crsPendentes = state.contasReceber.filter(cr => 
+          cr.status === 'confirmado' || cr.status === 'previsto'
+        );
+        
+        if (crsPendentes.length === 0) return;
+        
+        // Procurar CR com valor similar (tolerância de 5%)
+        const tolerancia = 0.05;
+        const crCompativel = crsPendentes.find(cr => {
+          const diferenca = Math.abs(cr.valor - valorRecebido) / cr.valor;
+          return diferenca <= tolerancia;
+        });
+        
+        if (crCompativel) {
+          // Sugerir baixa automática
+          const confirmar = confirm(
+            `💰 Detectamos uma Conta a Receber compatível com este recebimento:\n\n` +
+            `CR: ${crCompativel.descricao}\n` +
+            `Valor: R$ ${crCompativel.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` +
+            `Deseja marcar esta CR como recebida automaticamente?`
+          );
+          
+          if (confirmar) {
+            await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crCompativel.id), {
+              status: 'recebido',
+              dataRecebimento: new Date().toISOString().split('T')[0],
+              recebimentoVinculadoId: unidadeId
+            });
+            
+            showToast('✅ Conta a Receber baixada automaticamente!', 'success');
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao tentar baixar CR automaticamente:', err);
+        // Não bloquear o fluxo principal
+      }
+    }
+
     async function addRecebimento(e) {
       e.preventDefault();
 
@@ -5735,6 +6594,9 @@
           recebidoPor,
           observacoes
         });
+        
+        // 💰 Tentar baixar automaticamente CR relacionada
+        await tentarBaixarCRAutomatica(valor, unidadeId, tipo);
         
       } catch (err) {
         console.error(err);
