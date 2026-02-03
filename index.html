@@ -2007,7 +2007,9 @@
           if (l.pago !== false) {
             custoPago += valor;
             const pagoPorCanonical = resolvePagoPor(l, obra);
-            const pagoPorFirestoreId = resolveSocioFirestoreId(l.pagador || l.pagoPor || l.pagoPorId || l.quemPagou || l.socioPagou || pagoPorCanonical);
+            let pagoPorFirestoreId = resolveSocioFirestoreId(l.pagador || l.pagoPor || l.pagoPorId || l.quemPagou || l.socioPagou || pagoPorCanonical);
+            if (!pagoPorFirestoreId && pagoPorCanonical === 'A') pagoPorFirestoreId = obra.socioAId || null;
+            if (!pagoPorFirestoreId && pagoPorCanonical === 'B') pagoPorFirestoreId = obra.socioBId || null;
             if (pagoPorFirestoreId) {
               investimentosPorSocio[pagoPorFirestoreId] = (investimentosPorSocio[pagoPorFirestoreId] || 0) + valor;
             }
@@ -2308,7 +2310,15 @@
 
       // Se for nome
       const socioPorNome = socios.find(s => String(s.nome).toLowerCase() === v.toLowerCase());
-      return socioPorNome ? socioPorNome.firestoreId : null;
+      if (socioPorNome) return socioPorNome.firestoreId;
+
+      // Fallback: usar state.socios
+      const sociosState = state?.socios || [];
+      const socioStatePorId = sociosState.find(s => String(s.id) === v || String(s.firestoreId || s.uid || s.firestoreID) === v);
+      if (socioStatePorId) return socioStatePorId.id;
+
+      const socioStatePorNome = sociosState.find(s => String(s.nome).toLowerCase() === v.toLowerCase());
+      return socioStatePorNome ? socioStatePorNome.id : null;
     }
     
     // Infere alocações de um recebimento (rateio 50/50 ou custom)
