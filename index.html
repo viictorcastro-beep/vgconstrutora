@@ -5306,6 +5306,7 @@
       // Lançamentos diretos
       lancs.forEach(l => {
         if (!l.unidadeId) return;
+        if (l.pago === false) return;
         if (!custosPorUnidade[l.unidadeId]) {
           custosPorUnidade[l.unidadeId] = {
             custoTotal: 0,
@@ -5320,9 +5321,10 @@
         custosPorUnidade[l.unidadeId].custoTotal += l.valor;
         
         // Quem pagou
-        if (l.pagoPor === "A") {
+        const pagoPorCanonical = resolvePagoPor(l, obra);
+        if (pagoPorCanonical === "A") {
           custosPorUnidade[l.unidadeId].pagoPorA += l.valor;
-        } else if (l.pagoPor === "B") {
+        } else if (pagoPorCanonical === "B") {
           custosPorUnidade[l.unidadeId].pagoPorB += l.valor;
         } else {
           // 50/50
@@ -5393,8 +5395,8 @@
       });
 
       // 3. Calcular totais por sócio (considerando investimentos)
-      const investimentoA = obra?.investimentoA || 0;
-      const investimentoB = obra?.investimentoB || 0;
+      const investimentoA = 0;
+      const investimentoB = 0;
       
       let totalPagoA = investimentoA;
       let totalPagoB = investimentoB;
