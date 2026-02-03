@@ -3702,11 +3702,50 @@
       }
     }
     
+    function renderEqualizacaoGlobal() {
+      const container = $("equalizacao-global");
+      if (!container) return;
+
+      container.innerHTML = `
+        <div class="card p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-300">
+          <h2 class="font-black text-3xl mb-2 text-purple-900">🌍 Equalização Global Consolidada</h2>
+          <p class="text-sm text-gray-700 mb-6">Análise consolidada de TODAS as obras com diferentes modos de equalização</p>
+          
+          <div class="bg-white rounded-lg border border-purple-200 p-4 mb-6">
+            <button id="calcular-equalizacao-global-obras" class="btn btn-dark w-full">
+              🔄 Calcular Equalização Global
+            </button>
+          </div>
+          
+          <div id="equalizacao-global-result-obras" class="hidden"></div>
+        </div>
+      `;
+
+      const btnEqualizacao = $("calcular-equalizacao-global-obras");
+      if (btnEqualizacao) {
+        btnEqualizacao.onclick = async () => {
+          btnEqualizacao.disabled = true;
+          btnEqualizacao.innerHTML = '<div class="loader inline-block mr-2"></div> Calculando...';
+          
+          try {
+            const resultado = await calcularEqualizacaoGlobal();
+            renderEqualizacaoGlobalResult(resultado, "equalizacao-global-result-obras");
+          } catch (err) {
+            console.error('Erro ao calcular equalização global:', err);
+            showToast('❌ Erro ao calcular equalização global', 'error');
+          } finally {
+            btnEqualizacao.disabled = false;
+            btnEqualizacao.innerHTML = '🔄 Recalcular Equalização Global';
+          }
+        };
+      }
+    }
+
     /**
      * Renderiza o resultado da Equalização Global nos dois modos
      */
-    function renderEqualizacaoGlobalResult(resultado) {
-      const container = $("equalizacao-global-result");
+    function renderEqualizacaoGlobalResult(resultado, containerId = "equalizacao-global-result") {
+      const container = $(containerId);
       if (!container) return;
       
       if (resultado.erro) {
