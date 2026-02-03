@@ -1901,7 +1901,8 @@
 
       // Views que não precisam de OBRA_ID
       if (VIEW === "OBRAS") {
-        // View estática, não precisa renderização
+        renderEqualizacaoGlobal();
+        renderObrasLista().catch(err => console.error('Erro ao renderizar lista de obras:', err));
         return;
       }
 
@@ -1947,6 +1948,132 @@
       renderUnidadesModal();
       renderFornecedoresModal();
       renderCategoriasModal();
+    }
+
+    async function renderObrasLista() {
+      const container = $("obras-lista");
+      if (!container) return;
+
+      if (!state.obras || state.obras.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center text-gray-500 py-8">
+            <div class="text-4xl mb-2">🏗️</div>
+            <div class="font-bold">Nenhuma obra cadastrada</div>
+            <div class="text-sm">Crie uma obra para ver o resumo aqui.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="col-span-full text-center text-gray-500 py-6">
+          <div class="loader"></div>
+          <div class="text-sm mt-2">Carregando resumo das obras...</div>
+        </div>
+      `;
+
+      const resumoPorObra = await Promise.all(state.obras.map(async (obra) => {
+        const [unidadesSnap, lancSnap, recebSnap, crSnap] = await Promise.all([
+          getDocs(collection(db, "obras", obra.id, "unidades")),
+          getDocs(collection(db, "obras", obra.id, "lancamentos")),
+          getDocs(collection(db, "obras", obra.id, "recebimentos")),
+          getDocs(collection(db, "obras", obra.id, "contasReceber"))
+        ]);
+
+        let custoTotal = 0;
+        let custoPago = 0;
+        lancSnap.forEach(doc => {
+          const l = doc.data();
+          const valor = Number(l.valor || 0);
+          custoTotal += valor;
+          if (l.pago !== false) custoPago += valor;
+        });
+
+        let recebidoTotal = 0;
+        recebSnap.forEach(doc => {
+          const r = doc.data();
+          recebidoTotal += Number(r.valor || 0);
+        });
+
+        let crAberto = 0;
+        crSnap.forEach(doc => {
+          const cr = doc.data();
+          if (cr.status !== 'recebido') crAberto += Number(cr.valor || 0);
+        });
+
+        const invA = Number(obra.investimentoA || 0);
+        const invB = Number(obra.investimentoB || 0);
+        const invTotal = invA + invB;
+
+        const socioA = obra.socioAId ? socioNomePorQualquerId(obra.socioAId) : '—';
+        const socioB = obra.socioBId ? socioNomePorQualquerId(obra.socioBId) : '—';
+
+        return {
+          id: obra.id,
+          nome: obra.nome || obra.id,
+          endereco: obra.endereco || '—',
+          dataInicio: obra.dataInicio || null,
+          dataRecebimento: obra.dataRecebimento || null,
+          unidades: unidadesSnap.size,
+          custoTotal,
+          custoPago,
+          recebidoTotal,
+          crAberto,
+          invA,
+          invB,
+          invTotal,
+          socioA,
+          socioB
+        };
+      }));
+
+      container.innerHTML = resumoPorObra.map(obra => `
+        <div class="card p-5 border-2 border-gray-200 hover:border-blue-300 transition">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <div class="font-black text-lg text-gray-800">🏗️ ${escapeHtml(obra.nome)}</div>
+              <div class="text-xs text-gray-500">${escapeHtml(obra.endereco)}</div>
+            </div>
+            <div class="text-xs text-gray-500 text-right">
+              ${obra.dataInicio ? `📅 Início: ${new Date(obra.dataInicio).toLocaleDateString('pt-BR')}` : '📅 Início: —'}
+              <div>${obra.dataRecebimento ? `💰 Receb.: ${new Date(obra.dataRecebimento).toLocaleDateString('pt-BR')}` : '💰 Receb.: —'}</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-blue-50 border border-blue-100 rounded p-3">
+              <div class="text-xs text-blue-700 font-bold">👥 Sócios</div>
+              <div class="text-gray-800">${escapeHtml(obra.socioA)}</div>
+              <div class="text-gray-800">${escapeHtml(obra.socioB)}</div>
+            </div>
+            <div class="bg-orange-50 border border-orange-100 rounded p-3">
+              <div class="text-xs text-orange-700 font-bold">💳 Investimentos</div>
+              <div class="text-gray-800">A: R$ ${obra.invA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-gray-800">B: R$ ${obra.invB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="font-bold text-orange-800">Total: R$ ${obra.invTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-sm">
+            <div class="bg-gray-50 border border-gray-100 rounded p-3">
+              <div class="text-xs text-gray-500">📦 Unidades</div>
+              <div class="font-black text-gray-800">${obra.unidades}</div>
+            </div>
+            <div class="bg-red-50 border border-red-100 rounded p-3">
+              <div class="text-xs text-red-600">💸 Custos (pagos)</div>
+              <div class="font-black text-red-700">R$ ${obra.custoPago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            </div>
+            <div class="bg-green-50 border border-green-100 rounded p-3">
+              <div class="text-xs text-green-600">💵 Recebido</div>
+              <div class="font-black text-green-700">R$ ${obra.recebidoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            </div>
+            <div class="bg-yellow-50 border border-yellow-100 rounded p-3">
+              <div class="text-xs text-yellow-700">🧾 CR Aberto</div>
+              <div class="font-black text-yellow-800">R$ ${obra.crAberto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
     }
 
     // FILTER FUNCTIONS
