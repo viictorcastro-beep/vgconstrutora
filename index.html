@@ -2353,16 +2353,30 @@
           
           console.log(`     💰 Investimentos: A R$ ${invA.toFixed(2)} | B R$ ${invB.toFixed(2)} | Total R$ ${invTotal.toFixed(2)}`);
           
+          // 💵 CAIXA: Quem pagou fisicamente
           if (invA > 0 && obra.socioAId && posicoes[obra.socioAId]) {
             posicoes[obra.socioAId].detalheCaixa.pagoFisico += invA;
-            posicoes[obra.socioAId].detalheDireito.custoPorAlocacao += invTotal / 2; // 50/50
-            console.log(`       ✅ Investimento A adicionado ao sócio ${posicoes[obra.socioAId].nome}`);
+            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[obra.socioAId].nome}`);
           }
           
           if (invB > 0 && obra.socioBId && posicoes[obra.socioBId]) {
             posicoes[obra.socioBId].detalheCaixa.pagoFisico += invB;
-            posicoes[obra.socioBId].detalheDireito.custoPorAlocacao += invTotal / 2; // 50/50
-            console.log(`       ✅ Investimento B adicionado ao sócio ${posicoes[obra.socioBId].nome}`);
+            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[obra.socioBId].nome}`);
+          }
+          
+          // 📋 COMPETÊNCIA: AMBOS deveriam pagar 50/50 do total (independente de quem investiu)
+          if (invTotal > 0) {
+            const metadeInv = invTotal / 2;
+            
+            if (obra.socioAId && posicoes[obra.socioAId]) {
+              posicoes[obra.socioAId].detalheDireito.custoPorAlocacao += metadeInv;
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[obra.socioAId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            }
+            
+            if (obra.socioBId && posicoes[obra.socioBId]) {
+              posicoes[obra.socioBId].detalheDireito.custoPorAlocacao += metadeInv;
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[obra.socioBId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            }
           }
 
           // 1️⃣ PROCESSAR LANÇAMENTOS (CUSTOS)
