@@ -2,6 +2,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>VG CONSTRUTORA — Gestor de Obras</title>
@@ -2551,6 +2555,7 @@
           totalInvestido: 0,        // Custos pagos (CAIXA)
           recebidoCaixa: 0,         // 💵 CAIXA: Quem recebeu fisicamente
           direitoCompetencia: 0,    // 📋 DIREITO: Competência (50/50 ou %)
+          deveriaPagar: 0,        // 📊 Competência: quanto deveria pagar (50% custos)
           vgvPrevisto: 0,           // Valor geral de vendas previsto
           vendasConfirmadas: 0,     // Vendas realmente fechadas
           equalizacoes: [],         // Equalização por obra
@@ -2573,7 +2578,21 @@
         try {
           console.log(`📊 Processando obra: ${obra.nome} (ID: ${obra.id})`);
           
-          // Carregar unidades da obra
+          
+          // ✅ Investimentos iniciais (aporte/terreno) entram como CUSTO da obra e como CAIXA de quem pagou
+          const socioAIdObra = resolveSocioCanonicalId(obra?.socioAId || "A");
+          const socioBIdObra = resolveSocioCanonicalId(obra?.socioBId || "B");
+          const invAObra = Number(obra?.investimentoA || 0);
+          const invBObra = Number(obra?.investimentoB || 0);
+          const invTotalObra = invAObra + invBObra;
+
+          if (invTotalObra > 0) {
+            obraInfo.custos += invTotalObra;
+            if (balancoPorSocio[socioAIdObra]) balancoPorSocio[socioAIdObra].totalInvestido += invAObra;
+            if (balancoPorSocio[socioBIdObra]) balancoPorSocio[socioBIdObra].totalInvestido += invBObra;
+            console.log(`      💼 Investimentos: A R$ ${invAObra.toFixed(2)} | B R$ ${invBObra.toFixed(2)} | Total R$ ${invTotalObra.toFixed(2)}`);
+          }
+// Carregar unidades da obra
           const unidadesSnap = await getDocs(collection(db, "obras", obra.id, "unidades"));
           const unidades = unidadesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           console.log(`  📦 ${unidades.length} unidades encontradas`);
@@ -2922,6 +2941,16 @@ if (!socioAId && !socioBId) {
             obraInfo.custos += investB;
           }
 
+
+          // ✅ Competência de custos (50/50) por obra: cada sócio deve arcar com metade do custo total da obra
+          {
+            const socioAIdObra2 = resolveSocioCanonicalId(obra?.socioAId || "A");
+            const socioBIdObra2 = resolveSocioCanonicalId(obra?.socioBId || "B");
+            const metadeCustoObra = (obraInfo.custos || 0) / 2;
+            if (balancoPorSocio[socioAIdObra2]) balancoPorSocio[socioAIdObra2].deveriaPagar += metadeCustoObra;
+            if (balancoPorSocio[socioBIdObra2]) balancoPorSocio[socioBIdObra2].deveriaPagar += metadeCustoObra;
+          }
+
           // Adicionar obra no detalhamento
           Object.values(balancoPorSocio).forEach(socio => {
             if (obraInfo.custos > 0 || obraInfo.receitas > 0) {
@@ -2956,23 +2985,23 @@ if (!socioAId && !socioBId) {
             const dadosA = balancoPorSocio[socioA.id];
             const dadosB = balancoPorSocio[socioB.id];
             
-            // 💵 Acerto = RecebidoCaixa - DireitoCompetencia
-            const acertoA = dadosA.recebidoCaixa - dadosA.direitoCompetencia;
-            const acertoB = dadosB.recebidoCaixa - dadosB.direitoCompetencia;
+            // ⚖️ Saldo para equalização (completo): (Pagou - DeveriaPagar) - (Recebeu - TemDireito)
+            const saldoA = (dadosA.totalInvestido - dadosA.deveriaPagar) - (dadosA.recebidoCaixa - dadosA.direitoCompetencia);
+            const saldoB = (dadosB.totalInvestido - dadosB.deveriaPagar) - (dadosB.recebidoCaixa - dadosB.direitoCompetencia);
             
             let acertoValor = 0;
             let pagador = '';
             let recebedor = '';
             
-            // Quem tem acerto positivo (recebeu mais que o direito) deve repassar
-            if (acertoA > 0.01) {
-              acertoValor = Math.abs(acertoA);
-              pagador = socioA.nome; // A recebeu mais, deve repassar
-              recebedor = socioB.nome; // B tem direito a receber
-            } else if (acertoB > 0.01) {
-              acertoValor = Math.abs(acertoB);
-              pagador = socioB.nome; // B recebeu mais, deve repassar
-              recebedor = socioA.nome; // A tem direito a receber
+            // Se saldo é negativo => tem a pagar; positivo => tem a receber
+            if (saldoA < -0.01) {
+              acertoValor = Math.abs(saldoA);
+              pagador = socioA.nome;
+              recebedor = socioB.nome;
+            } else if (saldoA > 0.01) {
+              acertoValor = Math.abs(saldoA);
+              pagador = socioB.nome;
+              recebedor = socioA.nome;
             }
             
             if (acertoValor > 0.01) {
@@ -2980,16 +3009,23 @@ if (!socioAId && !socioBId) {
                 pagador,
                 recebedor,
                 valor: acertoValor,
-                recebidoCaixaA: dadosA.recebidoCaixa,
-                recebidoCaixaB: dadosB.recebidoCaixa,
+                // Caixa (físico)
+                recebeuCaixaA: dadosA.recebidoCaixa,
+                recebeuCaixaB: dadosB.recebidoCaixa,
+                pagouCaixaA: dadosA.totalInvestido,
+                pagouCaixaB: dadosB.totalInvestido,
+                // Competência (50/50 custos por obra + direito de receitas)
+                deveriaPagarA: dadosA.deveriaPagar,
+                deveriaPagarB: dadosB.deveriaPagar,
                 direitoA: dadosA.direitoCompetencia,
                 direitoB: dadosB.direitoCompetencia,
-                acertoA,
-                acertoB,
+                // Saldo completo (positivo => tem a receber; negativo => tem a pagar)
+                saldoA,
+                saldoB,
                 socioANome: socioA.nome,
                 socioBNome: socioB.nome
               });
-            }
+}
           }
         }
       }
@@ -3001,7 +3037,7 @@ if (!socioAId && !socioBId) {
           ${state.socios.map(socio => {
             const dados = balancoPorSocio[socio.id];
             
-            // 🎯 CÁLCULO DO ACERTO: RecebidoCaixa - DireitoCompetência
+            // 🎯 CÁLCULO DO SALDO (COMPLETO): (Pagou - DeveriaPagar) - (Recebeu - TemDireito)tência
             const acertoNecessario = dados.recebidoCaixa - dados.direitoCompetencia;
             const deveRepassar = acertoNecessario > 0; // Recebeu mais que o direito
             const temAReceber = acertoNecessario < 0; // Recebeu menos que o direito
@@ -3184,16 +3220,24 @@ if (!socioAId && !socioBId) {
                     <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.recebeuCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">📋 Direito (50/50):</span>
                       <span class="font-bold text-blue-600">R$ ${acerto.direitoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 Pagou (Caixa):</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.pagouCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">📊 Deveria Pagar (50% custos):</span>
+                      <span class="font-bold text-orange-600">R$ ${acerto.deveriaPagarA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
                     <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Diferença (Caixa - Direito):</span>
-                      <span class="font-black text-lg ${acerto.acertoA >= 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoA >= 0 ? '+' : ''}R$ ${acerto.acertoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      <span class="font-bold">Saldo Completo (pagar/receber):</span>
+                      <span class="font-black text-lg ${acerto.saldoA >= 0 ? 'text-orange-600' : 'text-green-600'}">
+                        ${acerto.saldoA >= 0 ? '+' : ''}R$ ${acerto.saldoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                       </span>
                     </div>
                   </div>
@@ -3203,16 +3247,24 @@ if (!socioAId && !socioBId) {
                     <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.recebeuCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">📋 Direito (50/50):</span>
                       <span class="font-bold text-blue-600">R$ ${acerto.direitoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 Pagou (Caixa):</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.pagouCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">📊 Deveria Pagar (50% custos):</span>
+                      <span class="font-bold text-orange-600">R$ ${acerto.deveriaPagarB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
                     <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Diferença (Caixa - Direito):</span>
-                      <span class="font-black text-lg ${acerto.acertoB >= 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoB >= 0 ? '+' : ''}R$ ${acerto.acertoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      <span class="font-bold">Saldo Completo (pagar/receber):</span>
+                      <span class="font-black text-lg ${acerto.saldoB >= 0 ? 'text-orange-600' : 'text-green-600'}">
+                        ${acerto.saldoB >= 0 ? '+' : ''}R$ ${acerto.saldoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                       </span>
                     </div>
                   </div>
