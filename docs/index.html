@@ -2599,6 +2599,31 @@
               lancamentos.forEach(l => {
                 if (l.unidadeId === unidade.id) {
                   const valor = l.valor || 0;
+                  const pago = (l.pago !== false); // default: pago
+                  const pagoPorRaw = l.pagoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(l.pagoPor) || l.pagoPor);
+
+                  // Se tiver "pagoPor", registrar como CAIXA (quem pagou) e NÃO ratear por percentual
+                  if (pago && pagoPorRaw) {
+                    if (pagoPorRaw === "AMBOS") {
+                      const metade = valor / 2;
+                      if (socioAId && balancoPorSocio[socioAId]) balancoPorSocio[socioAId].totalInvestido += metade;
+                      if (socioBId && balancoPorSocio[socioBId]) balancoPorSocio[socioBId].totalInvestido += metade;
+                      obraInfo.custos += valor;
+                      console.log(`      💳 Lançamento (CAIXA - AMBOS): R$ ${valor}`);
+                      return;
+                    }
+
+                    const pagoPorCanonical = pagoPorRaw;
+                    const pagoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === pagoPorCanonical)?.firestoreId || pagoPorCanonical;
+                    if (balancoPorSocio[pagoPorFirestoreId]) {
+                      balancoPorSocio[pagoPorFirestoreId].totalInvestido += valor;
+                      obraInfo.custos += valor;
+                      console.log(`      💳 Lançamento (CAIXA - pagoPor): ${balancoPorSocio[pagoPorFirestoreId].nome} +R$ ${valor.toFixed(2)}`);
+                      return;
+                    }
+                  }
+
+                  // Fallback: sem "pagoPor", ratear por percentuais
                   const percentA = l.victorPercent || l.percentualA || 50;
                   const percentB = l.gustavoPercent || l.percentualB || 50;
                   
@@ -2664,10 +2689,42 @@
             let receitaUnidade = 0;
 
             // Custos diretos da unidade (lançamentos)
+            // Regra: se o lançamento tiver "pagoPor", ele entra como CAIXA (quem pagou fisicamente).
+            // Caso contrário, entra como custo da unidade (competência do proprietário).
             lancamentos.forEach(l => {
               if (l.unidadeId === unidade.id) {
-                custoUnidade += l.valor || 0;
-                console.log(`      💳 Lançamento: R$ ${l.valor}`);
+                const valorLanc = l.valor || 0;
+                const pago = (l.pago !== false); // default: pago
+                const pagoPorRaw = l.pagoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(l.pagoPor) || l.pagoPor);
+
+                if (pago && pagoPorRaw) {
+                  // Se foi "AMBOS", divide 50/50 entre os sócios da obra
+                  if (pagoPorRaw === "AMBOS") {
+                    const socioAId = obra.socioAId;
+                    const socioBId = obra.socioBId;
+                    const metade = valorLanc / 2;
+                    if (socioAId && balancoPorSocio[socioAId]) balancoPorSocio[socioAId].totalInvestido += metade;
+                    if (socioBId && balancoPorSocio[socioBId]) balancoPorSocio[socioBId].totalInvestido += metade;
+                    obraInfo.custos += valorLanc;
+                    console.log(`      💳 Lançamento (CAIXA - AMBOS): R$ ${valorLanc}`);
+                    return;
+                  }
+
+                  // Normalizar para firestoreId quando o app usa IDs canônicos
+                  const pagoPorCanonical = pagoPorRaw;
+                  const pagoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === pagoPorCanonical)?.firestoreId || pagoPorCanonical;
+
+                  if (balancoPorSocio[pagoPorFirestoreId]) {
+                    balancoPorSocio[pagoPorFirestoreId].totalInvestido += valorLanc;
+                    obraInfo.custos += valorLanc;
+                    console.log(`      💳 Lançamento (CAIXA - pagoPor): ${balancoPorSocio[pagoPorFirestoreId].nome} +R$ ${valorLanc}`);
+                    return;
+                  }
+                }
+
+                // Fallback: sem "pagoPor", conta como custo da unidade (competência do proprietário)
+                custoUnidade += valorLanc;
+                console.log(`      💳 Lançamento (COMPETÊNCIA): R$ ${valorLanc}`);
               }
             });
 
@@ -2743,12 +2800,35 @@
             
             const valor = lanc.valor || 0;
             console.log(`    💳 Lançamento geral: R$ ${valor} (${lanc.descricao})`);
-            
+
             // Buscar IDs dos sócios da obra
             const socioAId = obra.socioAId;
             const socioBId = obra.socioBId;
-            
-            if (!socioAId && !socioBId) {
+
+            // Se tiver "pagoPor", registrar como CAIXA (quem pagou) e NÃO ratear por percentual
+            const pago = (lanc.pago !== false); // default: pago
+            const pagoPorRaw = lanc.pagoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(lanc.pagoPor) || lanc.pagoPor);
+            if (pago && pagoPorRaw) {
+              if (pagoPorRaw === "AMBOS") {
+                const metade = valor / 2;
+                if (socioAId && balancoPorSocio[socioAId]) balancoPorSocio[socioAId].totalInvestido += metade;
+                if (socioBId && balancoPorSocio[socioBId]) balancoPorSocio[socioBId].totalInvestido += metade;
+                obraInfo.custos += valor;
+                console.log(`      💳 Lançamento geral (CAIXA - AMBOS): R$ ${valor}`);
+                return;
+              }
+
+              const pagoPorCanonical = pagoPorRaw;
+              const pagoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === pagoPorCanonical)?.firestoreId || pagoPorCanonical;
+              if (balancoPorSocio[pagoPorFirestoreId]) {
+                balancoPorSocio[pagoPorFirestoreId].totalInvestido += valor;
+                obraInfo.custos += valor;
+                console.log(`      💳 Lançamento geral (CAIXA - pagoPor): ${balancoPorSocio[pagoPorFirestoreId].nome} +R$ ${valor.toFixed(2)}`);
+                return;
+              }
+            }
+
+if (!socioAId && !socioBId) {
               console.log(`      ⚠️ Obra sem sócios vinculados, ignorando lançamento`);
               return;
             }
