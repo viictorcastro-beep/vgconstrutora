@@ -2003,7 +2003,8 @@
 
         const invA = Number(obra.investimentoA || 0);
         const invB = Number(obra.investimentoB || 0);
-        const invTotal = invA + invB;
+        const investimentoCustos = custoPago;
+        const invTotal = invA + invB + investimentoCustos;
 
         const socioA = obra.socioAId ? socioNomePorQualquerId(obra.socioAId) : '—';
         const socioB = obra.socioBId ? socioNomePorQualquerId(obra.socioBId) : '—';
@@ -2022,6 +2023,7 @@
           invA,
           invB,
           invTotal,
+          investimentoCustos,
           socioA,
           socioB
         };
@@ -2047,9 +2049,10 @@
               <div class="text-gray-800">${escapeHtml(obra.socioB)}</div>
             </div>
             <div class="bg-orange-50 border border-orange-100 rounded p-3">
-              <div class="text-xs text-orange-700 font-bold">💳 Investimentos</div>
+              <div class="text-xs text-orange-700 font-bold">💳 Investimentos (inclui custos)</div>
               <div class="text-gray-800">A: R$ ${obra.invA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
               <div class="text-gray-800">B: R$ ${obra.invB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-gray-800">Custos: R$ ${obra.investimentoCustos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
               <div class="font-bold text-orange-800">Total: R$ ${obra.invTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
             </div>
           </div>
@@ -2060,8 +2063,8 @@
               <div class="font-black text-gray-800">${obra.unidades}</div>
             </div>
             <div class="bg-red-50 border border-red-100 rounded p-3">
-              <div class="text-xs text-red-600">💸 Custos (pagos)</div>
-              <div class="font-black text-red-700">R$ ${obra.custoPago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-xs text-red-600">💸 Custos (investimentos)</div>
+              <div class="font-black text-red-700">R$ ${obra.investimentoCustos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
             </div>
             <div class="bg-green-50 border border-green-100 rounded p-3">
               <div class="text-xs text-green-600">💵 Recebido</div>
@@ -2195,12 +2198,19 @@
       if (!valor) return "";
       
       const socios = state?.config?.socios || [];
-      if (socios.length === 0) {
-        console.warn("⚠️ socioNomePorQualquerId: config.socios está vazio");
+      const sociosState = state?.socios || [];
+      const v = String(valor);
+
+      if (socios.length === 0 && sociosState.length === 0) {
+        console.warn("⚠️ socioNomePorQualquerId: config.socios e state.socios estão vazios");
         return `Sócio •••${String(valor).slice(-4)}`;
       }
-      
-      const v = String(valor);
+
+      // 0) Tentar no state.socios (ID real do Firestore)
+      let socioState = sociosState.find(s => String(s.id) === v || String(s.firestoreId || s.uid || s.firestoreID) === v);
+      if (socioState?.nome) {
+        return socioState.nome;
+      }
       
       // 1) Se vier A/B/C... (busca por id de letra)
       let socio = socios.find(s => String(s.id) === v);
@@ -2214,6 +2224,12 @@
       if (socio?.nome) {
         console.log(`✓ Encontrado por firestoreId "${v}": ${socio.nome}`);
         return socio.nome;
+      }
+
+      // 2.5) Fallback: tentar novamente no state.socios por firestoreId
+      socioState = sociosState.find(s => String(s.firestoreId || s.uid || s.firestoreID) === v);
+      if (socioState?.nome) {
+        return socioState.nome;
       }
       
       // 3) Fallback: mascara sem poluir (últimos 4 chars)
