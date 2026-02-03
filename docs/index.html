@@ -3482,6 +3482,24 @@
       const transferencia = modoA?.transferencia || null;
       const detalhesAcerto = transferencia ? (posicoes[transferencia.para]?.detalhesObras || []) : [];
       const detalhesFiltrados = detalhesAcerto.filter(d => Math.abs(d.posicaoLiquida) > 0.01);
+      const textoExcessoPaga = (d) => {
+        if (!transferencia || Math.abs(d.excessoPaga) < 0.01) return '';
+        return d.excessoPaga > 0
+          ? `${transferencia.deNome} paga ${transferencia.paraNome} R$ ${formatCurrency(d.excessoPaga)}`
+          : `${transferencia.paraNome} paga ${transferencia.deNome} R$ ${formatCurrency(Math.abs(d.excessoPaga))}`;
+      };
+      const textoExcessoRecebe = (d) => {
+        if (!transferencia || Math.abs(d.excessoRecebe) < 0.01) return '';
+        return d.excessoRecebe > 0
+          ? `${transferencia.paraNome} paga ${transferencia.deNome} R$ ${formatCurrency(d.excessoRecebe)}`
+          : `${transferencia.deNome} paga ${transferencia.paraNome} R$ ${formatCurrency(Math.abs(d.excessoRecebe))}`;
+      };
+      const textoNet = (d) => {
+        if (!transferencia || Math.abs(d.posicaoLiquida) < 0.01) return '';
+        return d.posicaoLiquida > 0
+          ? `${transferencia.deNome} → ${transferencia.paraNome}`
+          : `${transferencia.paraNome} → ${transferencia.deNome}`;
+      };
       
       let html = `
         <!-- Resumo de Posições Consolidadas -->
@@ -3569,14 +3587,17 @@
                       <span class="font-bold ${d.excessoPaga >= 0 ? 'text-green-700' : 'text-red-700'}">
                         ${formatSigned(d.excessoPaga)}
                       </span>
+                      <div class="text-xs text-gray-600 mt-1">${textoExcessoPaga(d)}</div>
                     </div>
                     <div>
                       Diferença recebimento (recebido - direito):
                       <span class="font-bold ${d.excessoRecebe >= 0 ? 'text-red-700' : 'text-green-700'}">
                         ${formatSigned(d.excessoRecebe)}
                       </span>
+                      <div class="text-xs text-gray-600 mt-1">${textoExcessoRecebe(d)}</div>
                     </div>
                   </div>
+                  <div class="text-xs text-gray-600 mt-2">Net: <strong>${textoNet(d)}</strong></div>
                 </div>
               `).join('')}
             </div>
