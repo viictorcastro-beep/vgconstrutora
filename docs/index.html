@@ -2877,6 +2877,25 @@
             }
           });
 
+          // 🔧 Fallback: se custo alocado estiver zerado na obra, dividir 50/50
+          const totalPagoSemAcerto = Object.values(detalhesObra)
+            .reduce((sum, d) => sum + (d.pagoFisicoSemAcerto || 0), 0);
+          const totalCustoAlocado = Object.values(detalhesObra)
+            .reduce((sum, d) => sum + (d.custoPorAlocacao || 0), 0);
+
+          if (totalPagoSemAcerto > 0.01 && Math.abs(totalCustoAlocado) < 0.01) {
+            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
+              const metade = socioBFirestoreId ? totalPagoSemAcerto / 2 : totalPagoSemAcerto;
+              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metade;
+              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', metade);
+            }
+            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+              const metade = totalPagoSemAcerto / 2;
+              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metade;
+              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', metade);
+            }
+          }
+
           Object.entries(detalhesObra).forEach(([socioId, d]) => {
             const excessoRecebe = d.recebidoFisicoSemAcerto - d.receitaPorAlocacao;
             const excessoPaga = d.pagoFisicoSemAcerto - d.custoPorAlocacao;
