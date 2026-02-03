@@ -1951,6 +1951,22 @@
       renderCategoriasModal();
     }
 
+    window.goToObraDashboard = function(obraId) {
+      if (!obraId) return;
+      if (!hasAccessToObra(obraId)) {
+        showToast('❌ Você não tem acesso a esta obra', 'error');
+        return;
+      }
+
+      OBRA_ID = obraId;
+      localStorage.setItem("obraId", OBRA_ID);
+      const selectObras = $("obra-select");
+      if (selectObras) selectObras.value = OBRA_ID;
+      VIEW = "DASHBOARD";
+      subscribeObra();
+      rerender();
+    };
+
     async function renderObrasLista() {
       const container = $("obras-lista");
       if (!container) return;
@@ -2045,7 +2061,7 @@
       }));
 
       container.innerHTML = resumoPorObra.map(obra => `
-        <div class="card p-5 border-2 border-gray-200 hover:border-blue-300 transition">
+        <div class="card p-5 border-2 border-gray-200 hover:border-blue-300 transition cursor-pointer" onclick="goToObraDashboard('${obra.id}')">
           <div class="flex items-start justify-between mb-3">
             <div>
               <div class="font-black text-lg text-gray-800">🏗️ ${escapeHtml(obra.nome)}</div>
@@ -2077,8 +2093,10 @@
               <div class="font-black text-gray-800">${obra.unidades}</div>
             </div>
             <div class="bg-red-50 border border-red-100 rounded p-3">
-              <div class="text-xs text-red-600">💸 Custos (pagos)</div>
-              <div class="font-black text-red-700">R$ ${obra.investimentoCustos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-xs text-red-600">💸 Total pago por sócio</div>
+              <div class="text-[12px] text-red-700">${escapeHtml(obra.socioA)}: R$ ${((obra.investimentosPorSocio?.[obra.socioAId] || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="text-[12px] text-red-700">${escapeHtml(obra.socioB)}: R$ ${((obra.investimentosPorSocio?.[obra.socioBId] || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div class="font-black text-red-700">Total: R$ ${obra.investimentoCustos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
             </div>
             <div class="bg-green-50 border border-green-100 rounded p-3">
               <div class="text-xs text-green-600">💵 Recebido</div>
