@@ -2426,6 +2426,10 @@
           detalhesObra[id] = {
             recebidoFisico: 0,
             pagoFisico: 0,
+            recebidoFisicoSemAcerto: 0,
+            pagoFisicoSemAcerto: 0,
+            acertosRecebido: 0,
+            acertosPago: 0,
             receitaPorAlocacao: 0,
             custoPorAlocacao: 0,
             contasReceber: 0
@@ -2458,12 +2462,14 @@
           // 💵 CAIXA: Quem pagou fisicamente
           if (invA > 0 && socioAFirestoreId && posicoes[socioAFirestoreId]) {
             posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += invA;
+            addDetalheObra(socioAFirestoreId, 'pagoFisicoSemAcerto', invA);
             addDetalheObra(socioAFirestoreId, 'pagoFisico', invA);
             console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}`);
           }
           
           if (invB > 0 && socioBFirestoreId && posicoes[socioBFirestoreId]) {
             posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += invB;
+            addDetalheObra(socioBFirestoreId, 'pagoFisicoSemAcerto', invB);
             addDetalheObra(socioBFirestoreId, 'pagoFisico', invB);
             console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}`);
           }
@@ -2512,15 +2518,18 @@
             
             if (pagoPorFirestoreId && posicoes[pagoPorFirestoreId]) {
               posicoes[pagoPorFirestoreId].detalheCaixa.pagoFisico += valor;
+              addDetalheObra(pagoPorFirestoreId, 'pagoFisicoSemAcerto', valor);
               addDetalheObra(pagoPorFirestoreId, 'pagoFisico', valor);
             } else {
               // Fallback: dividir 50/50 se não souber quem pagou
               if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
                 posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += valorA;
+                addDetalheObra(socioAFirestoreId, 'pagoFisicoSemAcerto', valorA);
                 addDetalheObra(socioAFirestoreId, 'pagoFisico', valorA);
               }
               if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
                 posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += valorB;
+                addDetalheObra(socioBFirestoreId, 'pagoFisicoSemAcerto', valorB);
                 addDetalheObra(socioBFirestoreId, 'pagoFisico', valorB);
               }
             }
@@ -2553,6 +2562,7 @@
             
             if (recebidoPorFirestoreId && posicoes[recebidoPorFirestoreId]) {
               posicoes[recebidoPorFirestoreId].detalheCaixa.recebidoFisico += valor;
+              addDetalheObra(recebidoPorFirestoreId, 'recebidoFisicoSemAcerto', valor);
               addDetalheObra(recebidoPorFirestoreId, 'recebidoFisico', valor);
             }
             
@@ -2583,10 +2593,12 @@
 
             if (deId && posicoes[deId]) {
               posicoes[deId].detalheCaixa.pagoFisico += valor;
+              addDetalheObra(deId, 'acertosPago', valor);
               addDetalheObra(deId, 'pagoFisico', valor);
             }
             if (paraId && posicoes[paraId]) {
               posicoes[paraId].detalheCaixa.recebidoFisico += valor;
+              addDetalheObra(paraId, 'acertosRecebido', valor);
               addDetalheObra(paraId, 'recebidoFisico', valor);
             }
           });
@@ -2622,8 +2634,8 @@
           });
 
           Object.entries(detalhesObra).forEach(([socioId, d]) => {
-            const excessoRecebe = d.recebidoFisico - d.receitaPorAlocacao;
-            const excessoPaga = d.pagoFisico - d.custoPorAlocacao;
+            const excessoRecebe = d.recebidoFisicoSemAcerto - d.receitaPorAlocacao;
+            const excessoPaga = d.pagoFisicoSemAcerto - d.custoPorAlocacao;
             const posicaoLiquida = excessoPaga - excessoRecebe;
             if (posicoes[socioId]) {
               posicoes[socioId].detalhesObras.push({
@@ -3676,6 +3688,18 @@
                       <div class="text-xs text-gray-600 mt-1">${textoExcessoRecebe(d)}</div>
                     </div>
                   </div>
+                  ${(Math.abs(d.acertosPago || 0) > 0.01 || Math.abs(d.acertosRecebido || 0) > 0.01) ? `
+                    <div class="mt-2 text-sm text-gray-700">
+                      <div>
+                        Acerto pendente (obra):
+                        <span class="font-bold text-indigo-700">
+                          ${d.acertosPago > 0
+                            ? `${transferencia.paraNome} paga ${transferencia.deNome} R$ ${formatCurrency(d.acertosPago)}`
+                            : `${transferencia.deNome} paga ${transferencia.paraNome} R$ ${formatCurrency(d.acertosRecebido)}`}
+                        </span>
+                      </div>
+                    </div>
+                  ` : ''}
                   <div class="text-xs text-gray-600 mt-2">Net: <strong>${textoNet(d)}</strong></div>
                   <div class="mt-2 text-sm font-bold text-gray-800">
                     Total da obra: ${textoNet(d)} ${formatCurrency(Math.abs(d.posicaoLiquida))}
