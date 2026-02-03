@@ -2338,6 +2338,7 @@
           direitoPorCompetencia: 0,
           contasReceber: 0,
           totalConsolidado: 0,
+          detalhesObras: [],
           detalheCaixa: {
             recebidoFisico: 0,
             pagoFisico: 0
@@ -2362,6 +2363,22 @@
         console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[socioAFirestoreId]}`);
         console.log(`     Obra tem socioBId em posicoes? ${!!posicoes[socioBFirestoreId]}`);
 
+        const detalhesObra = {};
+        Object.keys(posicoes).forEach(id => {
+          detalhesObra[id] = {
+            recebidoFisico: 0,
+            pagoFisico: 0,
+            receitaPorAlocacao: 0,
+            custoPorAlocacao: 0,
+            contasReceber: 0
+          };
+        });
+        const addDetalheObra = (socioId, campo, valor) => {
+          if (socioId && detalhesObra[socioId]) {
+            detalhesObra[socioId][campo] += valor;
+          }
+        };
+
         try {
           // Carregar dados da obra
           const unidadesSnap = await getDocs(collection(db, "obras", obraId, "unidades"));
@@ -2383,11 +2400,13 @@
           // 💵 CAIXA: Quem pagou fisicamente
           if (invA > 0 && socioAFirestoreId && posicoes[socioAFirestoreId]) {
             posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += invA;
+            addDetalheObra(socioAFirestoreId, 'pagoFisico', invA);
             console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}`);
           }
           
           if (invB > 0 && socioBFirestoreId && posicoes[socioBFirestoreId]) {
             posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += invB;
+            addDetalheObra(socioBFirestoreId, 'pagoFisico', invB);
             console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}`);
           }
           
@@ -2397,11 +2416,13 @@
             
             if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
               posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
+              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', metadeInv);
               console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
             
             if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
               posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
+              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', metadeInv);
               console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
           }
@@ -2433,25 +2454,30 @@
             
             if (pagoPorFirestoreId && posicoes[pagoPorFirestoreId]) {
               posicoes[pagoPorFirestoreId].detalheCaixa.pagoFisico += valor;
+              addDetalheObra(pagoPorFirestoreId, 'pagoFisico', valor);
             } else {
               // Fallback: dividir 50/50 se não souber quem pagou
               if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
                 posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += valorA;
+                addDetalheObra(socioAFirestoreId, 'pagoFisico', valorA);
               }
               if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
                 posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += valorB;
+                addDetalheObra(socioBFirestoreId, 'pagoFisico', valorB);
               }
             }
             
             // 📋 COMPETÊNCIA: Custo alocado por percentual
             if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
               posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += valorA;
+              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', valorA);
             } else if (obra.socioAId) {
               console.warn(`     ⚠️ socioAId "${obra.socioAId}" não encontrado em posicoes!`);
             }
             
             if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
               posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += valorB;
+              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', valorB);
             } else if (obra.socioBId) {
               console.warn(`     ⚠️ socioBId "${obra.socioBId}" não encontrado em posicoes!`);
             }
@@ -2469,6 +2495,7 @@
             
             if (recebidoPorFirestoreId && posicoes[recebidoPorFirestoreId]) {
               posicoes[recebidoPorFirestoreId].detalheCaixa.recebidoFisico += valor;
+              addDetalheObra(recebidoPorFirestoreId, 'recebidoFisico', valor);
             }
             
             // 📋 DIREITO: Alocações 50/50 ou percentual customizado
@@ -2479,6 +2506,7 @@
                 const socioFirestoreId = resolveSocioFirestoreId(canonicalId);
                 if (socioFirestoreId && posicoes[socioFirestoreId]) {
                   posicoes[socioFirestoreId].detalheDireito.receitaPorAlocacao += aloc.valor;
+                  addDetalheObra(socioFirestoreId, 'receitaPorAlocacao', aloc.valor);
                 }
               }
             });
@@ -2496,9 +2524,10 @@
                 alocacoes.forEach(aloc => {
                   const canonicalId = resolveSocioCanonicalId(aloc.socioId);
                   if (canonicalId) {
-                    const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
+                    const socioFirestoreId = resolveSocioFirestoreId(canonicalId);
                     if (socioFirestoreId && posicoes[socioFirestoreId]) {
                       posicoes[socioFirestoreId].contasReceber += aloc.valor;
+                      addDetalheObra(socioFirestoreId, 'contasReceber', aloc.valor);
                     }
                   }
                 });
@@ -2506,8 +2535,30 @@
                 // 50/50 default
                 const metade = valor / 2;
                 if (socioAFirestoreId && posicoes[socioAFirestoreId]) posicoes[socioAFirestoreId].contasReceber += metade;
+                if (socioAFirestoreId && posicoes[socioAFirestoreId]) addDetalheObra(socioAFirestoreId, 'contasReceber', metade);
                 if (socioBFirestoreId && posicoes[socioBFirestoreId]) posicoes[socioBFirestoreId].contasReceber += metade;
+                if (socioBFirestoreId && posicoes[socioBFirestoreId]) addDetalheObra(socioBFirestoreId, 'contasReceber', metade);
               }
+            }
+          });
+
+          Object.entries(detalhesObra).forEach(([socioId, d]) => {
+            const excessoRecebe = d.recebidoFisico - d.receitaPorAlocacao;
+            const excessoPaga = d.pagoFisico - d.custoPorAlocacao;
+            const posicaoLiquida = excessoPaga - excessoRecebe;
+            if (posicoes[socioId]) {
+              posicoes[socioId].detalhesObras.push({
+                obraId,
+                obraNome: obra.nome || obraId,
+                recebidoFisico: d.recebidoFisico,
+                pagoFisico: d.pagoFisico,
+                receitaPorAlocacao: d.receitaPorAlocacao,
+                custoPorAlocacao: d.custoPorAlocacao,
+                contasReceber: d.contasReceber,
+                excessoRecebe,
+                excessoPaga,
+                posicaoLiquida
+              });
             }
           });
 
@@ -3426,6 +3477,11 @@
       
       // Converter posicoes object para array
       const posArray = Object.values(posicoes);
+      const formatCurrency = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+      const formatSigned = (v) => `${v >= 0 ? '+' : '-'}R$ ${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      const transferencia = modoA?.transferencia || null;
+      const detalhesAcerto = transferencia ? (posicoes[transferencia.para]?.detalhesObras || []) : [];
+      const detalhesFiltrados = detalhesAcerto.filter(d => Math.abs(d.posicaoLiquida) > 0.01);
       
       let html = `
         <!-- Resumo de Posições Consolidadas -->
@@ -3493,6 +3549,39 @@
             `).join('')}
           </div>
         </div>
+
+        ${transferencia && detalhesFiltrados.length ? `
+          <div class="bg-white rounded-lg border-2 border-orange-400 p-6 mb-6">
+            <h3 class="font-black text-xl mb-2 text-orange-900">🧩 Detalhamento do Acerto</h3>
+            <p class="text-sm text-gray-600 mb-4">
+              Componentes por obra que formam o acerto (${escapeHtml(transferencia.deNome)} → ${escapeHtml(transferencia.paraNome)}).
+            </p>
+            <div class="space-y-3">
+              ${detalhesFiltrados.map(d => `
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="font-bold text-gray-800">🏗️ ${escapeHtml(d.obraNome)}</div>
+                    <div class="font-black text-orange-700">${formatSigned(d.posicaoLiquida)}</div>
+                  </div>
+                  <div class="text-sm text-gray-700 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                      Excesso pago (custos/investimentos):
+                      <span class="font-bold ${d.excessoPaga >= 0 ? 'text-green-700' : 'text-red-700'}">
+                        ${formatSigned(d.excessoPaga)}
+                      </span>
+                    </div>
+                    <div>
+                      Diferença recebimento (recebido - direito):
+                      <span class="font-bold ${d.excessoRecebe >= 0 ? 'text-red-700' : 'text-green-700'}">
+                        ${formatSigned(d.excessoRecebe)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
         
         <!-- Modo A: Caixa Puro -->
         <div class="bg-white rounded-lg border-2 border-green-400 p-6 mb-6">
