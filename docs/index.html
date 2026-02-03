@@ -2303,7 +2303,7 @@
 
     async function garantirAcertoPendenteQd61Lt32() {
       if (!isAdmin()) return;
-      if (localStorage.getItem('acerto_qd61_2044_pendente_v2') === '1') return;
+      if (localStorage.getItem('acerto_qd61_2044_pendente_v3') === '1') return;
 
       const obra = state.obras.find(o =>
         (o.nome && o.nome.toLowerCase().includes('qd61') && o.nome.toLowerCase().includes('lt32')) ||
@@ -2327,10 +2327,12 @@
       let existenteId = null;
       acertosSnap.docs.forEach(doc => {
         const a = doc.data();
-        const match = String(a.de) === String(de)
-          && String(a.para) === String(para)
-          && Math.abs((a.valor || 0) - valor) < 0.01
-          && String(a.descricao || '').includes('Acerto pendente QD61 LT32');
+        const deId = resolveSocioFirestoreId(a.de);
+        const paraId = resolveSocioFirestoreId(a.para);
+        const match = Math.abs((a.valor || 0) - valor) < 0.01
+          && ((String(deId) === String(de) && String(paraId) === String(para))
+              || (String(deId) === String(para) && String(paraId) === String(de))
+              || String(a.descricao || '').includes('QD61 LT32'));
         if (match) existenteId = doc.id;
       });
 
@@ -2350,11 +2352,12 @@
         await updateDoc(doc(db, "obras", obra.id, "acertos", existenteId), {
           de,
           para,
-          considerarNaEqualizacao: true
+          considerarNaEqualizacao: true,
+          descricao
         });
       }
 
-      localStorage.setItem('acerto_qd61_2044_pendente_v2', '1');
+      localStorage.setItem('acerto_qd61_2044_pendente_v3', '1');
     }
 
     // ========================================
