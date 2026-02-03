@@ -2010,6 +2010,27 @@
       const socio = socios.find(s => String(s.firestoreId) === v);
       return socio ? socio.id : null;
     }
+
+    // Resolve QUALQUER formato de ID para o firestoreId real
+    function resolveSocioFirestoreId(valor) {
+      if (!valor) return null;
+      const socios = state?.config?.socios || [];
+      const v = String(valor);
+
+      // Se já for canonical (A/B/C)
+      if (v.length === 1 && v >= 'A' && v <= 'Z') {
+        const socio = socios.find(s => s.id === v);
+        return socio ? socio.firestoreId : null;
+      }
+
+      // Se for firestoreId
+      const socioPorId = socios.find(s => String(s.firestoreId) === v);
+      if (socioPorId) return socioPorId.firestoreId;
+
+      // Se for nome
+      const socioPorNome = socios.find(s => String(s.nome).toLowerCase() === v.toLowerCase());
+      return socioPorNome ? socioPorNome.firestoreId : null;
+    }
     
     // Infere alocações de um recebimento (rateio 50/50 ou custom)
     function inferirAlocacoesRecebimento(recebimento, obra) {

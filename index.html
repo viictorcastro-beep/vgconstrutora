@@ -2105,6 +2105,27 @@
       const socio = socios.find(s => String(s.firestoreId) === v);
       return socio ? socio.id : null;
     }
+
+    // Resolve QUALQUER formato de ID para o firestoreId real
+    function resolveSocioFirestoreId(valor) {
+      if (!valor) return null;
+      const socios = state?.config?.socios || [];
+      const v = String(valor);
+
+      // Se já for canonical (A/B/C)
+      if (v.length === 1 && v >= 'A' && v <= 'Z') {
+        const socio = socios.find(s => s.id === v);
+        return socio ? socio.firestoreId : null;
+      }
+
+      // Se for firestoreId
+      const socioPorId = socios.find(s => String(s.firestoreId) === v);
+      if (socioPorId) return socioPorId.firestoreId;
+
+      // Se for nome
+      const socioPorNome = socios.find(s => String(s.nome).toLowerCase() === v.toLowerCase());
+      return socioPorNome ? socioPorNome.firestoreId : null;
+    }
     
     // Infere alocações de um recebimento (rateio 50/50 ou custom)
     function inferirAlocacoesRecebimento(recebimento, obra) {
@@ -2332,8 +2353,11 @@
         console.log(`\n  📊 Processando obra: ${obra.nome} (ID: ${obraId})`);
         console.log(`     socioAId: "${obra.socioAId}", socioBId: "${obra.socioBId}"`);
         console.log(`     posicoes keys: [${Object.keys(posicoes).join(', ')}]`);
-        console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[obra.socioAId]}`);
-        console.log(`     Obra tem socioBId em posicoes? ${!!posicoes[obra.socioBId]}`);
+        const socioAFirestoreId = resolveSocioFirestoreId(obra.socioAId);
+        const socioBFirestoreId = resolveSocioFirestoreId(obra.socioBId);
+        console.log(`     socioAId (firestore): "${socioAFirestoreId}" | socioBId (firestore): "${socioBFirestoreId}"`);
+        console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[socioAFirestoreId]}`);
+        console.log(`     Obra tem socioBId em posicoes? ${!!posicoes[socioBFirestoreId]}`);
 
         try {
           // Carregar dados da obra
@@ -2354,28 +2378,28 @@
           console.log(`     💰 Investimentos: A R$ ${invA.toFixed(2)} | B R$ ${invB.toFixed(2)} | Total R$ ${invTotal.toFixed(2)}`);
           
           // 💵 CAIXA: Quem pagou fisicamente
-          if (invA > 0 && obra.socioAId && posicoes[obra.socioAId]) {
-            posicoes[obra.socioAId].detalheCaixa.pagoFisico += invA;
-            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[obra.socioAId].nome}`);
+          if (invA > 0 && socioAFirestoreId && posicoes[socioAFirestoreId]) {
+            posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += invA;
+            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}`);
           }
           
-          if (invB > 0 && obra.socioBId && posicoes[obra.socioBId]) {
-            posicoes[obra.socioBId].detalheCaixa.pagoFisico += invB;
-            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[obra.socioBId].nome}`);
+          if (invB > 0 && socioBFirestoreId && posicoes[socioBFirestoreId]) {
+            posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += invB;
+            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}`);
           }
           
           // 📋 COMPETÊNCIA: AMBOS deveriam pagar 50/50 do total (independente de quem investiu)
           if (invTotal > 0) {
             const metadeInv = invTotal / 2;
             
-            if (obra.socioAId && posicoes[obra.socioAId]) {
-              posicoes[obra.socioAId].detalheDireito.custoPorAlocacao += metadeInv;
-              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[obra.socioAId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
+              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
             
-            if (obra.socioBId && posicoes[obra.socioBId]) {
-              posicoes[obra.socioBId].detalheDireito.custoPorAlocacao += metadeInv;
-              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[obra.socioBId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
           }
 
@@ -2408,23 +2432,23 @@
               posicoes[pagoPorFirestoreId].detalheCaixa.pagoFisico += valor;
             } else {
               // Fallback: dividir 50/50 se não souber quem pagou
-              if (obra.socioAId && posicoes[obra.socioAId]) {
-                posicoes[obra.socioAId].detalheCaixa.pagoFisico += valorA;
+              if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
+                posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += valorA;
               }
-              if (obra.socioBId && posicoes[obra.socioBId]) {
-                posicoes[obra.socioBId].detalheCaixa.pagoFisico += valorB;
+              if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+                posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += valorB;
               }
             }
             
             // 📋 COMPETÊNCIA: Custo alocado por percentual
-            if (obra.socioAId && posicoes[obra.socioAId]) {
-              posicoes[obra.socioAId].detalheDireito.custoPorAlocacao += valorA;
+            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
+              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += valorA;
             } else if (obra.socioAId) {
               console.warn(`     ⚠️ socioAId "${obra.socioAId}" não encontrado em posicoes!`);
             }
             
-            if (obra.socioBId && posicoes[obra.socioBId]) {
-              posicoes[obra.socioBId].detalheDireito.custoPorAlocacao += valorB;
+            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += valorB;
             } else if (obra.socioBId) {
               console.warn(`     ⚠️ socioBId "${obra.socioBId}" não encontrado em posicoes!`);
             }
@@ -2438,7 +2462,7 @@
             
             // 💵 CAIXA: Quem recebeu fisicamente
             const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
-            const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorRaw)?.firestoreId;
+            const recebidoPorFirestoreId = resolveSocioFirestoreId(recebidoPorRaw);
             
             if (recebidoPorFirestoreId && posicoes[recebidoPorFirestoreId]) {
               posicoes[recebidoPorFirestoreId].detalheCaixa.recebidoFisico += valor;
@@ -2449,7 +2473,7 @@
             alocacoes.forEach(aloc => {
               const canonicalId = resolveSocioCanonicalId(aloc.socioId);
               if (canonicalId) {
-                const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
+                const socioFirestoreId = resolveSocioFirestoreId(canonicalId);
                 if (socioFirestoreId && posicoes[socioFirestoreId]) {
                   posicoes[socioFirestoreId].detalheDireito.receitaPorAlocacao += aloc.valor;
                 }
@@ -2478,8 +2502,8 @@
               } else {
                 // 50/50 default
                 const metade = valor / 2;
-                if (obra.socioAId && posicoes[obra.socioAId]) posicoes[obra.socioAId].contasReceber += metade;
-                if (obra.socioBId && posicoes[obra.socioBId]) posicoes[obra.socioBId].contasReceber += metade;
+                if (socioAFirestoreId && posicoes[socioAFirestoreId]) posicoes[socioAFirestoreId].contasReceber += metade;
+                if (socioBFirestoreId && posicoes[socioBFirestoreId]) posicoes[socioBFirestoreId].contasReceber += metade;
               }
             }
           });
@@ -2494,7 +2518,10 @@
       Object.values(posicoes).forEach(pos => {
         pos.caixaFisico = pos.detalheCaixa.recebidoFisico - pos.detalheCaixa.pagoFisico;
         pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
-        pos.totalConsolidado = pos.caixaFisico + pos.direitoPorCompetencia + pos.contasReceber;
+        const excessoRecebe = pos.detalheCaixa.recebidoFisico - pos.detalheDireito.receitaPorAlocacao;
+        const excessoPaga = pos.detalheCaixa.pagoFisico - pos.detalheDireito.custoPorAlocacao;
+        pos.posicaoLiquida = excessoPaga - excessoRecebe;
+        pos.totalConsolidado = pos.posicaoLiquida + pos.contasReceber;
         
         console.log(`  ${pos.nome}:`);
         console.log(`    - Recebido (Caixa): R$ ${pos.detalheCaixa.recebidoFisico.toFixed(2)}`);
@@ -2503,6 +2530,7 @@
         console.log(`    - Receita Direito: R$ ${pos.detalheDireito.receitaPorAlocacao.toFixed(2)}`);
         console.log(`    - Custo Direito: R$ ${pos.detalheDireito.custoPorAlocacao.toFixed(2)}`);
         console.log(`    - Saldo Direito: R$ ${pos.direitoPorCompetencia.toFixed(2)}`);
+        console.log(`    - Posição Líquida: R$ ${pos.posicaoLiquida.toFixed(2)}`);
         console.log(`    - Contas a Receber: R$ ${pos.contasReceber.toFixed(2)}`);
         console.log(`    - Total Consolidado: R$ ${pos.totalConsolidado.toFixed(2)}`);
       });
@@ -2534,65 +2562,53 @@
       const posA = posicoes[socioA];
       const posB = posicoes[socioB];
 
-      console.log('\n🎯 [EQ GLOBAL] Calculando acerto:');
-      console.log(`  ${posA.nome}:`);
-      console.log(`    - Saldo Caixa: R$ ${posA.caixaFisico.toFixed(2)}`);
-      console.log(`  ${posB.nome}:`);
-      console.log(`    - Saldo Caixa: R$ ${posB.caixaFisico.toFixed(2)}`);
+      console.log('\n🎯 [EQ GLOBAL] Calculando acerto (netting):');
 
-      // 🎯 MODO A: Equalização por Saldo Real de Caixa (Recebido - Pago)
-      // Esse é o saldo que cada um TEM depois de investir e receber
-      // Para equalizar 50/50, cada um deveria ter a MESMA posição
-      const totalRecebido = posA.detalheCaixa.recebidoFisico + posB.detalheCaixa.recebidoFisico;
-      const totalPago = posA.detalheCaixa.pagoFisico + posB.detalheCaixa.pagoFisico;
-      const saldoTotalCaixa = totalRecebido - totalPago;
-      const saldoIdealCaixa = saldoTotalCaixa / 2;
+      const excessoRecebeA = posA.detalheCaixa.recebidoFisico - posA.detalheDireito.receitaPorAlocacao;
+      const excessoPagaA = posA.detalheCaixa.pagoFisico - posA.detalheDireito.custoPorAlocacao;
+      const posicaoLiquidaA = excessoPagaA - excessoRecebeA;
 
-      console.log(`  Total Recebido (ambos): R$ ${totalRecebido.toFixed(2)}`);
-      console.log(`  Total Pago (ambos): R$ ${totalPago.toFixed(2)}`);
-      console.log(`  Saldo Total: R$ ${saldoTotalCaixa.toFixed(2)}`);
-      console.log(`  Saldo Ideal 50/50 (cada): R$ ${saldoIdealCaixa.toFixed(2)}`);
+      const excessoRecebeB = posB.detalheCaixa.recebidoFisico - posB.detalheDireito.receitaPorAlocacao;
+      const excessoPagaB = posB.detalheCaixa.pagoFisico - posB.detalheDireito.custoPorAlocacao;
+      const posicaoLiquidaB = excessoPagaB - excessoRecebeB;
 
-      const diferencaA = posA.caixaFisico - saldoIdealCaixa;
-      const diferencaB = posB.caixaFisico - saldoIdealCaixa;
-
-      console.log(`  ${posA.nome} - Diferença: R$ ${diferencaA.toFixed(2)}`);
-      console.log(`  ${posB.nome} - Diferença: R$ ${diferencaB.toFixed(2)}`);
+      console.log(`  ${posA.nome} → excesso paga: R$ ${excessoPagaA.toFixed(2)}, excesso recebe: R$ ${excessoRecebeA.toFixed(2)}, posição líquida: R$ ${posicaoLiquidaA.toFixed(2)}`);
+      console.log(`  ${posB.nome} → excesso paga: R$ ${excessoPagaB.toFixed(2)}, excesso recebe: R$ ${excessoRecebeB.toFixed(2)}, posição líquida: R$ ${posicaoLiquidaB.toFixed(2)}`);
 
       let modoA = {
-        tipo: 'Caixa Físico (Saldo Real)',
-        descricao: 'Equalização baseada em investimentos + recebimentos reais',
-        saldoIdeal: saldoIdealCaixa,
+        tipo: 'Netting (Pago vs Deveria / Recebido vs Direito)',
+        descricao: 'Equalização por posição líquida (50/50 real)',
+        saldoIdeal: 0,
         transferencia: null
       };
 
-      if (Math.abs(diferencaA) > 0.01) {
-        if (diferencaA > 0) {
-          // A tem saldo acima do ideal, deve repassar para B
-          modoA.transferencia = {
-            de: socioA,
-            deNome: posA.nome,
-            para: socioB,
-            paraNome: posB.nome,
-            valor: Math.abs(diferencaA)
-          };
-          console.log(`  ✅ Acerto: ${posA.nome} → ${posB.nome} = R$ ${Math.abs(diferencaA).toFixed(2)}`);
-        } else {
-          // B tem saldo acima do ideal, deve repassar para A
+      if (Math.abs(posicaoLiquidaA) > 0.01) {
+        if (posicaoLiquidaA > 0) {
+          // A tem a receber, B paga
           modoA.transferencia = {
             de: socioB,
             deNome: posB.nome,
             para: socioA,
             paraNome: posA.nome,
-            valor: Math.abs(diferencaB)
+            valor: Math.abs(posicaoLiquidaA)
           };
-          console.log(`  ✅ Acerto: ${posB.nome} → ${posA.nome} = R$ ${Math.abs(diferencaB).toFixed(2)}`);
+          console.log(`  ✅ Acerto: ${posB.nome} → ${posA.nome} = R$ ${Math.abs(posicaoLiquidaA).toFixed(2)}`);
+        } else {
+          // A tem a pagar, B recebe
+          modoA.transferencia = {
+            de: socioA,
+            deNome: posA.nome,
+            para: socioB,
+            paraNome: posB.nome,
+            valor: Math.abs(posicaoLiquidaA)
+          };
+          console.log(`  ✅ Acerto: ${posA.nome} → ${posB.nome} = R$ ${Math.abs(posicaoLiquidaA).toFixed(2)}`);
         }
       }
 
       // MODO B: Equalização Estratégica (Caixa + CR)
-      const totalA = posA.caixaFisico + posA.contasReceber;
-      const totalB = posB.caixaFisico + posB.contasReceber;
+      const totalA = posicaoLiquidaA + posA.contasReceber;
+      const totalB = posicaoLiquidaB + posB.contasReceber;
       const mediaTotal = (totalA + totalB) / 2;
       const saldoATotal = totalA - mediaTotal;
       const saldoBTotal = totalB - mediaTotal;
