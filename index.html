@@ -422,11 +422,10 @@
               </div>
               <div>
                 <div class="text-xs muted mb-1">Status de Pagamento</div>
-                <select id="lanc-status" class="select">
-                  <option value="pendente">⏳ Pendente</option>
-                  <option value="pago">✅ Pago</option>
-                  <option value="atrasado">🚨 Atrasado</option>
+                <select id="lanc-status" class="select" disabled>
+                  <option value="pago" selected>✅ Pago</option>
                 </select>
+                <div class="text-[11px] text-gray-500 mt-1">Lançamentos só são criados quando há pagamento.</div>
               </div>
             </div>
             
@@ -436,8 +435,9 @@
             </div>
             
             <div class="mb-4">
-              <div class="text-xs muted mb-1">Link Comprovante (Google Drive)</div>
-              <input id="lanc-comprovante" type="url" class="input" placeholder="https://drive.google.com/file/d/..." />
+              <div class="text-xs muted mb-1">Link Comprovante (Google Drive) *</div>
+              <input id="lanc-comprovante" type="url" class="input" placeholder="https://drive.google.com/file/d/..." required />
+              <div class="text-[11px] text-gray-500 mt-1">Obrigatório para comprovação futura.</div>
             </div>
             
             <div class="flex gap-3">
@@ -7055,12 +7055,22 @@
       const fornecedorId = $("lanc-fornecedor").value;
       const pagador = $("lanc-pagador").value;
       const valor = parseFloat($("lanc-valor").value);
-      const status = $("lanc-status").value;
+      const status = "pago";
       const descricao = $("lanc-descricao").value.trim();
       const comprovante = $("lanc-comprovante").value.trim();
 
       if (!data || !unidadeId || !categoriaId || !fornecedorId || !valor || !descricao) {
         showToast('Preencha todos os campos obrigatórios', 'error');
+        return;
+      }
+
+      if (!comprovante) {
+        showToast('Informe o link do comprovante (Google Drive)', 'error');
+        return;
+      }
+
+      if (!/^https:\/\/drive\.google\.com\//i.test(comprovante)) {
+        showToast('O comprovante deve ser um link do Google Drive', 'error');
         return;
       }
 
@@ -7089,8 +7099,9 @@
           pagador,
           valor,
           status,
+          pago: true,
           descricao,
-          comprovante: comprovante || null,
+          comprovante,
           createdAt: serverTimestamp(),
           createdBy: state.user.email,
           historico: [{
