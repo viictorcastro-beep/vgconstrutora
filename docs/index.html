@@ -2006,8 +2006,18 @@
           custoTotal += valor;
           if (l.pago !== false) {
             custoPago += valor;
+            const rawPagador = l.pagador || l.pagoPor || l.pagoPorId || l.quemPagou || l.socioPagou || null;
+            let pagoPorFirestoreId = null;
+            if (rawPagador === 'A') pagoPorFirestoreId = obra.socioAId || null;
+            if (rawPagador === 'B') pagoPorFirestoreId = obra.socioBId || null;
+            if (!pagoPorFirestoreId && (rawPagador === obra.socioAId || rawPagador === obra.socioBId)) {
+              pagoPorFirestoreId = rawPagador;
+            }
+            if (!pagoPorFirestoreId && rawPagador) {
+              pagoPorFirestoreId = resolveSocioFirestoreId(rawPagador);
+            }
+
             const pagoPorCanonical = resolvePagoPor(l, obra);
-            let pagoPorFirestoreId = resolveSocioFirestoreId(l.pagador || l.pagoPor || l.pagoPorId || l.quemPagou || l.socioPagou || pagoPorCanonical);
             if (!pagoPorFirestoreId && pagoPorCanonical === 'A') pagoPorFirestoreId = obra.socioAId || null;
             if (!pagoPorFirestoreId && pagoPorCanonical === 'B') pagoPorFirestoreId = obra.socioBId || null;
             if (pagoPorFirestoreId) {
