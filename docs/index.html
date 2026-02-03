@@ -2311,6 +2311,22 @@
         const obraId = obra.id;
 
         try {
+          // 0) INVESTIMENTOS INICIAIS (aporte/terreno)
+          // Entra como: (a) CAIXA -> quem pagou de fato; (b) DIREITO -> competência 50/50
+          const _socioAIdBase = resolveSocioCanonicalId(obra?.socioAId || "A");
+          const _socioBIdBase = resolveSocioCanonicalId(obra?.socioBId || "B");
+          const _invA = obra?.investimentoA || 0;
+          const _invB = obra?.investimentoB || 0;
+          const _totalInv = _invA + _invB;
+          if (_totalInv > 0) {
+            if (posicoes[_socioAIdBase]) posicoes[_socioAIdBase].detalheCaixa.pagoFisico += _invA;
+            if (posicoes[_socioBIdBase]) posicoes[_socioBIdBase].detalheCaixa.pagoFisico += _invB;
+
+            const _metadeInv = _totalInv / 2;
+            if (posicoes[_socioAIdBase]) posicoes[_socioAIdBase].detalheDireito.custoPorAlocacao += _metadeInv;
+            if (posicoes[_socioBIdBase]) posicoes[_socioBIdBase].detalheDireito.custoPorAlocacao += _metadeInv;
+          }
+
           // 1) RECEBIMENTOS - Posição de CAIXA (quem recebeu fisicamente)
           const recebimentosSnap = await getDocs(collection(db, "obras", obraId, "recebimentos"));
           for (const recDoc of recebimentosSnap.docs) {
@@ -2336,7 +2352,7 @@
           const lancamentosSnap = await getDocs(collection(db, "obras", obraId, "lancamentos"));
           for (const lancDoc of lancamentosSnap.docs) {
             const lanc = lancDoc.data();
-            const pago = lanc.pago;
+            const pago = (lanc.pago !== false); // default: pago=true, só false explicitamente
             const valor = lanc.valor || 0;
 
             // Custos por quem pagou (simplificação - pode melhorar com rateio)
@@ -2346,7 +2362,7 @@
 
             if (pago) {
               // Custo pago fisicamente
-              const pagoPor = resolveSocioCanonicalId(lanc.pagoPor || socioAId);
+              const pagoPor = resolveSocioCanonicalId(lanc.pagoPor || lanc.pagador || socioAId);
               if (posicoes[pagoPor]) {
                 posicoes[pagoPor].detalheCaixa.pagoFisico += valor;
               }
@@ -7216,10 +7232,15 @@ if (!socioAId && !socioBId) {
       let saldoBrutoB = diferencaGastosB - deveRepassarB;
 
       // 5.1 ADICIONAR INVESTIMENTOS INICIAIS
-      // Se A investiu mais no início (ex: sinal do terreno), B deve compensar
-      const diferencaInvestimento = investimentoA - investimentoB;
-      saldoBrutoA += diferencaInvestimento;  // Se A investiu mais, aumenta seu saldo
-      saldoBrutoB -= diferencaInvestimento;  // Se A investiu mais, diminui saldo de B
+      // A lógica correta é: cada sócio deve arcar com 50% do total investido.
+      // Quem investiu acima de 50% tem a receber; quem investiu abaixo tem a pagar.
+      const totalInvestimentos = investimentoA + investimentoB;
+      const deveInvestirCada = totalInvestimentos / 2;
+      const diferencaInvestA = investimentoA - deveInvestirCada; // positivo => A pagou mais que sua parte
+      const diferencaInvestB = investimentoB - deveInvestirCada; // positivo => B pagou mais que sua parte
+
+      saldoBrutoA += diferencaInvestA;
+      saldoBrutoB += diferencaInvestB;
 
       // 6. APLICAR ACERTOS (transferências entre sócios)
       let saldoFinalA = saldoBrutoA;
@@ -7238,8 +7259,8 @@ if (!socioAId && !socioBId) {
       });
 
       // 7. SALDO DE CAIXA (informativo)
-      const saldoCaixaA = recebeuFisicamenteA - pagouA;
-      const saldoCaixaB = recebeuFisicamenteB - pagouB;
+      const saldoCaixaA = recebeuFisicamenteA - (pagouA + investimentoA);
+      const saldoCaixaB = recebeuFisicamenteB - (pagouB + investimentoB);
 
       // Retornar dados completos para exibição
       return {
