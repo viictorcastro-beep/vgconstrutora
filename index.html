@@ -2864,17 +2864,35 @@
             const saldoRealA = dadosA.recebidoCaixa - dadosA.totalInvestido;
             const saldoRealB = dadosB.recebidoCaixa - dadosB.totalInvestido;
             
+            console.log(`\n🔍 DEBUG ACERTO CONSOLIDADO:`);
+            console.log(`  ${socioA.nome}:`);
+            console.log(`    - Total Investido: R$ ${dadosA.totalInvestido.toFixed(2)}`);
+            console.log(`    - Recebido Caixa: R$ ${dadosA.recebidoCaixa.toFixed(2)}`);
+            console.log(`    - Saldo Real: R$ ${saldoRealA.toFixed(2)}`);
+            console.log(`  ${socioB.nome}:`);
+            console.log(`    - Total Investido: R$ ${dadosB.totalInvestido.toFixed(2)}`);
+            console.log(`    - Recebido Caixa: R$ ${dadosB.recebidoCaixa.toFixed(2)}`);
+            console.log(`    - Saldo Real: R$ ${saldoRealB.toFixed(2)}`);
+            
             // 🎯 Total Consolidado
             const totalInvestido = dadosA.totalInvestido + dadosB.totalInvestido;
             const totalRecebidoCaixa = dadosA.recebidoCaixa + dadosB.recebidoCaixa;
             const saldoTotal = totalRecebidoCaixa - totalInvestido;
             
+            console.log(`  Total Investido (ambos): R$ ${totalInvestido.toFixed(2)}`);
+            console.log(`  Total Recebido (ambos): R$ ${totalRecebidoCaixa.toFixed(2)}`);
+            console.log(`  Saldo Total: R$ ${saldoTotal.toFixed(2)}`);
+            
             // 🎯 Saldo Ideal 50/50
             const saldoIdeal = saldoTotal / 2;
+            console.log(`  Saldo Ideal 50/50 (cada): R$ ${saldoIdeal.toFixed(2)}`);
             
             // 🎯 Acerto necessário = Diferença entre Saldo Real e Saldo Ideal
             const acertoA = saldoRealA - saldoIdeal;
             const acertoB = saldoRealB - saldoIdeal;
+            
+            console.log(`  Acerto ${socioA.nome}: R$ ${acertoA.toFixed(2)}`);
+            console.log(`  Acerto ${socioB.nome}: R$ ${acertoB.toFixed(2)}`);
             
             let acertoValor = 0;
             let pagador = '';
