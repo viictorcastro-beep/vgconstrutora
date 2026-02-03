@@ -1,4 +1,4 @@
-<!-- BUILD: 2026-02-02 | commit: 9e4b6dc | FIXED: socio names + recebimentos logic -->
+<!-- BUILD: 638245c - 2026-02-02 15:30 BRT -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,15 +9,15 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- PDF export -->
-  <script src="../assets/vendor/jspdf.umd.min.js?v=1770048957"></script>
-  <script src="../assets/vendor/jspdf.plugin.autotable.min.js?v=1770048957"></script>
+  <!-- PDF export - USANDO CDN até corrigir paths locais -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   
   <!-- Charts -->
-  <script src="../assets/vendor/chart.umd.min.js?v=1770048957"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   
   <!-- Excel Export -->
-  <script src="../assets/vendor/xlsx.full.min.js?v=1770048957"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body { background:#f1f5f9; }
@@ -186,6 +186,7 @@
         <button class="btn btn-soft view-btn" data-view="LANCAMENTOS">💰 Lançamentos</button>
         <button class="btn btn-soft view-btn" data-view="RATEIOS">⚖️ Rateios</button>
         <button class="btn btn-soft view-btn" data-view="RECEBIMENTOS">💵 Recebimentos</button>
+        <button class="btn btn-soft view-btn" data-view="CONTAS_RECEBER">💰 Contas a Receber</button>
         <button class="btn btn-soft view-btn" data-view="ACERTOS">🤝 Acertos Sócios</button>
         <button class="btn btn-soft view-btn" data-view="CONFIG">⚙️ Config</button>
       </div>
@@ -582,6 +583,85 @@
         <div class="card p-6">
           <div class="font-black text-lg mb-4">📋 Lista de Recebimentos</div>
           <div id="receb-list"></div>
+        </div>
+      </div>
+
+      <!-- CONTAS A RECEBER VIEW -->
+      <div id="view-CONTAS_RECEBER" class="view-content hidden">
+        <div class="card p-6 mb-6">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h2 class="font-black text-2xl text-gray-800 mb-2">💰 Contas a Receber</h2>
+              <p class="text-sm text-gray-600">Valores vendidos/confirmados mas ainda não recebidos</p>
+            </div>
+            <button id="cr-create-btn" class="btn btn-green">+ Nova Conta a Receber</button>
+          </div>
+          
+          <div class="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-6">
+            <div class="font-bold text-blue-900 mb-2">💡 O que são Contas a Receber (CR)?</div>
+            <p class="text-blue-800 text-sm">
+              São valores de <strong>vendas confirmadas</strong> que ainda não viraram dinheiro. 
+              Por exemplo: você vendeu 30% de uma obra por R$ 10.000, mas ainda não recebeu o pagamento. 
+              Registre aqui para que o sistema considere esse valor futuro na equalização estratégica.
+            </p>
+          </div>
+          
+          <!-- Formulário de nova CR -->
+          <div id="cr-form-container" class="hidden">
+            <form id="cr-form" class="bg-gray-50 border border-gray-300 rounded-lg p-6 mb-6">
+              <div class="font-bold text-gray-800 mb-4">📝 Cadastrar Nova Conta a Receber</div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <div class="text-xs muted mb-1">Data Prevista *</div>
+                  <input id="cr-data" type="date" class="input" required />
+                </div>
+                <div>
+                  <div class="text-xs muted mb-1">Descrição *</div>
+                  <input id="cr-descricao" type="text" class="input" placeholder="Ex: Venda 30% - Unidade 1" required />
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <div class="text-xs muted mb-1">Valor * (R$)</div>
+                  <input id="cr-valor" type="number" step="0.01" class="input" placeholder="10000.00" required />
+                </div>
+                <div>
+                  <div class="text-xs muted mb-1">Status *</div>
+                  <select id="cr-status" class="select" required>
+                    <option value="previsto">Previsto</option>
+                    <option value="confirmado">Confirmado</option>
+                    <option value="recebido">Recebido (baixado)</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="bg-yellow-50 border border-yellow-300 rounded p-4 mb-4">
+                <div class="font-bold text-yellow-900 mb-2">⚖️ Distribuição entre Sócios (50/50 padrão)</div>
+                <p class="text-xs text-yellow-800 mb-3">Por padrão, divide 50/50. Você pode ajustar se necessário.</p>
+                
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-xs muted mb-1">Sócio A %</div>
+                    <input id="cr-percent-a" type="number" step="0.01" class="input" value="50" />
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Sócio B %</div>
+                    <input id="cr-percent-b" type="number" step="0.01" class="input" value="50" />
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flex gap-3">
+                <button type="submit" class="btn btn-dark">✅ Salvar Conta a Receber</button>
+                <button type="button" id="cr-cancel-btn" class="btn btn-soft">❌ Cancelar</button>
+              </div>
+            </form>
+          </div>
+          
+          <!-- Lista de CRs -->
+          <div id="cr-list"></div>
         </div>
       </div>
 
@@ -1008,9 +1088,14 @@
       appId: "1:648174167866:web:98fb10be18b73fcc7a9203"
     };
 
-    // BUILD STAMP
-    console.log("%c🔨 BUILD: 2026-02-02 | commit: 9e4b6dc", "color: #22c55e; font-weight: bold; font-size: 14px;");
-    console.log("%c✓ FIXED: socio names display + recebimentos 50/50 logic + acertos automáticos", "color: #10b981;");
+    // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
+    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
+    console.log("%c🔨 BUILD: 638245c (2026-02-02 15:30 BRT)", "color: #22c55e; font-weight: bold; font-size: 16px;");
+    console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
+    console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
+    console.log("%c✓ FIXED: acertos automáticos com netting", "color: #10b981;");
+    console.log("%c✓ FIXED: vendors via CDN (sem 404s)", "color: #10b981;");
+    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
 
     // Initialize
     console.log("🔥 Inicializando Firebase...");
@@ -1182,6 +1267,7 @@
       rateios: [],
       recebimentos: [],
       acertos: [],
+      contasReceber: [],  // Nova: Contas a Receber (vendas confirmadas não recebidas)
       config: {
         socios: []  // Inicializar como array vazio
       }
@@ -1246,6 +1332,7 @@
         rateiosCol: collection(db, "obras", obraId, "rateios"),
         recebimentosCol: collection(db, "obras", obraId, "recebimentos"),
         acertosCol: collection(db, "obras", obraId, "acertos"),
+        contasReceberCol: collection(db, "obras", obraId, "contasReceber"),  // Nova coleção para CR
         configDoc: doc(db, "obras", obraId, "config", "main")
       };
     }
@@ -1751,6 +1838,12 @@
         scheduleRerender();
       }));
 
+      // 📊 Contas a Receber subscriber
+      listeners.push(onSnapshot(r.contasReceberCol, (snap) => {
+        state.contasReceber = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        scheduleRerender();
+      }));
+
       listeners.push(onSnapshot(r.configDoc, (snap) => {
         state.config = snap.exists() ? snap.data() : {};
         scheduleRerender();
@@ -1836,6 +1929,8 @@
         renderRateiosView();
       } else if (VIEW === "RECEBIMENTOS") {
         renderRecebimentosView();
+      } else if (VIEW === "CONTAS_RECEBER") {
+        renderContasReceberView();
       } else if (VIEW === "ACERTOS") {
         renderAcertosView();
       } else if (VIEW === "CONFIG") {
@@ -2078,9 +2173,15 @@
         items.push({ value: "", label: "Selecione..." });
       }
       
-      // Sócios da obra - usa socioNomePorQualquerId para resolver QUALQUER formato
-      if (socioAId) items.push({ value: socioAId, label: socioNomePorQualquerId(socioAId) });
-      if (socioBId) items.push({ value: socioBId, label: socioNomePorQualquerId(socioBId) });
+      // Sócios da obra - VALUE CANÔNICO (A/B), LABEL com nome real
+      if (socioAId) items.push({ 
+        value: resolveSocioCanonicalId(socioAId) || "A",  // ✅ CANÔNICO
+        label: socioNomePorQualquerId(socioAId) 
+      });
+      if (socioBId) items.push({ 
+        value: resolveSocioCanonicalId(socioBId) || "B",  // ✅ CANÔNICO
+        label: socioNomePorQualquerId(socioBId) 
+      });
       
       // Opção Ambos - mostra nomes reais
       if (incluirAmbos && socioAId && socioBId) {
@@ -2142,6 +2243,15 @@
       return valor; // Já é um ID
     }
 
+    /**
+     * Resolve quem pagou o lançamento com robustez
+     * Tenta múltiplos campos e fallback para socioAId da obra
+     */
+    function resolvePagoPor(lanc, obra) {
+      const valor = lanc.pagoPor ?? lanc.pagador ?? lanc.socioPagou ?? lanc.pagoPorId ?? lanc.quemPagou ?? obra?.socioAId ?? 'A';
+      return resolveSocioCanonicalId(valor);
+    }
+
     // Garante que state.config.socios está válido antes de renderizar
     function garantirSociosMapeados() {
       // Se config.socios está vazio mas temos socios, mapear
@@ -2186,6 +2296,362 @@
       }
     }
 
+    // ========================================
+    // 🌍 EQUALIZAÇÃO GLOBAL CONSOLIDADA
+    // ========================================
+
+    /**
+     * Calcula a posição financeira consolidada de cada sócio através de TODAS as obras.
+     * Retorna objeto com estrutura:
+     * {
+     *   socioId: {
+     *     nome: "Victor Castro",
+     *     caixaFisico: 10000,        // Total recebido fisicamente - pago fisicamente
+     *     direitoPorCompetencia: 5000, // Alocações 50/50 de recebimentos e custos
+     *     contasReceber: 10000,      // Valores vendidos confirmados mas não recebidos
+     *     totalConsolidado: 25000    // caixa + direito + CR
+     *   }
+     * }
+     */
+    async function calcularPosicaoGlobalConsolidada() {
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔍 [EQ GLOBAL] Iniciando cálculo da Posição Global Consolidada...');
+      console.log(`📊 Total de sócios: ${state.socios.length}`);
+      console.log(`🏗️ Total de obras: ${state.obras.length}`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      
+      // 🔥 CRÍTICO: Garantir que os sócios estão mapeados antes de processar!
+      garantirSociosMapeados();
+      
+      const posicoes = {};
+
+      // Inicializar para cada sócio usando Firestore ID
+      state.socios.forEach(socio => {
+        console.log(`  ✅ Inicializando sócio: ${socio.nome} (ID: ${socio.id})`);
+        posicoes[socio.id] = {
+          id: socio.id,
+          nome: socio.nome,
+          caixaFisico: 0,
+          direitoPorCompetencia: 0,
+          contasReceber: 0,
+          totalConsolidado: 0,
+          detalheCaixa: {
+            recebidoFisico: 0,
+            pagoFisico: 0
+          },
+          detalheDireito: {
+            receitaPorAlocacao: 0,
+            custoPorAlocacao: 0
+          }
+        };
+      });
+
+      // 🎯 USAR A MESMA LÓGICA DO renderBalancoGlobal() QUE FUNCIONA CORRETAMENTE
+      // Iterar por TODAS as obras
+      for (const obra of state.obras) {
+        const obraId = obra.id;
+        console.log(`\n  📊 Processando obra: ${obra.nome} (ID: ${obraId})`);
+        console.log(`     socioAId: "${obra.socioAId}", socioBId: "${obra.socioBId}"`);
+        console.log(`     posicoes keys: [${Object.keys(posicoes).join(', ')}]`);
+        const socioAFirestoreId = resolveSocioFirestoreId(obra.socioAId);
+        const socioBFirestoreId = resolveSocioFirestoreId(obra.socioBId);
+        console.log(`     socioAId (firestore): "${socioAFirestoreId}" | socioBId (firestore): "${socioBFirestoreId}"`);
+        console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[socioAFirestoreId]}`);
+        console.log(`     Obra tem socioBId em posicoes? ${!!posicoes[socioBFirestoreId]}`);
+
+        try {
+          // Carregar dados da obra
+          const unidadesSnap = await getDocs(collection(db, "obras", obraId, "unidades"));
+          const unidades = unidadesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          
+          const lancamentosSnap = await getDocs(collection(db, "obras", obraId, "lancamentos"));
+          const lancamentos = lancamentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          
+          const recebimentosSnap = await getDocs(collection(db, "obras", obraId, "recebimentos"));
+          const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+          // 0️⃣ PROCESSAR INVESTIMENTOS DA OBRA (CRÍTICO!)
+          const invA = Number(obra.investimentoA || 0);
+          const invB = Number(obra.investimentoB || 0);
+          const invTotal = invA + invB;
+          
+          console.log(`     💰 Investimentos: A R$ ${invA.toFixed(2)} | B R$ ${invB.toFixed(2)} | Total R$ ${invTotal.toFixed(2)}`);
+          
+          // 💵 CAIXA: Quem pagou fisicamente
+          if (invA > 0 && socioAFirestoreId && posicoes[socioAFirestoreId]) {
+            posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += invA;
+            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}`);
+          }
+          
+          if (invB > 0 && socioBFirestoreId && posicoes[socioBFirestoreId]) {
+            posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += invB;
+            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}`);
+          }
+          
+          // 📋 COMPETÊNCIA: AMBOS deveriam pagar 50/50 do total (independente de quem investiu)
+          if (invTotal > 0) {
+            const metadeInv = invTotal / 2;
+            
+            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
+              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            }
+            
+            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            }
+          }
+
+          // 1️⃣ PROCESSAR LANÇAMENTOS (CUSTOS)
+          console.log(`     💳 ${lancamentos.length} lançamentos encontrados`);
+          lancamentos.forEach(l => {
+            const valor = l.valor || 0;
+            
+            // 🔥 CORREÇÃO CRÍTICA: pago = true por padrão, a menos que seja explicitamente false
+            const pago = (l.pago !== false);
+            
+            if (!pago) {
+              console.log(`       ⏭️ Lançamento R$ ${valor.toFixed(2)} NÃO pago (pago === false), ignorando`);
+              return; // Skip lançamentos não pagos
+            }
+            
+            console.log(`       💳 Lançamento R$ ${valor.toFixed(2)} (pago: ${l.pago ?? 'undefined->true'})`);
+            
+            const percentA = l.victorPercent || l.percentualA || 50;
+            const percentB = l.gustavoPercent || l.percentualB || 50;
+            
+            const valorA = (percentA / 100) * valor;
+            const valorB = (percentB / 100) * valor;
+            
+            // 💵 CAIXA: Quem pagou fisicamente
+            const pagoPorCanonical = resolvePagoPor(l, obra);
+            const pagoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === pagoPorCanonical)?.firestoreId;
+            
+            if (pagoPorFirestoreId && posicoes[pagoPorFirestoreId]) {
+              posicoes[pagoPorFirestoreId].detalheCaixa.pagoFisico += valor;
+            } else {
+              // Fallback: dividir 50/50 se não souber quem pagou
+              if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
+                posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += valorA;
+              }
+              if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+                posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += valorB;
+              }
+            }
+            
+            // 📋 COMPETÊNCIA: Custo alocado por percentual
+            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
+              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += valorA;
+            } else if (obra.socioAId) {
+              console.warn(`     ⚠️ socioAId "${obra.socioAId}" não encontrado em posicoes!`);
+            }
+            
+            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += valorB;
+            } else if (obra.socioBId) {
+              console.warn(`     ⚠️ socioBId "${obra.socioBId}" não encontrado em posicoes!`);
+            }
+          });
+          console.log(`     ✅ Lançamentos processados`);
+
+          // 2️⃣ PROCESSAR RECEBIMENTOS
+          console.log(`     💰 ${recebimentos.length} recebimentos encontrados`);
+          recebimentos.forEach(rec => {
+            const valor = rec.valor || 0;
+            
+            // 💵 CAIXA: Quem recebeu fisicamente
+            const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
+            const recebidoPorFirestoreId = resolveSocioFirestoreId(recebidoPorRaw);
+            
+            if (recebidoPorFirestoreId && posicoes[recebidoPorFirestoreId]) {
+              posicoes[recebidoPorFirestoreId].detalheCaixa.recebidoFisico += valor;
+            }
+            
+            // 📋 DIREITO: Alocações 50/50 ou percentual customizado
+            const alocacoes = inferirAlocacoesRecebimento(rec, obra);
+            alocacoes.forEach(aloc => {
+              const canonicalId = resolveSocioCanonicalId(aloc.socioId);
+              if (canonicalId) {
+                const socioFirestoreId = resolveSocioFirestoreId(canonicalId);
+                if (socioFirestoreId && posicoes[socioFirestoreId]) {
+                  posicoes[socioFirestoreId].detalheDireito.receitaPorAlocacao += aloc.valor;
+                }
+              }
+            });
+          });
+
+          // 3️⃣ CONTAS A RECEBER (opcional, para modo estratégico)
+          const crSnap = await getDocs(collection(db, "obras", obraId, "contasReceber"));
+          crSnap.forEach(doc => {
+            const cr = doc.data();
+            if (cr.status !== 'recebido') {
+              const valor = cr.valor || 0;
+              const alocacoes = cr.alocacoes || [];
+              
+              if (alocacoes.length > 0) {
+                alocacoes.forEach(aloc => {
+                  const canonicalId = resolveSocioCanonicalId(aloc.socioId);
+                  if (canonicalId) {
+                    const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
+                    if (socioFirestoreId && posicoes[socioFirestoreId]) {
+                      posicoes[socioFirestoreId].contasReceber += aloc.valor;
+                    }
+                  }
+                });
+              } else {
+                // 50/50 default
+                const metade = valor / 2;
+                if (socioAFirestoreId && posicoes[socioAFirestoreId]) posicoes[socioAFirestoreId].contasReceber += metade;
+                if (socioBFirestoreId && posicoes[socioBFirestoreId]) posicoes[socioBFirestoreId].contasReceber += metade;
+              }
+            }
+          });
+
+        } catch (err) {
+          console.error(`❌ Erro ao processar obra ${obraId}:`, err);
+        }
+      }
+
+      // Calcular totais consolidados
+      console.log('\n📊 [EQ GLOBAL] Totais consolidados:');
+      Object.values(posicoes).forEach(pos => {
+        pos.caixaFisico = pos.detalheCaixa.recebidoFisico - pos.detalheCaixa.pagoFisico;
+        pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
+        const excessoRecebe = pos.detalheCaixa.recebidoFisico - pos.detalheDireito.receitaPorAlocacao;
+        const excessoPaga = pos.detalheCaixa.pagoFisico - pos.detalheDireito.custoPorAlocacao;
+        pos.posicaoLiquida = excessoPaga - excessoRecebe;
+        pos.totalConsolidado = pos.posicaoLiquida + pos.contasReceber;
+        
+        console.log(`  ${pos.nome}:`);
+        console.log(`    - Recebido (Caixa): R$ ${pos.detalheCaixa.recebidoFisico.toFixed(2)}`);
+        console.log(`    - Pago (Caixa): R$ ${pos.detalheCaixa.pagoFisico.toFixed(2)}`);
+        console.log(`    - Saldo Caixa: R$ ${pos.caixaFisico.toFixed(2)}`);
+        console.log(`    - Receita Direito: R$ ${pos.detalheDireito.receitaPorAlocacao.toFixed(2)}`);
+        console.log(`    - Custo Direito: R$ ${pos.detalheDireito.custoPorAlocacao.toFixed(2)}`);
+        console.log(`    - Saldo Direito: R$ ${pos.direitoPorCompetencia.toFixed(2)}`);
+        console.log(`    - Posição Líquida: R$ ${pos.posicaoLiquida.toFixed(2)}`);
+        console.log(`    - Contas a Receber: R$ ${pos.contasReceber.toFixed(2)}`);
+        console.log(`    - Total Consolidado: R$ ${pos.totalConsolidado.toFixed(2)}`);
+      });
+      
+      // 🔍 LOG DE VALIDAÇÃO (remover depois)
+      console.log('\n[EQG] posicoes completas:', JSON.stringify(posicoes, null, 2));
+
+      return posicoes;
+    }
+
+    /**
+     * Calcula a equalização global entre sócios (quem deve transferir para quem).
+     * Retorna dois modos:
+     * - modoA (Caixa): Equalizar apenas posição de caixa físico (curto prazo)
+     * - modoB (Estratégico): Equalizar caixa + contas a receber (visão futura)
+     */
+    async function calcularEqualizacaoGlobal() {
+      const posicoes = await calcularPosicaoGlobalConsolidada();
+      const socioIds = Object.keys(posicoes);
+
+      if (socioIds.length !== 2) {
+        return {
+          erro: 'Sistema suporta apenas 2 sócios no momento',
+          posicoes
+        };
+      }
+
+      const [socioA, socioB] = socioIds;
+      const posA = posicoes[socioA];
+      const posB = posicoes[socioB];
+
+      console.log('\n🎯 [EQ GLOBAL] Calculando acerto (netting):');
+
+      const excessoRecebeA = posA.detalheCaixa.recebidoFisico - posA.detalheDireito.receitaPorAlocacao;
+      const excessoPagaA = posA.detalheCaixa.pagoFisico - posA.detalheDireito.custoPorAlocacao;
+      const posicaoLiquidaA = excessoPagaA - excessoRecebeA;
+
+      const excessoRecebeB = posB.detalheCaixa.recebidoFisico - posB.detalheDireito.receitaPorAlocacao;
+      const excessoPagaB = posB.detalheCaixa.pagoFisico - posB.detalheDireito.custoPorAlocacao;
+      const posicaoLiquidaB = excessoPagaB - excessoRecebeB;
+
+      console.log(`  ${posA.nome} → excesso paga: R$ ${excessoPagaA.toFixed(2)}, excesso recebe: R$ ${excessoRecebeA.toFixed(2)}, posição líquida: R$ ${posicaoLiquidaA.toFixed(2)}`);
+      console.log(`  ${posB.nome} → excesso paga: R$ ${excessoPagaB.toFixed(2)}, excesso recebe: R$ ${excessoRecebeB.toFixed(2)}, posição líquida: R$ ${posicaoLiquidaB.toFixed(2)}`);
+
+      let modoA = {
+        tipo: 'Netting (Pago vs Deveria / Recebido vs Direito)',
+        descricao: 'Equalização por posição líquida (50/50 real)',
+        saldoIdeal: 0,
+        transferencia: null
+      };
+
+      if (Math.abs(posicaoLiquidaA) > 0.01) {
+        if (posicaoLiquidaA > 0) {
+          // A tem a receber, B paga
+          modoA.transferencia = {
+            de: socioB,
+            deNome: posB.nome,
+            para: socioA,
+            paraNome: posA.nome,
+            valor: Math.abs(posicaoLiquidaA)
+          };
+          console.log(`  ✅ Acerto: ${posB.nome} → ${posA.nome} = R$ ${Math.abs(posicaoLiquidaA).toFixed(2)}`);
+        } else {
+          // A tem a pagar, B recebe
+          modoA.transferencia = {
+            de: socioA,
+            deNome: posA.nome,
+            para: socioB,
+            paraNome: posB.nome,
+            valor: Math.abs(posicaoLiquidaA)
+          };
+          console.log(`  ✅ Acerto: ${posA.nome} → ${posB.nome} = R$ ${Math.abs(posicaoLiquidaA).toFixed(2)}`);
+        }
+      }
+
+      // MODO B: Equalização Estratégica (Caixa + CR)
+      const totalA = posicaoLiquidaA + posA.contasReceber;
+      const totalB = posicaoLiquidaB + posB.contasReceber;
+      const mediaTotal = (totalA + totalB) / 2;
+      const saldoATotal = totalA - mediaTotal;
+      const saldoBTotal = totalB - mediaTotal;
+
+      let modoB = {
+        tipo: 'Caixa + Contas a Receber',
+        descricao: 'Equalização estratégica considerando valores a receber futuros',
+        mediaTotal,
+        transferencia: null
+      };
+
+      if (Math.abs(saldoATotal) > 0.01) {
+        if (saldoATotal > 0) {
+          // A tem excesso total, deve repassar para B
+          modoB.transferencia = {
+            de: socioA,
+            deNome: posA.nome,
+            para: socioB,
+            paraNome: posB.nome,
+            valor: Math.abs(saldoATotal)
+          };
+        } else {
+          // B tem excesso total, deve repassar para A
+          modoB.transferencia = {
+            de: socioB,
+            deNome: posB.nome,
+            para: socioA,
+            paraNome: posA.nome,
+            valor: Math.abs(saldoBTotal)
+          };
+        }
+      }
+
+      return {
+        posicoes,
+        modoA,
+        modoB,
+        diferenca: modoA.transferencia && modoB.transferencia 
+          ? Math.abs((modoA.transferencia.valor || 0) - (modoB.transferencia.valor || 0))
+          : 0
+      };
+    }
+
     // VIEW DE BALANÇO GLOBAL
     async function renderBalancoGlobal() {
       garantirSociosMapeados(); // Garantir antes de processar
@@ -2205,12 +2671,13 @@
       state.socios.forEach(socio => {
         balancoPorSocio[socio.id] = {
           nome: socio.nome,
-          totalInvestido: 0,      // Custos pagos
-          totalRecebido: 0,        // Receitas recebidas
-          vgvPrevisto: 0,          // Valor geral de vendas previsto
-          vendasConfirmadas: 0,    // Vendas realmente fechadas
-          equalizacoes: [],        // Equalização por obra
-          obras: []                // Detalhamento por obra
+          totalInvestido: 0,        // Custos pagos (CAIXA)
+          recebidoCaixa: 0,         // 💵 CAIXA: Quem recebeu fisicamente
+          direitoCompetencia: 0,    // 📋 DIREITO: Competência (50/50 ou %)
+          vgvPrevisto: 0,           // Valor geral de vendas previsto
+          vendasConfirmadas: 0,     // Vendas realmente fechadas
+          equalizacoes: [],         // Equalização por obra
+          obras: []                 // Detalhamento por obra
         };
       });
 
@@ -2297,22 +2764,32 @@
               recebimentos.forEach(rec => {
                 if (rec.unidadeId === unidade.id) {
                   const valor = rec.valor || 0;
+                  
+                  // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
+                  const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
+                  const recebidoPorCanonical = recebidoPorRaw;
+                  const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
+                  
+                  if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
+                    balancoPorSocio[recebidoPorFirestoreId].recebidoCaixa += valor;
+                    console.log(`      💵 CAIXA: ${balancoPorSocio[recebidoPorFirestoreId].nome} recebeu R$ ${valor.toFixed(2)}`);
+                  }
+                  
+                  // 📋 DIREITO (Competência): 50/50 ou percentual definido
                   const percentA = rec.victorPercent || rec.percentualA || 50;
                   const percentB = rec.gustavoPercent || rec.percentualB || 50;
                   
                   const valorA = (percentA / 100) * valor;
                   const valorB = (percentB / 100) * valor;
                   
-                  console.log(`      💰 Recebimento R$ ${valor} (${rec.descricao || rec.tipo})`);
-                  
                   if (socioAId && balancoPorSocio[socioAId]) {
-                    balancoPorSocio[socioAId].totalRecebido += valorA;
-                    console.log(`        👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
+                    balancoPorSocio[socioAId].direitoCompetencia += valorA;
+                    console.log(`      📋 DIREITO: ${balancoPorSocio[socioAId].nome} tem direito a R$ ${valorA.toFixed(2)} (${percentA}%)`);
                   }
                   
                   if (socioBId && balancoPorSocio[socioBId]) {
-                    balancoPorSocio[socioBId].totalRecebido += valorB;
-                    console.log(`        👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
+                    balancoPorSocio[socioBId].direitoCompetencia += valorB;
+                    console.log(`      📋 DIREITO: ${balancoPorSocio[socioBId].nome} tem direito a R$ ${valorB.toFixed(2)} (${percentB}%)`);
                   }
                   
                   obraInfo.receitas += valor;
@@ -2344,25 +2821,33 @@
               }
             });
 
-            // Receitas da unidade (recebimentos confirmados) - USAR ALOCAÇÕES REAIS
+            // Receitas da unidade (recebimentos confirmados)
             recebimentos.forEach(rec => {
               if (rec.unidadeId === unidade.id) {
                 const valor = rec.valor || 0;
                 receitaUnidade += valor;
                 
-                // Inferir alocações (quem tem DIREITO ao valor, não quem recebeu fisicamente)
-                const alocacoes = inferirAlocacoesRecebimento(rec, obra);
-                
                 console.log(`      💰 Recebimento: R$ ${valor} (Recebido por: ${rec.recebidoPor || 'N/A'})`);
                 
-                // Distribuir pelos sócios conforme alocações
+                // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
+                const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
+                const recebidoPorCanonical = recebidoPorRaw;
+                const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
+                
+                if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
+                  balancoPorSocio[recebidoPorFirestoreId].recebidoCaixa += valor;
+                  console.log(`        💵 CAIXA: ${balancoPorSocio[recebidoPorFirestoreId].nome} recebeu fisicamente R$ ${valor.toFixed(2)}`);
+                }
+                
+                // 📋 DIREITO (Competência): alocações 50/50 ou customizadas
+                const alocacoes = inferirAlocacoesRecebimento(rec, obra);
                 alocacoes.forEach(aloc => {
                   const canonicalId = resolveSocioCanonicalId(aloc.socioId);
                   if (canonicalId) {
                     const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
                     if (socioFirestoreId && balancoPorSocio[socioFirestoreId]) {
-                      balancoPorSocio[socioFirestoreId].totalRecebido += aloc.valor;
-                      console.log(`        👤 ${balancoPorSocio[socioFirestoreId].nome}: +R$ ${aloc.valor.toFixed(2)}`);
+                      balancoPorSocio[socioFirestoreId].direitoCompetencia += aloc.valor;
+                      console.log(`        📋 DIREITO: ${balancoPorSocio[socioFirestoreId].nome} tem direito a R$ ${aloc.valor.toFixed(2)}`);
                     }
                   }
                 });
@@ -2376,7 +2861,7 @@
             
             // Acumular no sócio
             balancoPorSocio[proprietarioId].totalInvestido += custoUnidade;
-            balancoPorSocio[proprietarioId].totalRecebido += receitaUnidade;
+            // ❌ REMOVIDO: totalRecebido (já processado em recebidoCaixa + direitoCompetencia)
             balancoPorSocio[proprietarioId].vgvPrevisto += vgvUnidade;
             balancoPorSocio[proprietarioId].vendasConfirmadas += receitaUnidade;
             
@@ -2439,17 +2924,25 @@
             const valor = receb.valor || 0;
             console.log(`    💵 Recebimento geral: R$ ${valor} (Recebido por: ${receb.recebidoPor || 'N/A'})`);
             
-            // Inferir alocações (quem tem DIREITO, não quem recebeu)
-            const alocacoes = inferirAlocacoesRecebimento(receb, obra);
+            // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
+            const recebidoPorRaw = receb.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(receb.recebidoPor) || receb.recebidoPor);
+            const recebidoPorCanonical = recebidoPorRaw;
+            const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
             
-            // Distribuir pelos sócios conforme alocações
+            if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
+              balancoPorSocio[recebidoPorFirestoreId].recebidoCaixa += valor;
+              console.log(`      💵 CAIXA: ${balancoPorSocio[recebidoPorFirestoreId].nome} recebeu R$ ${valor.toFixed(2)}`);
+            }
+            
+            // 📋 DIREITO (Competência): alocações 50/50 ou customizadas
+            const alocacoes = inferirAlocacoesRecebimento(receb, obra);
             alocacoes.forEach(aloc => {
               const canonicalId = resolveSocioCanonicalId(aloc.socioId);
               if (canonicalId) {
                 const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
                 if (socioFirestoreId && balancoPorSocio[socioFirestoreId]) {
-                  balancoPorSocio[socioFirestoreId].totalRecebido += aloc.valor;
-                  console.log(`      👤 ${balancoPorSocio[socioFirestoreId].nome}: +R$ ${aloc.valor.toFixed(2)}`);
+                  balancoPorSocio[socioFirestoreId].direitoCompetencia += aloc.valor;
+                  console.log(`      📋 DIREITO: ${balancoPorSocio[socioFirestoreId].nome} tem direito a R$ ${aloc.valor.toFixed(2)}`);
                 }
               }
             });
@@ -2496,7 +2989,7 @@
         return;
       }
       
-      // Calcular acertos consolidados
+      // Calcular acertos consolidados (baseado em SALDO REAL considerando INVESTIMENTOS + RECEBIMENTOS)
       const acertosConsolidados = [];
       if (state.socios.length >= 2) {
         for (let i = 0; i < state.socios.length; i++) {
@@ -2506,37 +2999,76 @@
             const dadosA = balancoPorSocio[socioA.id];
             const dadosB = balancoPorSocio[socioB.id];
             
-            const investidoA = dadosA.totalInvestido;
-            const investidoB = dadosB.totalInvestido;
-            const totalInvestido = investidoA + investidoB;
-            const deveriaInvestirCada = totalInvestido / 2;
-            const diferencaA = investidoA - deveriaInvestirCada;
-            const diferencaB = investidoB - deveriaInvestirCada;
+            // 🎯 NOVO CÁLCULO: Saldo Real = Recebido (Caixa) - Investido
+            const saldoRealA = dadosA.recebidoCaixa - dadosA.totalInvestido;
+            const saldoRealB = dadosB.recebidoCaixa - dadosB.totalInvestido;
+            
+            console.log(`\n🔍 DEBUG ACERTO CONSOLIDADO:`);
+            console.log(`  ${socioA.nome}:`);
+            console.log(`    - Total Investido: R$ ${dadosA.totalInvestido.toFixed(2)}`);
+            console.log(`    - Recebido Caixa: R$ ${dadosA.recebidoCaixa.toFixed(2)}`);
+            console.log(`    - Saldo Real: R$ ${saldoRealA.toFixed(2)}`);
+            console.log(`  ${socioB.nome}:`);
+            console.log(`    - Total Investido: R$ ${dadosB.totalInvestido.toFixed(2)}`);
+            console.log(`    - Recebido Caixa: R$ ${dadosB.recebidoCaixa.toFixed(2)}`);
+            console.log(`    - Saldo Real: R$ ${saldoRealB.toFixed(2)}`);
+            
+            // 🎯 Total Consolidado
+            const totalInvestido = dadosA.totalInvestido + dadosB.totalInvestido;
+            const totalRecebidoCaixa = dadosA.recebidoCaixa + dadosB.recebidoCaixa;
+            const saldoTotal = totalRecebidoCaixa - totalInvestido;
+            
+            console.log(`  Total Investido (ambos): R$ ${totalInvestido.toFixed(2)}`);
+            console.log(`  Total Recebido (ambos): R$ ${totalRecebidoCaixa.toFixed(2)}`);
+            console.log(`  Saldo Total: R$ ${saldoTotal.toFixed(2)}`);
+            
+            // 🎯 Saldo Ideal 50/50
+            const saldoIdeal = saldoTotal / 2;
+            console.log(`  Saldo Ideal 50/50 (cada): R$ ${saldoIdeal.toFixed(2)}`);
+            
+            // 🎯 Acerto necessário = Diferença entre Saldo Real e Saldo Ideal
+            const acertoA = saldoRealA - saldoIdeal;
+            const acertoB = saldoRealB - saldoIdeal;
+            
+            console.log(`  Acerto ${socioA.nome}: R$ ${acertoA.toFixed(2)}`);
+            console.log(`  Acerto ${socioB.nome}: R$ ${acertoB.toFixed(2)}`);
             
             let acertoValor = 0;
             let pagador = '';
             let recebedor = '';
             
-            if (diferencaA > 0) {
-              acertoValor = diferencaA;
-              recebedor = socioA.nome;
-              pagador = socioB.nome;
-            } else if (diferencaB > 0) {
-              acertoValor = diferencaB;
-              recebedor = socioB.nome;
-              pagador = socioA.nome;
+            // Quem tem saldo real acima do ideal deve repassar
+            if (acertoA > 0.01) {
+              acertoValor = Math.abs(acertoA);
+              pagador = socioA.nome; // A tem saldo acima do ideal
+              recebedor = socioB.nome; // B tem saldo abaixo do ideal
+            } else if (acertoB > 0.01) {
+              acertoValor = Math.abs(acertoB);
+              pagador = socioB.nome; // B tem saldo acima do ideal
+              recebedor = socioA.nome; // A tem saldo abaixo do ideal
             }
             
-            if (acertoValor > 0) {
+            if (acertoValor > 0.01) {
               acertosConsolidados.push({
                 pagador,
                 recebedor,
                 valor: acertoValor,
-                investidoA,
-                investidoB,
-                deveriaInvestirCada,
+                // Dados detalhados para exibição
+                investidoA: dadosA.totalInvestido,
+                investidoB: dadosB.totalInvestido,
+                recebidoCaixaA: dadosA.recebidoCaixa,
+                recebidoCaixaB: dadosB.recebidoCaixa,
+                saldoRealA,
+                saldoRealB,
+                saldoIdeal,
+                direitoA: dadosA.direitoCompetencia,
+                direitoB: dadosB.direitoCompetencia,
+                acertoA,
+                acertoB,
                 socioANome: socioA.nome,
-                socioBNome: socioB.nome
+                socioBNome: socioB.nome,
+                totalInvestido,
+                totalRecebidoCaixa
               });
             }
           }
@@ -2549,16 +3081,26 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           ${state.socios.map(socio => {
             const dados = balancoPorSocio[socio.id];
-            const saldoAtual = dados.totalRecebido - dados.totalInvestido;
             
-            // Determinar status (invertido: negativo = credor, positivo = devedor)
-            const isCredor = saldoAtual < 0; // Investiu mais do que recebeu = tem a receber
-            const statusLabel = isCredor ? 'Credor' : saldoAtual > 0 ? 'Devedor' : 'Equalizado';
-            const statusColor = isCredor ? 'green' : saldoAtual > 0 ? 'red' : 'gray';
+            // 🎯 NOVO CÁLCULO: Saldo Real = Recebido (Caixa) - Investido
+            const saldoReal = dados.recebidoCaixa - dados.totalInvestido;
             
-            // ROI Real (baseado em receitas confirmadas)
+            // 🎯 Para determinar se deve repassar ou tem a receber, precisamos comparar com o outro sócio
+            // Mas como não sabemos qual é o "outro" aqui, vamos mostrar o saldo real
+            // A equalização será mostrada na seção consolidada
+            
+            // Cálculo do acerto baseado em Caixa vs. Direito (para exibição secundária)
+            const acertoNecessario = dados.recebidoCaixa - dados.direitoCompetencia;
+            const deveRepassar = acertoNecessario > 0; // Recebeu mais que o direito
+            const temAReceber = acertoNecessario < 0; // Recebeu menos que o direito
+            
+            // Determinar status baseado no saldo real
+            const statusLabel = saldoReal >= 0 ? 'Saldo Positivo' : 'Saldo Negativo';
+            const statusColor = saldoReal >= 0 ? 'green' : 'red';
+            
+            // ROI Real (baseado em direito de competência)
             const roiReal = dados.totalInvestido > 0 
-              ? ((dados.totalRecebido - dados.totalInvestido) / dados.totalInvestido) * 100 
+              ? ((dados.direitoCompetencia - dados.totalInvestido) / dados.totalInvestido) * 100 
               : 0;
             
             // ROI Previsto (baseado no VGV previsto)
@@ -2574,7 +3116,7 @@
             const dataAtual = new Date().toLocaleDateString('pt-BR');
 
             return `
-              <div class="card p-6 ${isCredor ? 'border-l-4 border-green-500' : saldoAtual > 0 ? 'border-l-4 border-red-500' : 'border-l-4 border-gray-300'}">
+              <div class="card p-6 border-l-4 ${saldoReal >= 0 ? 'border-green-500' : 'border-red-500'}">
                 <div class="flex items-center justify-between mb-4">
                   <h3 class="font-black text-2xl text-gray-800">👔 ${escapeHtml(socio.nome)}</h3>
                   <span class="badge bg-${statusColor}-100 text-${statusColor}-800">${statusLabel}</span>
@@ -2587,30 +3129,62 @@
                 
                 <div class="space-y-3 mb-6">
                   <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">💳 Total Investido:</span>
+                    <span class="text-sm text-gray-600">💳 Total Investido (Custos):</span>
                     <span class="font-bold text-red-600">R$ ${dados.totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                   </div>
                   
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">💰 Total Recebido:</span>
-                    <span class="font-bold text-green-600">R$ ${dados.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <div class="border-t border-gray-200 pt-3">
+                    <div class="font-bold text-gray-800 mb-2">💰 Recebimentos:</div>
+                    
+                    <div class="bg-green-50 border border-green-200 rounded p-3 mb-2">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="text-sm text-green-800">💵 Recebido (Caixa):</span>
+                        <span class="font-black text-green-700 text-lg">R$ ${dados.recebidoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="text-xs text-green-600">Quem recebeu fisicamente</div>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-200 rounded p-3">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="text-sm text-blue-800">📋 Direito (Competência):</span>
+                        <span class="font-black text-blue-700 text-lg">R$ ${dados.direitoCompetencia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="text-xs text-blue-600">Direito econômico (50/50 ou %)</div>
+                    </div>
                   </div>
                   
-                  <div class="border-t-2 border-gray-300 pt-3 mt-3">
-                    <div class="flex justify-between items-center">
-                      <span class="font-bold text-gray-800">🎯 SALDO ATUAL:</span>
-                      <span class="text-2xl font-black ${isCredor ? 'text-green-600' : saldoAtual > 0 ? 'text-red-600' : 'text-gray-600'}">
-                        ${saldoAtual < 0 ? '-' : saldoAtual > 0 ? '+' : ''}R$ ${Math.abs(saldoAtual).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-1 text-right">
-                      ${isCredor 
-                        ? 'Tem a receber da sociedade' 
-                        : saldoAtual > 0 
-                          ? 'Deve à sociedade' 
-                          : 'Equalizado'}
+                  <!-- 🆕 SALDO REAL -->
+                  <div class="border-t-2 border-${statusColor}-300 pt-3 mt-3">
+                    <div class="bg-${statusColor}-50 border-2 border-${statusColor}-400 rounded-lg p-4">
+                      <div class="font-bold text-${statusColor}-900 mb-2">
+                        💰 Saldo Real (Recebido - Investido):
+                      </div>
+                      <div class="text-3xl font-black text-${statusColor}-700">
+                        R$ ${saldoReal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </div>
+                      <div class="text-xs text-${statusColor}-600 mt-2">
+                        ${saldoReal >= 0 
+                          ? 'Recebeu mais do que investiu' 
+                          : 'Ainda não recuperou todo o investimento'}
+                      </div>
                     </div>
                   </div>
+                  
+                  ${Math.abs(acertoNecessario) > 0.01 ? `
+                    <div class="mt-3">
+                      <div class="bg-gray-100 border border-gray-300 rounded-lg p-3">
+                        <div class="text-xs text-gray-600 mb-1">
+                          ${deveRepassar ? '⚠️ Diferença Caixa vs Direito:' : '✅ Diferença Caixa vs Direito:'}
+                        </div>
+                        <div class="text-lg font-bold text-gray-700">
+                          ${deveRepassar ? 'Recebeu' : 'Deixou de receber'} R$ ${Math.abs(acertoNecessario).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                          (Ver seção "Acerto Consolidado" abaixo para equalização completa)
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
                 
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -2660,55 +3234,134 @@
           }).join('')}
         </div>
         
+        <!-- 🌍 NOVA SEÇÃO: EQUALIZAÇÃO GLOBAL CONSOLIDADA -->
+        <div class="mt-8" id="equalizacao-global-section">
+          <div class="card p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-300">
+            <h2 class="font-black text-3xl mb-2 text-purple-900">🌍 Equalização Global Consolidada</h2>
+            <p class="text-sm text-gray-700 mb-6">Análise consolidada de TODAS as obras com diferentes modos de equalização</p>
+            
+            <div class="bg-white rounded-lg border border-purple-200 p-4 mb-6">
+              <button id="calcular-equalizacao-global" class="btn btn-dark w-full">
+                🔄 Calcular Equalização Global
+              </button>
+            </div>
+            
+            <div id="equalizacao-global-result" class="hidden">
+              <!-- Resultado será inserido aqui via JS -->
+            </div>
+          </div>
+        </div>
+        
         ${acertosConsolidados.length > 0 ? `
-          <div class="card p-6 mt-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300">
-            <h3 class="font-black text-2xl mb-4 text-blue-900">💡 Acerto Sugerido Consolidado</h3>
-            <p class="text-sm text-gray-700 mb-4">Equalização considerando TODAS as obras</p>
+          <div class="card p-6 mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-400">
+            <h3 class="font-black text-2xl mb-4 text-orange-900">💡 Acerto Sugerido Consolidado</h3>
+            <p class="text-sm text-gray-700 mb-4">Equalização <strong>50/50</strong> considerando <strong>Investimentos + Recebimentos</strong> (todas as obras)</p>
             
             ${acertosConsolidados.map(acerto => `
-              <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-4">
+              <div class="bg-white rounded-lg border-2 border-orange-500 p-6 mb-4">
                 <div class="flex items-center justify-between mb-4">
                   <div class="text-2xl font-black text-gray-800">
                     ${acerto.pagador} → ${acerto.recebedor}
                   </div>
-                  <div class="text-3xl font-black text-blue-600">
+                  <div class="text-3xl font-black text-orange-600">
                     R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                   </div>
                 </div>
                 
-                <div class="bg-blue-50 rounded-lg p-4 space-y-2 text-sm">
-                  <div class="font-bold text-blue-900 mb-2">📊 Cálculo detalhado:</div>
+                <div class="bg-orange-50 rounded-lg p-4 space-y-3 text-sm">
+                  <div class="font-bold text-orange-900 mb-3">📊 Como chegamos nesse valor:</div>
                   
-                  <div class="flex justify-between">
-                    <span class="text-gray-700">💳 ${acerto.socioANome} investiu:</span>
-                    <span class="font-bold text-red-600">R$ ${acerto.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <!-- Totais Consolidados -->
+                  <div class="bg-blue-50 border border-blue-300 rounded p-3 mb-4">
+                    <div class="font-bold text-blue-900 mb-2">🌍 Consolidado (Ambos Sócios):</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-700">💳 Total Investido:</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-700">💵 Total Recebido (Caixa):</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.totalRecebidoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-blue-400 pt-2 mt-2">
+                      <span class="font-bold text-blue-900">Saldo Total:</span>
+                      <span class="font-black text-lg ${(acerto.totalRecebidoCaixa - acerto.totalInvestido) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${(acerto.totalRecebidoCaixa - acerto.totalInvestido).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-blue-700">💰 Saldo Ideal 50/50 (cada):</span>
+                      <span class="font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
                   </div>
                   
-                  <div class="flex justify-between">
-                    <span class="text-gray-700">💳 ${acerto.socioBNome} investiu:</span>
-                    <span class="font-bold text-red-600">R$ ${acerto.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <!-- Sócio A -->
+                  <div class="bg-white border-2 ${acerto.saldoRealA > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
+                    <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 Investiu:</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
+                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
+                      <span class="font-black text-lg ${acerto.saldoRealA >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${acerto.saldoRealA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
+                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t-2 ${acerto.acertoA > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
+                      <span class="font-black">Diferença:</span>
+                      <span class="font-black text-xl ${acerto.acertoA > 0 ? 'text-orange-600' : 'text-green-600'}">
+                        ${acerto.acertoA >= 0 ? '+' : ''}R$ ${acerto.acertoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
                   </div>
                   
-                  <div class="border-t border-blue-200 pt-2 mt-2"></div>
-                  
-                  <div class="flex justify-between">
-                    <span class="text-gray-700">💰 Total investido (ambos):</span>
-                    <span class="font-bold text-purple-600">R$ ${(acerto.investidoA + acerto.investidoB).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <!-- Sócio B -->
+                  <div class="bg-white border-2 ${acerto.saldoRealB > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
+                    <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 Investiu:</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
+                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
+                      <span class="font-black text-lg ${acerto.saldoRealB >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${acerto.saldoRealB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
+                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t-2 ${acerto.acertoB > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
+                      <span class="font-black">Diferença:</span>
+                      <span class="font-black text-xl ${acerto.acertoB > 0 ? 'text-orange-600' : 'text-green-600'}">
+                        ${acerto.acertoB >= 0 ? '+' : ''}R$ ${acerto.acertoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
                   </div>
                   
-                  <div class="flex justify-between">
-                    <span class="text-gray-700">⚖️ Cada um deveria ter investido (50/50):</span>
-                    <span class="font-bold text-blue-600">R$ ${acerto.deveriaInvestirCada.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                  </div>
-                  
-                  <div class="border-t border-blue-200 pt-2 mt-2"></div>
-                  
-                  <div class="bg-yellow-100 border border-yellow-300 rounded p-3 mt-3">
-                    <div class="font-bold text-yellow-900 mb-1">💡 Como equalizar:</div>
+                  <div class="bg-yellow-100 border border-yellow-400 rounded p-4 mt-3">
+                    <div class="font-bold text-yellow-900 mb-2">💡 Conclusão:</div>
                     <div class="text-yellow-800">
-                      <strong>${acerto.pagador}</strong> deve transferir 
-                      <strong class="text-xl">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                      para <strong>${acerto.recebedor}</strong>
+                      <strong>${acerto.pagador}</strong> tem um saldo real acima do ideal 50/50. 
+                      Para equalizar perfeitamente a sociedade, deve transferir 
+                      <strong class="text-xl text-orange-700">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                      para <strong>${acerto.recebedor}</strong>.
+                    </div>
+                    <div class="text-xs text-yellow-700 mt-2">
+                      ✅ Após o acerto, ambos terão o mesmo saldo: R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                     </div>
                   </div>
                 </div>
@@ -2727,6 +3380,253 @@
       `;
 
       container.innerHTML = html;
+      
+      // 🌍 Adicionar listener para botão de Equalização Global
+      const btnEqualizacao = $("calcular-equalizacao-global");
+      if (btnEqualizacao) {
+        btnEqualizacao.onclick = async () => {
+          btnEqualizacao.disabled = true;
+          btnEqualizacao.innerHTML = '<div class="loader inline-block mr-2"></div> Calculando...';
+          
+          try {
+            const resultado = await calcularEqualizacaoGlobal();
+            renderEqualizacaoGlobalResult(resultado);
+          } catch (err) {
+            console.error('Erro ao calcular equalização global:', err);
+            showToast('❌ Erro ao calcular equalização global', 'error');
+          } finally {
+            btnEqualizacao.disabled = false;
+            btnEqualizacao.innerHTML = '🔄 Recalcular Equalização Global';
+          }
+        };
+      }
+    }
+    
+    /**
+     * Renderiza o resultado da Equalização Global nos dois modos
+     */
+    function renderEqualizacaoGlobalResult(resultado) {
+      const container = $("equalizacao-global-result");
+      if (!container) return;
+      
+      if (resultado.erro) {
+        container.innerHTML = `
+          <div class="bg-red-50 border border-red-300 rounded-lg p-4 text-red-800">
+            ❌ ${resultado.erro}
+          </div>
+        `;
+        container.classList.remove("hidden");
+        return;
+      }
+      
+      const { posicoes, modoA, modoB, diferenca } = resultado;
+      
+      // Converter posicoes object para array
+      const posArray = Object.values(posicoes);
+      
+      let html = `
+        <!-- Resumo de Posições Consolidadas -->
+        <div class="bg-white rounded-lg border-2 border-purple-400 p-6 mb-6">
+          <h3 class="font-black text-xl mb-4 text-purple-900">📊 Posição Consolidada por Sócio</h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${posArray.map(pos => `
+              <div class="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-300 rounded-lg p-4">
+                <div class="font-black text-lg text-gray-800 mb-3">👤 ${escapeHtml(pos.nome)}</div>
+                
+                <div class="space-y-2 text-sm">
+                  <div class="bg-white rounded p-2">
+                    <div class="font-bold text-green-700 mb-1">💵 Caixa Físico</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Recebido:</span>
+                      <span class="font-bold text-green-600">+R$ ${pos.detalheCaixa.recebidoFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Pago:</span>
+                      <span class="font-bold text-red-600">-R$ ${pos.detalheCaixa.pagoFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-300 pt-1 mt-1">
+                      <span class="font-bold">Saldo Caixa:</span>
+                      <span class="font-black text-lg ${pos.caixaFisico >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${pos.caixaFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-white rounded p-2">
+                    <div class="font-bold text-blue-700 mb-1">📋 Direito (Competência)</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Receita alocada:</span>
+                      <span class="font-bold text-green-600">+R$ ${pos.detalheDireito.receitaPorAlocacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Custo alocado:</span>
+                      <span class="font-bold text-red-600">-R$ ${pos.detalheDireito.custoPorAlocacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-300 pt-1 mt-1">
+                      <span class="font-bold">Saldo Direito:</span>
+                      <span class="font-black text-lg ${pos.direitoPorCompetencia >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${pos.direitoPorCompetencia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-yellow-50 border border-yellow-300 rounded p-2">
+                    <div class="font-bold text-yellow-800 mb-1">💰 Contas a Receber</div>
+                    <div class="text-2xl font-black text-yellow-700">
+                      R$ ${pos.contasReceber.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </div>
+                    <div class="text-xs text-yellow-600">Vendas confirmadas não recebidas</div>
+                  </div>
+                  
+                  <div class="bg-purple-100 border-2 border-purple-400 rounded p-2">
+                    <div class="font-bold text-purple-900 mb-1">🎯 Total Consolidado</div>
+                    <div class="text-2xl font-black text-purple-700">
+                      R$ ${pos.totalConsolidado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <!-- Modo A: Caixa Puro -->
+        <div class="bg-white rounded-lg border-2 border-green-400 p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-black text-xl text-green-900">💵 MODO A: Equalização por Caixa (Imediata)</h3>
+              <p class="text-sm text-gray-600 mt-1">${modoA.descricao}</p>
+            </div>
+            <span class="badge bg-green-100 text-green-800 text-lg px-4 py-2">Curto Prazo</span>
+          </div>
+          
+          ${modoA.transferencia ? `
+            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-500 rounded-lg p-6">
+              <div class="flex items-center justify-between mb-4">
+                <div class="text-2xl font-black text-gray-800">
+                  ${escapeHtml(modoA.transferencia.deNome)} → ${escapeHtml(modoA.transferencia.paraNome)}
+                </div>
+                <div class="text-4xl font-black text-green-600">
+                  R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </div>
+              </div>
+              
+              <div class="bg-white rounded p-4 text-sm">
+                <div class="font-bold text-green-900 mb-2">📊 Explicação:</div>
+                <p class="text-gray-700">
+                  <strong>${escapeHtml(modoA.transferencia.deNome)}</strong> recebeu mais dinheiro fisicamente do que 
+                  <strong>${escapeHtml(modoA.transferencia.paraNome)}</strong>. Para equalizar o caixa entre os sócios, 
+                  é necessário transferir <strong class="text-green-600">R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                  AGORA.
+                </p>
+              </div>
+            </div>
+          ` : `
+            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
+              <div class="text-4xl mb-3">✅</div>
+              <div class="font-bold text-gray-800 text-xl">Caixa Equalizado!</div>
+              <p class="text-gray-600 mt-2">Ambos os sócios têm saldo de caixa equivalente.</p>
+            </div>
+          `}
+        </div>
+        
+        <!-- Modo B: Caixa + CR -->
+        <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-black text-xl text-blue-900">🎯 MODO B: Equalização Estratégica (Caixa + CR)</h3>
+              <p class="text-sm text-gray-600 mt-1">${modoB.descricao}</p>
+            </div>
+            <span class="badge bg-blue-100 text-blue-800 text-lg px-4 py-2">Visão Futura</span>
+          </div>
+          
+          ${modoB.transferencia ? `
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-500 rounded-lg p-6">
+              <div class="flex items-center justify-between mb-4">
+                <div class="text-2xl font-black text-gray-800">
+                  ${escapeHtml(modoB.transferencia.deNome)} → ${escapeHtml(modoB.transferencia.paraNome)}
+                </div>
+                <div class="text-4xl font-black text-blue-600">
+                  R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </div>
+              </div>
+              
+              <div class="bg-white rounded p-4 text-sm">
+                <div class="font-bold text-blue-900 mb-2">📊 Explicação:</div>
+                <p class="text-gray-700">
+                  Considerando <strong>caixa atual + valores a receber futuros</strong>, 
+                  <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> está com mais recursos consolidados. 
+                  Para equalizar a posição estratégica, deve transferir 
+                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>.
+                </p>
+                <p class="text-gray-600 mt-2 text-xs">
+                  💡 Este valor é menor que o Modo A porque considera receitas futuras que vão equilibrar naturalmente.
+                </p>
+              </div>
+            </div>
+          ` : `
+            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
+              <div class="text-4xl mb-3">✅</div>
+              <div class="font-bold text-gray-800 text-xl">Posição Estratégica Equalizada!</div>
+              <p class="text-gray-600 mt-2">Considerando valores futuros, não há necessidade de repasse imediato.</p>
+            </div>
+          `}
+        </div>
+        
+        <!-- Comparação entre Modos -->
+        ${modoA.transferencia && modoB.transferencia && diferenca > 0.01 ? `
+          <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg p-6">
+            <h3 class="font-black text-lg text-purple-900 mb-3">🔍 Comparação entre Modos</h3>
+            
+            <div class="bg-white rounded p-4">
+              <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-700">Diferença entre modos:</span>
+                <span class="text-2xl font-black text-purple-600">
+                  R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </span>
+              </div>
+              
+              <div class="bg-yellow-50 border border-yellow-300 rounded p-3">
+                <div class="font-bold text-yellow-900 mb-2">💡 O que isso significa?</div>
+                <p class="text-yellow-800 text-sm">
+                  A diferença de <strong>R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                  representa o impacto das <strong>Contas a Receber</strong> na equalização. 
+                  Se vocês esperarem receber os valores pendentes, o repasse necessário diminui em aproximadamente esse montante.
+                </p>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        
+        <!-- Recomendações -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 rounded-lg p-6 mt-6">
+          <h3 class="font-black text-lg text-amber-900 mb-3">💡 Recomendações</h3>
+          
+          <div class="space-y-3 text-sm">
+            <div class="bg-white rounded p-3 border-l-4 border-green-500">
+              <div class="font-bold text-green-900">✅ Use o MODO A (Caixa) se:</div>
+              <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
+                <li>Precisam equalizar rapidamente</li>
+                <li>Um sócio está com fluxo de caixa apertado</li>
+                <li>Querem manter justiça imediata</li>
+              </ul>
+            </div>
+            
+            <div class="bg-white rounded p-3 border-l-4 border-blue-500">
+              <div class="font-bold text-blue-900">🎯 Use o MODO B (Estratégico) se:</div>
+              <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
+                <li>Têm valores confirmados a receber em breve</li>
+                <li>Querem evitar movimentações desnecessárias</li>
+                <li>Confiam que os recebimentos futuros vão equilibrar naturalmente</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      container.innerHTML = html;
+      container.classList.remove("hidden");
     }
     
     function limparFiltrosBalanco() {
@@ -5005,6 +5905,213 @@
       container.innerHTML = html;
     }
 
+    // CONTAS A RECEBER VIEW
+    function renderContasReceberView() {
+      garantirSociosMapeados();
+      renderContasReceberList();
+      
+      // Handlers
+      const btnCreate = $("cr-create-btn");
+      const btnCancel = $("cr-cancel-btn");
+      const formContainer = $("cr-form-container");
+      const form = $("cr-form");
+      
+      if (btnCreate) {
+        btnCreate.onclick = () => {
+          formContainer.classList.remove("hidden");
+          $("cr-data").value = new Date().toISOString().split('T')[0];
+        };
+      }
+      
+      if (btnCancel) {
+        btnCancel.onclick = () => {
+          formContainer.classList.add("hidden");
+          form.reset();
+        };
+      }
+      
+      if (form) {
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          
+          const data = $("cr-data").value;
+          const descricao = $("cr-descricao").value.trim();
+          const valor = parseFloat($("cr-valor").value) || 0;
+          const status = $("cr-status").value;
+          const percentA = parseFloat($("cr-percent-a").value) || 50;
+          const percentB = parseFloat($("cr-percent-b").value) || 50;
+          
+          if (!data || !descricao || valor <= 0) {
+            showToast('Preencha todos os campos obrigatórios', 'warning');
+            return;
+          }
+          
+          if (Math.abs(percentA + percentB - 100) > 0.01) {
+            showToast('A soma dos percentuais deve ser 100%', 'warning');
+            return;
+          }
+          
+          try {
+            const obra = state.obras.find(o => o.id === OBRA_ID);
+            const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
+            const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
+            
+            const alocacoes = [
+              { socioId: socioAId, valor: (percentA / 100) * valor },
+              { socioId: socioBId, valor: (percentB / 100) * valor }
+            ];
+            
+            await addDoc(refs(OBRA_ID).contasReceberCol, {
+              data,
+              descricao,
+              valor,
+              status,
+              alocacoes,
+              createdAt: serverTimestamp(),
+              createdBy: state.user.email
+            });
+            
+            showToast('✅ Conta a Receber cadastrada!', 'success');
+            formContainer.classList.add("hidden");
+            form.reset();
+          } catch (err) {
+            console.error(err);
+            showToast('❌ Erro ao cadastrar', 'error');
+          }
+        };
+      }
+    }
+    
+    function renderContasReceberList() {
+      const container = $("cr-list");
+      if (!container) return;
+      
+      if (state.contasReceber.length === 0) {
+        container.innerHTML = '<p class="text-center muted py-8">Nenhuma Conta a Receber cadastrada</p>';
+        return;
+      }
+      
+      // Calcular totais
+      const totalPrevisto = state.contasReceber.filter(cr => cr.status === 'previsto').reduce((sum, cr) => sum + (cr.valor || 0), 0);
+      const totalConfirmado = state.contasReceber.filter(cr => cr.status === 'confirmado').reduce((sum, cr) => sum + (cr.valor || 0), 0);
+      const totalRecebido = state.contasReceber.filter(cr => cr.status === 'recebido').reduce((sum, cr) => sum + (cr.valor || 0), 0);
+      
+      let html = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="card p-4 bg-yellow-50 border-yellow-300">
+            <div class="text-sm text-yellow-700 mb-1">⏳ Previsto</div>
+            <div class="text-2xl font-black text-yellow-800">R$ ${totalPrevisto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+          <div class="card p-4 bg-blue-50 border-blue-300">
+            <div class="text-sm text-blue-700 mb-1">✅ Confirmado</div>
+            <div class="text-2xl font-black text-blue-800">R$ ${totalConfirmado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+          <div class="card p-4 bg-green-50 border-green-300">
+            <div class="text-sm text-green-700 mb-1">💰 Recebido</div>
+            <div class="text-2xl font-black text-green-800">R$ ${totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+        </div>
+        
+        <div class="space-y-3">
+          ${state.contasReceber.map(cr => {
+            const statusColors = {
+              previsto: 'yellow',
+              confirmado: 'blue',
+              recebido: 'green'
+            };
+            const statusLabels = {
+              previsto: '⏳ Previsto',
+              confirmado: '✅ Confirmado',
+              recebido: '💰 Recebido'
+            };
+            const color = statusColors[cr.status] || 'gray';
+            const label = statusLabels[cr.status] || cr.status;
+            
+            const alocacoesHtml = (cr.alocacoes || []).map(aloc => {
+              const nome = socioNomePorQualquerId(aloc.socioId);
+              const percent = (aloc.valor / cr.valor * 100).toFixed(1);
+              return `${nome}: R$ ${aloc.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${percent}%)`;
+            }).join(' | ');
+            
+            return `
+              <div class="card p-4 border-l-4 border-${color}-500 hover:shadow-lg transition-shadow">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex-1">
+                    <div class="font-bold text-gray-800">${escapeHtml(cr.descricao)}</div>
+                    <div class="text-sm text-gray-600 mt-1">📅 ${new Date(cr.data).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-2xl font-black text-${color}-600">R$ ${(cr.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                    <span class="badge bg-${color}-100 text-${color}-800">${label}</span>
+                  </div>
+                </div>
+                
+                ${alocacoesHtml ? `
+                  <div class="bg-gray-50 rounded p-2 text-xs text-gray-700 mt-2">
+                    <strong>Distribuição:</strong> ${alocacoesHtml}
+                  </div>
+                ` : ''}
+                
+                <div class="flex gap-2 mt-3">
+                  ${cr.status !== 'recebido' ? `
+                    <button onclick="baixarContaReceber('${cr.id}')" class="btn btn-sm btn-green">
+                      ✅ Marcar como Recebido
+                    </button>
+                  ` : ''}
+                  <button onclick="editarContaReceber('${cr.id}')" class="btn btn-sm btn-soft">
+                    ✏️ Editar
+                  </button>
+                  <button onclick="deletarContaReceber('${cr.id}')" class="btn btn-sm btn-soft text-red-600">
+                    🗑️ Excluir
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+      
+      container.innerHTML = html;
+    }
+    
+    // Funções auxiliares para CR
+    window.baixarContaReceber = async function(crId) {
+      if (!confirm('Marcar esta Conta a Receber como recebida?\n\nIsso atualizará o status para "Recebido".')) {
+        return;
+      }
+      
+      try {
+        await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId), {
+          status: 'recebido',
+          dataRecebimento: new Date().toISOString().split('T')[0]
+        });
+        
+        showToast('✅ Conta a Receber baixada!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('❌ Erro ao baixar CR', 'error');
+      }
+    };
+    
+    window.editarContaReceber = async function(crId) {
+      // Implementação simplificada - pode melhorar depois
+      showToast('💡 Funcionalidade de edição em desenvolvimento', 'info');
+    };
+    
+    window.deletarContaReceber = async function(crId) {
+      if (!confirm('Tem certeza que deseja excluir esta Conta a Receber?')) {
+        return;
+      }
+      
+      try {
+        await deleteDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId));
+        showToast('✅ Conta a Receber excluída!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('❌ Erro ao excluir', 'error');
+      }
+    };
+
     // ACERTOS VIEW
     function renderAcertosView() {
       garantirSociosMapeados(); // Garantir antes de renderizar
@@ -5715,6 +6822,51 @@
       }
     }
 
+    /**
+     * Tenta baixar automaticamente uma Conta a Receber quando um recebimento é registrado.
+     * Procura por CRs confirmadas com valor similar e sugere baixa.
+     */
+    async function tentarBaixarCRAutomatica(valorRecebido, unidadeId, tipoRecebimento) {
+      try {
+        // Buscar CRs não recebidas (previstas ou confirmadas)
+        const crsPendentes = state.contasReceber.filter(cr => 
+          cr.status === 'confirmado' || cr.status === 'previsto'
+        );
+        
+        if (crsPendentes.length === 0) return;
+        
+        // Procurar CR com valor similar (tolerância de 5%)
+        const tolerancia = 0.05;
+        const crCompativel = crsPendentes.find(cr => {
+          const diferenca = Math.abs(cr.valor - valorRecebido) / cr.valor;
+          return diferenca <= tolerancia;
+        });
+        
+        if (crCompativel) {
+          // Sugerir baixa automática
+          const confirmar = confirm(
+            `💰 Detectamos uma Conta a Receber compatível com este recebimento:\n\n` +
+            `CR: ${crCompativel.descricao}\n` +
+            `Valor: R$ ${crCompativel.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` +
+            `Deseja marcar esta CR como recebida automaticamente?`
+          );
+          
+          if (confirmar) {
+            await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crCompativel.id), {
+              status: 'recebido',
+              dataRecebimento: new Date().toISOString().split('T')[0],
+              recebimentoVinculadoId: unidadeId
+            });
+            
+            showToast('✅ Conta a Receber baixada automaticamente!', 'success');
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao tentar baixar CR automaticamente:', err);
+        // Não bloquear o fluxo principal
+      }
+    }
+
     async function addRecebimento(e) {
       e.preventDefault();
 
@@ -5723,8 +6875,13 @@
       const tipo = $("receb-tipo").value;
       const valor = parseFloat($("receb-valor").value);
       const formaPagamento = $("receb-forma").value;
-      const recebidoPor = $("receb-recebido-por").value;
+      let recebidoPor = $("receb-recebido-por").value;
       const observacoes = $("receb-obs").value.trim();
+
+      // 🛡️ BLINDAGEM: Normalizar recebidoPor para canônico A/B/AMBOS
+      if (recebidoPor !== "AMBOS") {
+        recebidoPor = resolveSocioCanonicalId(recebidoPor) || recebidoPor;
+      }
 
       if (!data || !unidadeId || !valor || !recebidoPor) {
         showToast('Preencha todos os campos obrigatórios', 'warning');
@@ -5756,6 +6913,9 @@
           recebidoPor,
           observacoes
         });
+        
+        // 💰 Tentar baixar automaticamente CR relacionada
+        await tentarBaixarCRAutomatica(valor, unidadeId, tipo);
         
       } catch (err) {
         console.error(err);
