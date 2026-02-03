@@ -3598,6 +3598,9 @@
                     </div>
                   </div>
                   <div class="text-xs text-gray-600 mt-2">Net: <strong>${textoNet(d)}</strong></div>
+                  <div class="mt-2 text-sm font-bold text-gray-800">
+                    Total da obra: ${textoNet(d)} ${formatCurrency(Math.abs(d.posicaoLiquida))}
+                  </div>
                 </div>
               `).join('')}
             </div>
