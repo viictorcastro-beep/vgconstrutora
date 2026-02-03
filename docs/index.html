@@ -2022,6 +2022,15 @@
             if (!pagoPorFirestoreId && pagoPorCanonical === 'B') pagoPorFirestoreId = obra.socioBId || null;
             if (pagoPorFirestoreId) {
               investimentosPorSocio[pagoPorFirestoreId] = (investimentosPorSocio[pagoPorFirestoreId] || 0) + valor;
+            } else {
+              const percentA = l.victorPercent || l.percentualA || 50;
+              const percentB = l.gustavoPercent || l.percentualB || 50;
+              if (obra.socioAId) {
+                investimentosPorSocio[obra.socioAId] = (investimentosPorSocio[obra.socioAId] || 0) + (valor * (percentA / 100));
+              }
+              if (obra.socioBId) {
+                investimentosPorSocio[obra.socioBId] = (investimentosPorSocio[obra.socioBId] || 0) + (valor * (percentB / 100));
+              }
             }
           }
         });
