@@ -2317,8 +2317,8 @@
       const socioVictor = sociosCfg.find(s => (s.nome || '').toLowerCase().includes('victor'));
       if (!socioGustavo || !socioVictor) return;
 
-      const de = socioGustavo.id;
-      const para = socioVictor.id;
+      const de = socioGustavo.firestoreId;
+      const para = socioVictor.firestoreId;
       const valor = 2044.33;
       const descricao = 'Acerto pendente QD61 LT32 (ajuste legado)';
       const data = new Date().toISOString().split('T')[0];
@@ -2348,6 +2348,8 @@
         showToast('✅ Acerto pendente QD61 LT32 lançado (R$ 2.044,33)', 'success');
       } else {
         await updateDoc(doc(db, "obras", obra.id, "acertos", existenteId), {
+          de,
+          para,
           considerarNaEqualizacao: true
         });
       }
@@ -2576,10 +2578,8 @@
             if (!valor) return;
             if (a.considerarNaEqualizacao !== true) return;
 
-            const deNorm = normalizarSocioValor(a.de, obra);
-            const paraNorm = normalizarSocioValor(a.para, obra);
-            const deId = resolveSocioFirestoreId(deNorm) || resolveSocioFirestoreId(a.de);
-            const paraId = resolveSocioFirestoreId(paraNorm) || resolveSocioFirestoreId(a.para);
+            const deId = resolveSocioFirestoreId(a.de) || resolveSocioFirestoreId(normalizarSocioValor(a.de, obra));
+            const paraId = resolveSocioFirestoreId(a.para) || resolveSocioFirestoreId(normalizarSocioValor(a.para, obra));
 
             if (deId && posicoes[deId]) {
               posicoes[deId].detalheCaixa.pagoFisico += valor;
