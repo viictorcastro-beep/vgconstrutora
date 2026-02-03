@@ -2339,6 +2339,7 @@
           para,
           valor,
           descricao,
+          considerarNaEqualizacao: true,
           createdAt: serverTimestamp(),
           createdBy: state.user?.email || 'system'
         });
@@ -2567,6 +2568,7 @@
             const a = doc.data();
             const valor = Number(a.valor || 0);
             if (!valor) return;
+            if (a.considerarNaEqualizacao !== true) return;
 
             const deNorm = normalizarSocioValor(a.de, obra);
             const paraNorm = normalizarSocioValor(a.para, obra);
@@ -7131,6 +7133,7 @@
           para,
           valor,
           descricao,
+          considerarNaEqualizacao: false,
           createdAt: serverTimestamp(),
           createdBy: state.user.email
         });
