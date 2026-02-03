@@ -2152,9 +2152,15 @@
         items.push({ value: "", label: "Selecione..." });
       }
       
-      // Sócios da obra - usa socioNomePorQualquerId para resolver QUALQUER formato
-      if (socioAId) items.push({ value: socioAId, label: socioNomePorQualquerId(socioAId) });
-      if (socioBId) items.push({ value: socioBId, label: socioNomePorQualquerId(socioBId) });
+      // Sócios da obra - VALUE CANÔNICO (A/B), LABEL com nome real
+      if (socioAId) items.push({ 
+        value: resolveSocioCanonicalId(socioAId) || "A",  // ✅ CANÔNICO
+        label: socioNomePorQualquerId(socioAId) 
+      });
+      if (socioBId) items.push({ 
+        value: resolveSocioCanonicalId(socioBId) || "B",  // ✅ CANÔNICO
+        label: socioNomePorQualquerId(socioBId) 
+      });
       
       // Opção Ambos - mostra nomes reais
       if (incluirAmbos && socioAId && socioBId) {
@@ -2620,8 +2626,9 @@
                 if (rec.unidadeId === unidade.id) {
                   const valor = rec.valor || 0;
                   
-                  // 💵 CAIXA: Quem recebeu fisicamente
-                  const recebidoPorCanonical = resolveSocioCanonicalId(rec.recebidoPor);
+                  // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
+                  const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
+                  const recebidoPorCanonical = recebidoPorRaw;
                   const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
                   
                   if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
@@ -2683,8 +2690,9 @@
                 
                 console.log(`      💰 Recebimento: R$ ${valor} (Recebido por: ${rec.recebidoPor || 'N/A'})`);
                 
-                // 💵 CAIXA: Quem recebeu fisicamente
-                const recebidoPorCanonical = resolveSocioCanonicalId(rec.recebidoPor);
+                // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
+                const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
+                const recebidoPorCanonical = recebidoPorRaw;
                 const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
                 
                 if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
@@ -2777,8 +2785,9 @@
             const valor = receb.valor || 0;
             console.log(`    💵 Recebimento geral: R$ ${valor} (Recebido por: ${receb.recebidoPor || 'N/A'})`);
             
-            // 💵 CAIXA: Quem recebeu fisicamente
-            const recebidoPorCanonical = resolveSocioCanonicalId(receb.recebidoPor);
+            // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
+            const recebidoPorRaw = receb.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(receb.recebidoPor) || receb.recebidoPor);
+            const recebidoPorCanonical = recebidoPorRaw;
             const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
             
             if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
@@ -6632,8 +6641,13 @@
       const tipo = $("receb-tipo").value;
       const valor = parseFloat($("receb-valor").value);
       const formaPagamento = $("receb-forma").value;
-      const recebidoPor = $("receb-recebido-por").value;
+      let recebidoPor = $("receb-recebido-por").value;
       const observacoes = $("receb-obs").value.trim();
+
+      // 🛡️ BLINDAGEM: Normalizar recebidoPor para canônico A/B/AMBOS
+      if (recebidoPor !== "AMBOS") {
+        recebidoPor = resolveSocioCanonicalId(recebidoPor) || recebidoPor;
+      }
 
       if (!data || !unidadeId || !valor || !recebidoPor) {
         showToast('Preencha todos os campos obrigatórios', 'warning');

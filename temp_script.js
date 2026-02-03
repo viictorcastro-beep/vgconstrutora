@@ -1,1078 +1,4 @@
-<!-- BUILD: 638245c - 2026-02-02 15:30 BRT -->
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>VG CONSTRUTORA — Gestor de Obras</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🏗️</text></svg>">
 
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- PDF export - USANDO CDN até corrigir paths locais -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-  
-  <!-- Charts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  
-  <!-- Excel Export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-  <style>
-    body { background:#f1f5f9; }
-    .hidden { display:none !important; }
-    .modal { background: rgba(0,0,0,.55); }
-    .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background:#e2e8f0; }
-    .btn { border-radius: 12px; font-weight: 700; padding: 10px 14px; }
-    .btn-dark { background:#0f172a; color:white; }
-    .btn-dark:hover { background:#334155; }
-    .btn-danger { background:#dc2626; color:white; }
-    .btn-danger:hover { background:#b91c1c; }
-    .btn-soft { background:#e2e8f0; color:#0f172a; }
-    .btn-soft:hover { background:#cbd5e1; }
-    .btn-green { background:#059669; color:white; }
-    .btn-green:hover { background:#047857; }
-    .btn-indigo { background:#4f46e5; color:white; }
-    .btn-indigo:hover { background:#4338ca; }
-    .btn-purple { background:#7c3aed; color:white; }
-    .btn-purple:hover { background:#6d28d9; }
-    .muted { color:#64748b; }
-    .card { background:white; border-radius: 18px; box-shadow: 0 10px 24px rgba(15,23,42,.08); }
-    .table th { background:#f1f5f9; font-weight:800; }
-    .table td,.table th { padding:10px; }
-    .input { border:1px solid #cbd5e1; border-radius:12px; padding:10px; width:100%; }
-    .select { border:1px solid #cbd5e1; border-radius:12px; padding:10px; width:100%; background:white; }
-    .danger { color:#dc2626; font-weight: 800; }
-    .ok { color:#059669; font-weight: 800; }
-    
-    /* Toast Notifications */
-    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px; }
-    .toast { padding: 16px 20px; margin-bottom: 12px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.3); animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 12px; font-weight: 700; }
-    .toast.success { background: #059669; color: white; }
-    .toast.error { background: #dc2626; color: white; }
-    .toast.warning { background: #f59e0b; color: white; }
-    .toast.info { background: #3b82f6; color: white; }
-    .toast.hiding { animation: slideOut 0.3s ease; }
-    @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }
-    
-    /* Status Badges */
-    .badge { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-block; }
-    .badge-pendente { background: #fef3c7; color: #92400e; }
-    .badge-pago { background: #d1fae5; color: #065f46; }
-    .badge-atrasado { background: #fee2e2; color: #991b1b; }
-    
-    /* Alert Boxes */
-    .alert { border-left: 4px solid; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
-    .alert-warning { border-color: #f59e0b; background: #fffbeb; }
-    .alert-danger { border-color: #ef4444; background: #fef2f2; }
-    .alert-success { border-color: #10b981; background: #ecfdf5; }
-    
-    /* Obra Select - Alto Contraste */
-    #obra-select {
-      background: #ffffff !important;
-      color: #0f172a !important;
-      border: 2px solid #cbd5e1 !important;
-      font-weight: 600 !important;
-      font-size: 14px !important;
-    }
-    #obra-select option {
-      color: #0f172a !important;
-      background: #ffffff !important;
-      padding: 8px !important;
-    }
-    #obra-select:focus {
-      outline: 2px solid #3b82f6 !important;
-      outline-offset: 2px;
-      border-color: #3b82f6 !important;
-    }
-    
-    .empty-state { text-align:center; padding:60px 20px; color:#94a3b8; }
-    .empty-state svg { width:80px; height:80px; margin:0 auto 20px; opacity:0.3; }
-    
-    /* Dark Mode Support */
-    [data-theme="dark"] { background:#0f172a; color:#f1f5f9; }
-    [data-theme="dark"] .card { background:#1e293b; box-shadow: 0 10px 24px rgba(0,0,0,.3); }
-    [data-theme="dark"] .input, [data-theme="dark"] .select { background:#334155; border-color:#475569; color:#f1f5f9; }
-    [data-theme="dark"] .table th { background:#1e293b; }
-    [data-theme="dark"] .muted { color:#94a3b8; }
-    
-    /* Loading Skeleton */
-    .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: loading 1.5s infinite; }
-    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    
-    /* Chart Containers */
-    .chart-container { position: relative; height: 300px; width: 100%; }
-    
-    /* Hover Effects */
-    .hover-card:hover { transform: translateY(-4px); transition: all 0.3s ease; box-shadow: 0 20px 40px rgba(15,23,42,.15); }
-    
-    /* Transitions */
-    * { transition: background-color 0.2s ease, border-color 0.2s ease; }
-  </style>
-</head>
-
-<body class="text-slate-800" data-theme="light">
-
-  <!-- Toast Container -->
-  <div id="toast-container" class="toast-container"></div>
-
-  <!-- LOGIN -->
-  <div id="login-screen" class="min-h-screen flex items-center justify-center p-6">
-    <div class="card p-8 max-w-md w-full text-center">
-      <div class="text-4xl font-black mb-2">🏗️ VG CONSTRUTORA</div>
-      <div class="text-slate-600 mb-8">Gestor de Obras - Sistema Completo</div>
-      
-      <button id="login-btn" class="btn btn-dark w-full mb-3 flex items-center justify-center gap-2">
-        <svg width="20" height="20" viewBox="0 0 48 48">
-          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-          <path fill="none" d="M0 0h48v48H0z"/>
-        </svg>
-        <span id="login-btn-text">Entrar com Google</span>
-      </button>
-      
-      <div id="login-msg" class="text-xs text-slate-500 mt-4 min-h-[16px]"></div>
-      
-      <button id="login-redirect-btn" class="hidden text-sm text-blue-600 hover:underline mt-2">
-        Método alternativo (redirect)
-      </button>
-      
-      <div id="debug-info" class="hidden mt-6 p-4 bg-slate-100 rounded text-left text-xs">
-        <div class="font-bold mb-2">Debug Info:</div>
-        <div id="debug-content" class="space-y-1"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MAIN APP -->
-  <div id="app" class="hidden min-h-screen pb-20">
-    
-    <!-- Header -->
-    <div class="bg-slate-900 text-white py-4 px-6 flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <div class="text-2xl font-black">🏗️ VG CONSTRUTORA</div>
-        <select id="obra-select" class="select text-sm" onchange="switchObra()">
-          <option value="">Carregando...</option>
-        </select>
-      </div>
-      <div class="flex items-center gap-4">
-        <button id="menu-obras" class="btn btn-soft text-sm">Obras</button>
-        <button id="menu-socios" class="btn btn-soft text-sm" onclick="window.gerenciarSocios()" title="Gerenciar Sócios (Admin)">👔 Sócios</button>
-        <button id="menu-unidades" class="btn btn-soft text-sm">Unidades</button>
-        <button id="menu-fornecedores" class="btn btn-soft text-sm">Fornecedores</button>
-        <button id="menu-categorias" class="btn btn-soft text-sm">Categorias</button>
-        <button id="theme-toggle" class="btn btn-soft text-sm" title="Alternar tema">🌙</button>
-        <button id="export-excel-btn" class="btn btn-green text-sm" title="Exportar Excel">📊 Excel</button>
-        <div id="user-email" class="text-sm muted"></div>
-        <button id="logout-btn" class="btn btn-danger text-sm">Sair</button>
-      </div>
-    </div>
-
-    <!-- Content -->
-    <div class="max-w-7xl mx-auto p-6">
-      
-      <!-- Alertas de Vencimento -->
-      <div id="alertas-vencimento"></div>
-      
-      <!-- View Selector -->
-      <div id="view-selector" class="flex gap-3 mb-6 flex-wrap">
-        <button class="btn btn-dark view-btn" data-view="OBRAS">🏗️ Obras</button>
-        <button class="btn btn-soft view-btn" data-view="BALANCO_GLOBAL">💼 Balanço Global</button>
-        <button class="btn btn-soft view-btn" data-view="DASHBOARD">📊 Dashboard</button>
-        <button class="btn btn-soft view-btn" data-view="LANCAMENTOS">💰 Lançamentos</button>
-        <button class="btn btn-soft view-btn" data-view="RATEIOS">⚖️ Rateios</button>
-        <button class="btn btn-soft view-btn" data-view="RECEBIMENTOS">💵 Recebimentos</button>
-        <button class="btn btn-soft view-btn" data-view="CONTAS_RECEBER">💰 Contas a Receber</button>
-        <button class="btn btn-soft view-btn" data-view="ACERTOS">🤝 Acertos Sócios</button>
-        <button class="btn btn-soft view-btn" data-view="CONFIG">⚙️ Config</button>
-      </div>
-
-      <!-- OBRAS VIEW (Dashboard Geral) -->
-      <div id="view-OBRAS" class="view-content">
-        <div class="card p-6 mb-6">
-          <div class="flex items-center justify-between mb-6">
-            <div>
-              <h2 class="font-black text-3xl text-gray-800 mb-2">🏗️ Visão Geral de Obras</h2>
-              <p class="text-gray-600">Gerencie todas as obras e veja a equalização global entre sócios</p>
-            </div>
-            <button id="criar-obra-btn" class="btn btn-green">+ Nova Obra</button>
-          </div>
-        </div>
-
-        <!-- Equalização Global -->
-        <div id="equalizacao-global" class="mb-6"></div>
-
-        <!-- Lista de Obras -->
-        <div id="obras-lista" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
-      </div>
-
-      <!-- BALANÇO GLOBAL VIEW -->
-      <div id="view-BALANCO_GLOBAL" class="view-content hidden">
-        <div class="card p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="font-black text-3xl mb-2">💼 Balanço Global por Sócio</h2>
-              <p class="text-gray-600">Consolidação de investimentos, custos e receitas de todas as obras</p>
-            </div>
-            <button onclick="migrarProprietariosParaIDs()" class="btn btn-blue">🔄 Migrar Sistema Antigo</button>
-          </div>
-          
-          <!-- Filtros de Período -->
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-            <div class="font-bold text-gray-800 mb-3">📅 Filtro de Período</div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div class="text-xs muted mb-1">Data Início</div>
-                <input id="balanco-data-inicio" type="date" class="input" onchange="renderBalancoGlobal()" />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Data Fim</div>
-                <input id="balanco-data-fim" type="date" class="input" onchange="renderBalancoGlobal()" />
-              </div>
-              <div class="flex items-end">
-                <button onclick="limparFiltrosBalanco()" class="btn btn-soft w-full">🔄 Limpar Filtros</button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Conteúdo dinâmico -->
-          <div id="balanco-global-content"></div>
-        </div>
-      </div>
-
-      <!-- DASHBOARD VIEW -->
-      <div id="view-DASHBOARD" class="view-content">
-        
-        <!-- Filtros Avançados -->
-        <div class="card p-4 mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div>
-              <div class="text-xs muted mb-1">Período</div>
-              <select id="filter-periodo" class="select text-sm" onchange="rerender()">
-                <option value="TODOS">Todos</option>
-                <option value="MES_ATUAL">Mês Atual</option>
-                <option value="MES_ANTERIOR">Mês Anterior</option>
-                <option value="TRIMESTRE">Último Trimestre</option>
-                <option value="ANO">Ano Atual</option>
-              </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Status</div>
-              <select id="filter-status" class="select text-sm" onchange="rerender()">
-                <option value="TODOS">Todos</option>
-                <option value="pendente">⏳ Pendente</option>
-                <option value="pago">✅ Pago</option>
-                <option value="atrasado">🚨 Atrasado</option>
-              </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Categoria</div>
-              <select id="filter-categoria" class="select text-sm" onchange="rerender()">
-                <option value="TODAS">Todas</option>
-              </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Fornecedor</div>
-              <select id="filter-fornecedor" class="select text-sm" onchange="rerender()">
-                <option value="TODOS">Todos</option>
-              </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Buscar</div>
-              <input id="filter-text" type="text" class="input text-sm" placeholder="Descrição..." oninput="rerender()" />
-            </div>
-          </div>
-          <button id="filters-clear" class="btn btn-soft text-sm mt-3">Limpar Filtros</button>
-        </div>
-
-        <!-- KPIs -->
-        <div id="kpis-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6"></div>
-        
-        <!-- Análise Financeira Detalhada por Sócio e Unidade -->
-        <div id="analise-detalhada"></div>
-        
-        <!-- Métricas de Rentabilidade -->
-        <div id="roi-section" class="mb-6"></div>
-        
-        <!-- Gráficos Interativos -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">📈 Evolução de Custos</div>
-            <div class="chart-container">
-              <canvas id="chart-custos-tempo"></canvas>
-            </div>
-          </div>
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">🥧 Distribuição por Categoria</div>
-            <div class="chart-container">
-              <canvas id="chart-categorias-pie"></canvas>
-            </div>
-          </div>
-        </div>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">💰 Fluxo de Caixa Projetado</div>
-            <div class="chart-container">
-              <canvas id="chart-fluxo-caixa"></canvas>
-            </div>
-          </div>
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">📊 ROI Comparativo</div>
-            <div class="chart-container">
-              <canvas id="chart-roi-bar"></canvas>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Custo por m² -->
-        <div id="custo-m2-section"></div>
-        
-        <!-- Analytics -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">🏆 Top 5 Categorias</div>
-            <div id="top-categorias"></div>
-          </div>
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">🛒 Top 5 Fornecedores</div>
-            <div id="top-fornecedores"></div>
-          </div>
-        </div>
-        
-        <!-- Lucro Previsto -->
-        <div class="card p-6 mt-6">
-          <div class="font-black text-lg mb-4">💎 Lucro Previsto por Sócio</div>
-          <div id="lucro-section"></div>
-        </div>
-
-        <!-- Equalização -->
-        <div class="card p-6 mt-6">
-          <div class="font-black text-lg mb-4">⚖️ Equalização entre Sócios</div>
-          <div id="equalizacao-section"></div>
-        </div>
-
-        <!-- Export -->
-        <div class="mt-6 text-center">
-          <button id="export-pdf-btn" class="btn btn-danger">📄 Exportar Dashboard PDF</button>
-        </div>
-      </div>
-
-      <!-- LANÇAMENTOS VIEW -->
-      <div id="view-LANCAMENTOS" class="view-content hidden">
-        <div class="card p-6 mb-6">
-          <div class="font-black text-lg mb-4">💰 Novo Lançamento</div>
-          <form id="lanc-form">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Data *</div>
-                <input id="lanc-data" type="date" class="input" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Data Vencimento</div>
-                <input id="lanc-vencimento" type="date" class="input" />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Data Competência</div>
-                <input id="lanc-competencia" type="date" class="input" />
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Unidade *</div>
-                <select id="lanc-unidade" class="select" required>
-                  <option value="">Selecione...</option>
-                </select>
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Categoria *</div>
-                <select id="lanc-categoria" class="select" required>
-                  <option value="">Selecione...</option>
-                </select>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Fornecedor *</div>
-                <select id="lanc-fornecedor" class="select" required>
-                  <option value="">Selecione...</option>
-                </select>
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Pagador (Sócio) *</div>
-                <select id="lanc-pagador" class="select" data-socio-select required>
-                  <!-- Populado dinamicamente -->
-                </select>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Valor * (R$)</div>
-                <input id="lanc-valor" type="number" step="0.01" class="input" placeholder="1000.00" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Status de Pagamento</div>
-                <select id="lanc-status" class="select">
-                  <option value="pendente">⏳ Pendente</option>
-                  <option value="pago">✅ Pago</option>
-                  <option value="atrasado">🚨 Atrasado</option>
-                </select>
-              </div>
-            </div>
-            
-            <div class="mb-4">
-              <div class="text-xs muted mb-1">Descrição *</div>
-              <input id="lanc-descricao" type="text" class="input" placeholder="Ex: Material elétrico..." required />
-            </div>
-            
-            <div class="mb-4">
-              <div class="text-xs muted mb-1">Link Comprovante (Google Drive)</div>
-              <input id="lanc-comprovante" type="url" class="input" placeholder="https://drive.google.com/file/d/..." />
-            </div>
-            
-            <div class="flex gap-3">
-              <button type="submit" class="btn btn-green">💾 Salvar Lançamento</button>
-              <button type="button" id="lanc-quick" class="btn btn-soft">⚡ Atalho: Transitório</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="card p-6">
-          <div class="font-black text-lg mb-4">📋 Lista de Lançamentos</div>
-          <div id="lanc-list" class="overflow-x-auto"></div>
-        </div>
-      </div>
-
-      <!-- RATEIOS VIEW -->
-      <div id="view-RATEIOS" class="view-content hidden">
-        <div class="card p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <div class="font-black text-lg">⚖️ Novo Rateio</div>
-              <div class="text-xs muted mt-1">Distribua custos entre múltiplas obras/unidades</div>
-            </div>
-            <button id="rat-igual-btn" class="btn btn-purple text-sm">⚡ Ratear Igualmente</button>
-          </div>
-          
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-              <div class="text-xs muted mb-1">Data *</div>
-              <input id="rat-data" type="date" class="input" required />
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Data Vencimento</div>
-              <input id="rat-vencimento" type="date" class="input" />
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Status</div>
-              <select id="rat-status" class="select">
-                <option value="pendente">⏳ Pendente</option>
-                <option value="pago">✅ Pago</option>
-                <option value="atrasado">🚨 Atrasado</option>
-              </select>
-            </div>
-          </div>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <div class="text-xs muted mb-1">Fornecedor *</div>
-              <select id="rat-fornecedor" class="select" required>
-                <option value="">Selecione...</option>
-              </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Categoria *</div>
-              <select id="rat-categoria" class="select" required>
-                <option value="">Selecione...</option>
-              </select>
-            </div>
-          </div>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <div class="text-xs muted mb-1">Descrição *</div>
-              <input id="rat-descricao" type="text" class="input" placeholder="Ex: Conta de luz" required />
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Valor Total * (R$)</div>
-              <input id="rat-valor-total" type="number" step="0.01" class="input" placeholder="1000.00" required />
-            </div>
-          </div>
-          
-          <div class="mb-4">
-            <div class="font-bold mb-2">Distribuição por Unidade:</div>
-            <div id="rat-dests" class="space-y-2"></div>
-            <button id="rat-add-dest" class="btn btn-soft text-sm mt-2">+ Adicionar Destino</button>
-          </div>
-          
-          <button id="rat-save" class="btn btn-green">💾 Salvar Rateio</button>
-        </div>
-
-        <div class="card p-6">
-          <div class="font-black text-lg mb-4">📋 Lista de Rateios</div>
-          <div id="rat-list"></div>
-        </div>
-      </div>
-
-      <!-- RECEBIMENTOS VIEW -->
-      <div id="view-RECEBIMENTOS" class="view-content hidden">
-        <div class="card p-6 mb-6">
-          <div class="font-black text-lg mb-4">💵 Novo Recebimento</div>
-          <form id="receb-form">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Data *</div>
-                <input id="receb-data" type="date" class="input" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Unidade *</div>
-                <select id="receb-unidade" class="select" required>
-                  <option value="">Selecione...</option>
-                </select>
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Tipo *</div>
-                <select id="receb-tipo" class="select" required>
-                  <option value="sinal">Sinal</option>
-                  <option value="parcela">Parcela</option>
-                  <option value="quitacao">Quitação</option>
-                  <option value="outro">Outro</option>
-                </select>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Valor (R$) *</div>
-                <input id="receb-valor" type="number" step="0.01" class="input" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Forma de Pagamento *</div>
-                <select id="receb-forma" class="select" required>
-                  <option value="dinheiro">Dinheiro</option>
-                  <option value="pix">PIX</option>
-                  <option value="transferencia">Transferência</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="financiamento">Financiamento</option>
-                </select>
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">👤 Recebido por *</div>
-                <select id="receb-recebido-por" class="select" data-socio-select required>
-                  <!-- Populado dinamicamente -->
-                </select>
-              </div>
-            </div>
-            
-            <div class="mb-4">
-              <div class="text-xs muted mb-1">Observações</div>
-              <textarea id="receb-obs" class="input" rows="2" placeholder="Ex: Sinal da venda, abater dívida do Gustavo..."></textarea>
-            </div>
-            
-            <button type="submit" class="btn btn-dark w-full">Adicionar Recebimento</button>
-          </form>
-        </div>
-
-        <div class="card p-6">
-          <div class="font-black text-lg mb-4">📋 Lista de Recebimentos</div>
-          <div id="receb-list"></div>
-        </div>
-      </div>
-
-      <!-- CONTAS A RECEBER VIEW -->
-      <div id="view-CONTAS_RECEBER" class="view-content hidden">
-        <div class="card p-6 mb-6">
-          <div class="flex items-center justify-between mb-6">
-            <div>
-              <h2 class="font-black text-2xl text-gray-800 mb-2">💰 Contas a Receber</h2>
-              <p class="text-sm text-gray-600">Valores vendidos/confirmados mas ainda não recebidos</p>
-            </div>
-            <button id="cr-create-btn" class="btn btn-green">+ Nova Conta a Receber</button>
-          </div>
-          
-          <div class="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-6">
-            <div class="font-bold text-blue-900 mb-2">💡 O que são Contas a Receber (CR)?</div>
-            <p class="text-blue-800 text-sm">
-              São valores de <strong>vendas confirmadas</strong> que ainda não viraram dinheiro. 
-              Por exemplo: você vendeu 30% de uma obra por R$ 10.000, mas ainda não recebeu o pagamento. 
-              Registre aqui para que o sistema considere esse valor futuro na equalização estratégica.
-            </p>
-          </div>
-          
-          <!-- Formulário de nova CR -->
-          <div id="cr-form-container" class="hidden">
-            <form id="cr-form" class="bg-gray-50 border border-gray-300 rounded-lg p-6 mb-6">
-              <div class="font-bold text-gray-800 mb-4">📝 Cadastrar Nova Conta a Receber</div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <div class="text-xs muted mb-1">Data Prevista *</div>
-                  <input id="cr-data" type="date" class="input" required />
-                </div>
-                <div>
-                  <div class="text-xs muted mb-1">Descrição *</div>
-                  <input id="cr-descricao" type="text" class="input" placeholder="Ex: Venda 30% - Unidade 1" required />
-                </div>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <div class="text-xs muted mb-1">Valor * (R$)</div>
-                  <input id="cr-valor" type="number" step="0.01" class="input" placeholder="10000.00" required />
-                </div>
-                <div>
-                  <div class="text-xs muted mb-1">Status *</div>
-                  <select id="cr-status" class="select" required>
-                    <option value="previsto">Previsto</option>
-                    <option value="confirmado">Confirmado</option>
-                    <option value="recebido">Recebido (baixado)</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div class="bg-yellow-50 border border-yellow-300 rounded p-4 mb-4">
-                <div class="font-bold text-yellow-900 mb-2">⚖️ Distribuição entre Sócios (50/50 padrão)</div>
-                <p class="text-xs text-yellow-800 mb-3">Por padrão, divide 50/50. Você pode ajustar se necessário.</p>
-                
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <div class="text-xs muted mb-1">Sócio A %</div>
-                    <input id="cr-percent-a" type="number" step="0.01" class="input" value="50" />
-                  </div>
-                  <div>
-                    <div class="text-xs muted mb-1">Sócio B %</div>
-                    <input id="cr-percent-b" type="number" step="0.01" class="input" value="50" />
-                  </div>
-                </div>
-              </div>
-              
-              <div class="flex gap-3">
-                <button type="submit" class="btn btn-dark">✅ Salvar Conta a Receber</button>
-                <button type="button" id="cr-cancel-btn" class="btn btn-soft">❌ Cancelar</button>
-              </div>
-            </form>
-          </div>
-          
-          <!-- Lista de CRs -->
-          <div id="cr-list"></div>
-        </div>
-      </div>
-
-      <!-- ACERTOS VIEW -->
-      <div id="view-ACERTOS" class="view-content hidden">
-        <div class="card p-6 mb-6">
-          <div class="font-black text-lg mb-4">🤝 Novo Acerto entre Sócios</div>
-          <form id="acerto-form">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Data *</div>
-                <input id="ac-data" type="date" class="input" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">De (Sócio) *</div>
-                <select id="ac-de" class="select" data-socio-select required>
-                  <!-- Populado dinamicamente -->
-                </select>
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Para (Sócio) *</div>
-                <select id="ac-para" class="select" data-socio-select required>
-                  <!-- Populado dinamicamente -->
-                </select>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Valor * (R$)</div>
-                <input id="ac-valor" type="number" step="0.01" class="input" placeholder="1000.00" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Descrição *</div>
-                <input id="ac-descricao" type="text" class="input" placeholder="Ex: Acerto mês 01/2026" required />
-              </div>
-            </div>
-            
-            <div class="flex gap-3">
-              <button type="submit" class="btn btn-green">💾 Salvar Acerto</button>
-              <button type="button" id="acerto-sugerir" class="btn btn-indigo">💡 Sugerir Equalização</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="card p-6">
-          <div class="font-black text-lg mb-4">📋 Histórico de Acertos</div>
-          <div id="acerto-list"></div>
-        </div>
-      </div>
-
-      <!-- CONFIG VIEW -->
-      <div id="view-CONFIG" class="view-content hidden">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">👥 Configurar Sócios</div>
-            <div class="mb-3">
-              <div class="text-xs muted mb-1">Nome Sócio A</div>
-              <input id="socio-a" type="text" class="input" placeholder="Ex: João" />
-            </div>
-            <div class="mb-3">
-              <div class="text-xs muted mb-1">Nome Sócio B</div>
-              <input id="socio-b" type="text" class="input" placeholder="Ex: Maria" />
-            </div>
-            <button id="socios-save" class="btn btn-green">💾 Salvar</button>
-          </div>
-
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">💸 Deduções de Lucro</div>
-            <div class="text-xs muted mb-3">Impostos, taxas e outras deduções que reduzem o lucro</div>
-            
-            <div class="space-y-2 mb-3">
-              <input id="ded-nome" type="text" class="input text-sm" placeholder="Ex: IR, INSS, Corretagem" />
-              
-              <div class="grid grid-cols-2 gap-2">
-                <select id="ded-tipo" class="input text-sm" onchange="toggleDeducaoBase()">
-                  <option value="percentual">Percentual (%)</option>
-                  <option value="fixo">Valor Fixo (R$)</option>
-                </select>
-                <select id="ded-base" class="input text-sm">
-                  <option value="lucro">Sobre Lucro Bruto</option>
-                  <option value="venda">Sobre Valor de Venda</option>
-                </select>
-              </div>
-              
-              <div class="grid grid-cols-12 gap-2">
-                <div class="col-span-10">
-                  <input id="ded-valor" type="number" step="0.01" class="input text-sm" placeholder="Ex: 15.00" />
-                </div>
-                <div class="col-span-2">
-                  <button id="ded-create" class="btn btn-dark w-full text-sm">+</button>
-                </div>
-              </div>
-            </div>
-            
-            <div id="ded-list" class="space-y-2 text-sm"></div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- MODALS -->
-  <div id="modal-obras" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <div class="font-black text-xl">🏗️ Obras</div>
-        <button data-close="modal-obras" class="btn btn-soft">Fechar</button>
-      </div>
-
-      <div class="space-y-3 mb-4">
-        <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-12">
-            <div class="text-xs muted mb-1">Nome da Obra</div>
-            <input id="obra-new-nome" class="input" placeholder="Ex: Obra Residencial X" />
-          </div>
-        </div>
-        
-        <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-6">
-            <div class="text-xs muted mb-1">📅 Data de Início</div>
-            <input id="obra-new-inicio" type="date" class="input" />
-            <div class="text-xs muted mt-1">Quando começou a construção</div>
-          </div>
-          <div class="col-span-6">
-            <div class="text-xs muted mb-1">📅 Data de Recebimento</div>
-            <input id="obra-new-recebimento" type="date" class="input" />
-            <div class="text-xs muted mt-1">Quando espera receber/vendeu</div>
-          </div>
-        </div>
-        
-        <div class="flex items-end">
-          <button id="obra-create" class="btn btn-dark w-full">Criar Obra</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Criar/Editar Obra -->
-  <div id="modal-obra" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <div class="font-black text-xl">🏗️ Nova Obra</div>
-        <button data-close="modal-obra" class="btn btn-soft">Fechar</button>
-      </div>
-
-      <!-- LISTA DE OBRAS EXISTENTES (TOPO) -->
-      <div class="mb-6 border-b pb-4">
-        <div class="font-bold mb-2 text-lg">📋 Obras Existentes:</div>
-        <div id="obras-list" class="space-y-2 max-h-[200px] overflow-y-auto" style="min-height: 50px; display: block !important; visibility: visible !important;"></div>
-      </div>
-
-      <!-- FORMULÁRIO CRIAR/EDITAR -->
-      <div class="font-bold mb-3 text-lg">➕ Criar Nova Obra</div>
-      <form id="obra-form" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <div class="text-xs muted mb-1">Nome da Obra *</div>
-            <input id="obra-nome" type="text" class="input" placeholder="Ex: Residencial Solar" required />
-          </div>
-          <div>
-            <div class="text-xs muted mb-1">Endereço</div>
-            <input id="obra-endereco" type="text" class="input" placeholder="QD 61 LT 32" />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <div class="text-xs muted mb-1">📅 Data de Início</div>
-            <input id="obra-data-inicio" type="date" class="input" />
-            <div class="text-xs text-gray-600 mt-1">Quando começou a construção</div>
-          </div>
-          <div>
-            <div class="text-xs muted mb-1">📅 Data de Recebimento</div>
-            <input id="obra-data-recebimento" type="date" class="input" />
-            <div class="text-xs text-gray-600 mt-1">Quando espera receber/vendeu</div>
-          </div>
-        </div>
-
-        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <div class="font-bold text-purple-900 mb-3">👔 Sócios da Obra</div>
-          <div class="text-xs text-purple-700 mb-3">⚠️ Selecione os sócios cadastrados. <a href="#" onclick="openModal('modal-socios'); return false;" class="underline font-bold">Cadastrar novo sócio</a></div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div class="text-xs muted mb-1">Sócio A</div>
-              <select id="obra-socio-a" class="input">
-                <option value="">Selecione o Sócio A</option>
-              </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Sócio B (Opcional)</div>
-              <select id="obra-socio-b" class="input">
-                <option value="">Nenhum (Obra individual)</option>
-              </select>
-            </div>
-          </div>
-          <div class="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded p-2 mt-3">
-            💡 <strong>Investimentos:</strong> Lance pagamentos como "Terreno", "Sinal", etc. usando o sistema de lançamentos. Evita duplicação e permite rastreamento correto.
-          </div>
-        </div>
-
-        <button id="obra-submit-btn" type="submit" class="btn btn-green w-full">Criar Obra</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal: Gestão de Sócios (ADMIN ONLY) -->
-  <div id="modal-socios" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <div class="font-black text-xl">👔 Gestão de Sócios</div>
-          <div class="text-sm text-gray-600 mt-1">Configure os sócios que participam dos projetos</div>
-        </div>
-        <button data-close="modal-socios" class="btn btn-soft">Fechar</button>
-      </div>
-
-      <!-- Adicionar Sócio -->
-      <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-        <div class="font-bold text-green-900 mb-3">➕ Adicionar Novo Sócio</div>
-        <form id="form-add-socio" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="md:col-span-2">
-            <div class="text-xs muted mb-1">Nome do Sócio</div>
-            <input id="add-socio-nome" type="text" class="input" placeholder="Ex: Victor Castro" required />
-          </div>
-          <div>
-            <div class="text-xs muted mb-1">&nbsp;</div>
-            <button type="submit" class="btn btn-green w-full">Adicionar</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Lista de Sócios -->
-      <div>
-        <div class="font-bold text-gray-800 mb-3">Sócios Cadastrados</div>
-        <div id="lista-socios" class="space-y-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Gestão de Usuários da Obra (ADMIN ONLY) -->
-  <div id="modal-usuarios" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <div class="font-black text-xl">👥 Gestão de Usuários</div>
-          <div class="text-sm text-gray-600 mt-1" id="modal-usuarios-obra-nome"></div>
-        </div>
-        <button data-close="modal-usuarios" class="btn btn-soft">Fechar</button>
-      </div>
-
-      <!-- Adicionar Usuário -->
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-        <div class="font-bold text-blue-900 mb-3">➕ Adicionar Usuário</div>
-        <form id="form-add-usuario" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div class="md:col-span-2">
-            <div class="text-xs muted mb-1">Email do Usuário</div>
-            <input id="add-usuario-email" type="email" class="input" placeholder="socio@exemplo.com" required />
-          </div>
-          <div>
-            <div class="text-xs muted mb-1">Sócio</div>
-            <select id="add-usuario-socio" class="input" data-socio-select required>
-              <option value="">Selecione...</option>
-              <!-- Populado dinamicamente com sócios cadastrados -->
-            </select>
-          </div>
-          <div>
-            <div class="text-xs muted mb-1">&nbsp;</div>
-            <button type="submit" class="btn btn-green w-full">Adicionar</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Lista de Usuários -->
-      <div>
-        <div class="font-bold text-gray-800 mb-3">Usuários com Acesso</div>
-        <div id="lista-usuarios" class="space-y-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-unidades" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-3xl">
-      <div class="flex items-center justify-between mb-4">
-        <div class="font-black text-xl">🏠 Unidades (Casas)</div>
-        <button data-close="modal-unidades" class="btn btn-soft">Fechar</button>
-      </div>
-
-      <div class="space-y-3 mb-4">
-        <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-4">
-            <div class="text-xs muted mb-1">Nome</div>
-            <input id="unid-new-nome" class="input" placeholder="Ex: Casa A" />
-          </div>
-          <div class="col-span-2">
-            <div class="text-xs muted mb-1">Área (m²)</div>
-            <input id="unid-new-area" type="number" step="0.01" class="input" placeholder="120.00" />
-          </div>
-          <div class="col-span-3">
-            <div class="text-xs muted mb-1">Status</div>
-            <select id="unid-new-status" class="input">
-              <option value="disponivel">Disponível</option>
-              <option value="reservada">Reservada</option>
-              <option value="vendida">Vendida</option>
-            </select>
-          </div>
-          <div class="col-span-3">
-            <div class="text-xs muted mb-1">� Proprietário/Sócio</div>
-            <select id="unid-new-proprietario" class="input">
-              <option value="">Carregando sócios...</option>
-            </select>
-          </div>
-        </div>
-        
-        <div class="mb-3">
-          <div class="text-xs font-bold text-gray-700 mb-2">💰 Valores Financeiros</div>
-          <div class="grid grid-cols-12 gap-3">
-            <div class="col-span-6">
-              <div class="text-xs muted mb-1">VGV Previsto (R$) *</div>
-              <input id="unid-new-vgv" type="number" step="0.01" class="input" placeholder="450000.00" />
-              <div class="text-xs muted mt-1">Expectativa inicial de venda</div>
-            </div>
-            <div class="col-span-6">
-              <div class="text-xs muted mb-1">Valor Real de Venda (R$)</div>
-              <input id="unid-new-venda" type="number" step="0.01" class="input" placeholder="Preencha após vender" />
-              <div class="text-xs muted mt-1">Valor confirmado da negociação</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800">
-          💡 <strong>Proprietário:</strong> Indica em nome de quem a casa está registrada. Isso afeta a equalização:
-          custos e recebimentos seguem o proprietário.
-        </div>
-        
-        <button id="unid-create" class="btn btn-dark w-full">Criar Unidade</button>
-      </div>
-
-      <div>
-        <div class="font-bold mb-2">Lista de Unidades:</div>
-        <div id="unidades-list" class="space-y-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-fornecedores" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-3xl">
-      <div class="flex items-center justify-between mb-4">
-        <div class="font-black text-xl">🛒 Fornecedores</div>
-        <button data-close="modal-fornecedores" class="btn btn-soft">Fechar</button>
-      </div>
-
-      <div class="grid grid-cols-12 gap-3 mb-4">
-        <div class="col-span-4">
-          <div class="text-xs muted mb-1">Nome</div>
-          <input id="forn-nome" class="input" placeholder="Ex: Depósito X" />
-        </div>
-        <div class="col-span-3">
-          <div class="text-xs muted mb-1">Contato</div>
-          <input id="forn-contato" class="input" placeholder="(11) 99999-9999" />
-        </div>
-        <div class="col-span-3">
-          <div class="text-xs muted mb-1">CNPJ/CPF</div>
-          <input id="forn-doc" class="input" placeholder="Opcional" />
-        </div>
-        <div class="col-span-2 flex items-end">
-          <button id="forn-create" class="btn btn-dark w-full">+</button>
-        </div>
-      </div>
-
-      <div>
-        <div class="font-bold mb-2">Lista de Fornecedores:</div>
-        <div id="fornecedores-list" class="space-y-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-categorias" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-3xl">
-      <div class="flex items-center justify-between mb-4">
-        <div class="font-black text-xl">📂 Categorias</div>
-        <button data-close="modal-categorias" class="btn btn-soft">Fechar</button>
-      </div>
-
-      <div class="grid grid-cols-12 gap-3 mb-4">
-        <div class="col-span-5">
-          <div class="text-xs muted mb-1">Nome</div>
-          <input id="cat-nome" class="input" placeholder="Ex: Material Elétrico" />
-        </div>
-        <div class="col-span-3">
-          <div class="text-xs muted mb-1">Grupo</div>
-          <input id="cat-grupo" class="input" placeholder="Ex: Materiais" />
-        </div>
-        <div class="col-span-2">
-          <div class="text-xs muted mb-1">Cor</div>
-          <input id="cat-cor" type="color" class="input" value="#3b82f6" />
-        </div>
-        <div class="col-span-2 flex items-end">
-          <button id="cat-create" class="btn btn-dark w-full">+</button>
-        </div>
-      </div>
-
-      <div>
-        <div class="font-bold mb-2">Lista de Categorias:</div>
-        <div id="categorias-list" class="space-y-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <script type="module">
     // Firebase imports
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js");
     const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js");
@@ -1087,15 +13,6 @@
       messagingSenderId: "648174167866",
       appId: "1:648174167866:web:98fb10be18b73fcc7a9203"
     };
-
-    // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
-    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
-    console.log("%c🔨 BUILD: 638245c (2026-02-02 15:30 BRT)", "color: #22c55e; font-weight: bold; font-size: 16px;");
-    console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
-    console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
-    console.log("%c✓ FIXED: acertos automáticos com netting", "color: #10b981;");
-    console.log("%c✓ FIXED: vendors via CDN (sem 404s)", "color: #10b981;");
-    console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
 
     // Initialize
     console.log("🔥 Inicializando Firebase...");
@@ -1267,10 +184,7 @@
       rateios: [],
       recebimentos: [],
       acertos: [],
-      contasReceber: [],  // Nova: Contas a Receber (vendas confirmadas não recebidas)
-      config: {
-        socios: []  // Inicializar como array vazio
-      }
+      config: {}
     };
 
     const listeners = [];
@@ -1332,7 +246,6 @@
         rateiosCol: collection(db, "obras", obraId, "rateios"),
         recebimentosCol: collection(db, "obras", obraId, "recebimentos"),
         acertosCol: collection(db, "obras", obraId, "acertos"),
-        contasReceberCol: collection(db, "obras", obraId, "contasReceber"),  // Nova coleção para CR
         configDoc: doc(db, "obras", obraId, "config", "main")
       };
     }
@@ -1603,34 +516,6 @@
       listeners.push(onSnapshot(r, (snap) => {
         state.socios = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.nome.localeCompare(b.nome));
         console.log("👔 Sócios carregados:", state.socios.length);
-        
-        // Mapear sócios para estrutura A/B/C (manter compatibilidade)
-        // IMPORTANTE: priorizar firestoreId real, não socio.id que pode ter virado "A/B"
-        state.config.socios = state.socios.map((socio, index) => {
-          // Buscar o ID real do Firestore (não a letra A/B que pode estar em socio.id)
-          const firestoreId = socio.firestoreId || socio.firestoreID || socio.uid || socio.id;
-          
-          return {
-            id: String.fromCharCode(65 + index), // A, B, C...
-            nome: socio.nome,
-            firestoreId: firestoreId
-          };
-        });
-        
-        console.log("✓ Mapeamento de sócios (corrigido):", state.config.socios);
-        console.log("🔍 DIAGNÓSTICO - Testando resolve de IDs:");
-        if (state.config.socios.length > 0) {
-          state.config.socios.forEach(s => {
-            console.log(`  - Letra "${s.id}" → Nome: "${s.nome}" | FirestoreId: "${s.firestoreId}"`);
-            console.log(`    Teste por letra: "${socioNomePorQualquerId(s.id)}"`);
-            console.log(`    Teste por firestoreId: "${socioNomePorQualquerId(s.firestoreId)}"`);
-          });
-        }
-        
-        // Atualizar TODOS os selects de sócio
-        atualizarTodosSelectsDeSocio();
-        
-        // Manter funções legadas por compatibilidade
         hydrateSociosSelect();
         hydrateSociosObraSelect();
         hydrateProprietarioSelect();
@@ -1838,20 +723,11 @@
         scheduleRerender();
       }));
 
-      // 📊 Contas a Receber subscriber
-      listeners.push(onSnapshot(r.contasReceberCol, (snap) => {
-        state.contasReceber = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
-
       listeners.push(onSnapshot(r.configDoc, (snap) => {
         state.config = snap.exists() ? snap.data() : {};
         scheduleRerender();
       }));
 
-      // Atualizar selects de sócio quando trocar de obra
-      atualizarTodosSelectsDeSocio();
-      
       rerender();
     }
 
@@ -1896,7 +772,7 @@
 
       // Views que não precisam de OBRA_ID
       if (VIEW === "OBRAS") {
-        // View estática, não precisa renderização
+        renderObrasView();
         return;
       }
 
@@ -1929,8 +805,6 @@
         renderRateiosView();
       } else if (VIEW === "RECEBIMENTOS") {
         renderRecebimentosView();
-      } else if (VIEW === "CONTAS_RECEBER") {
-        renderContasReceberView();
       } else if (VIEW === "ACERTOS") {
         renderAcertosView();
       } else if (VIEW === "CONFIG") {
@@ -2028,495 +902,8 @@
       return rats;
     }
 
-    // ========== SISTEMA UNIVERSAL DE MAPEAMENTO DE SÓCIOS ==========
-    
-    // Busca sócio por ID (tenta em config.socios e socios)
-    function getSocioById(socioId) {
-      if (!socioId) return null;
-      if (!state) return null;
-      const socios = (state?.config?.socios || state?.socios || []);
-      return socios.find(s => String(s.id) === String(socioId)) || null;
-    }
-    
-    // Retorna nome do sócio ou fallback
-    function socioNome(socioId, fallback = null) {
-      const socio = getSocioById(socioId);
-      return socio?.nome || socio?.name || socio?.apelido || fallback || `Sócio ${socioId}`;
-    }
-    
-    // Retorna label formatado com nome e letra (ex: "Victor Castro (A)")
-    function socioLabel(socioId) {
-      const socio = getSocioById(socioId);
-      if (!socio) return `Sócio ${socioId}`;
-      
-      // Se existe mapeamento de letra em config.socios
-      const mapeado = (state?.config?.socios || []).find(s => s.firestoreId === socioId);
-      if (mapeado && mapeado.id) {
-        return `${socio.nome} (${mapeado.id})`;
-      }
-      
-      return socio.nome;
-    }
-    
-    // Resolve nome por QUALQUER ID - letra (A/B/C) OU firestoreId (PnOR7C...)
-    function socioNomePorQualquerId(valor) {
-      if (!valor) return "";
-      
-      const socios = state?.config?.socios || [];
-      if (socios.length === 0) {
-        console.warn("⚠️ socioNomePorQualquerId: config.socios está vazio");
-        return `Sócio •••${String(valor).slice(-4)}`;
-      }
-      
-      const v = String(valor);
-      
-      // 1) Se vier A/B/C... (busca por id de letra)
-      let socio = socios.find(s => String(s.id) === v);
-      if (socio?.nome) {
-        console.log(`✓ Encontrado por letra "${v}": ${socio.nome}`);
-        return socio.nome;
-      }
-      
-      // 2) Se vier firestoreId (PnOR7C..., yjjHz2i..., etc)
-      socio = socios.find(s => String(s.firestoreId) === v);
-      if (socio?.nome) {
-        console.log(`✓ Encontrado por firestoreId "${v}": ${socio.nome}`);
-        return socio.nome;
-      }
-      
-      // 3) Fallback: mascara sem poluir (últimos 4 chars)
-      console.warn(`⚠️ Não encontrado ID "${v}" em config.socios:`, socios);
-      return `Sócio •••${v.slice(-4)}`;
-    }
-    
-    // Resolve QUALQUER formato de ID para o canonical "A"/"B"/"C"
-    function resolveSocioCanonicalId(valor) {
-      if (!valor) return null;
-      const socios = state?.config?.socios || [];
-      
-      const v = String(valor);
-      
-      // Se já for A/B/C, retorna direto
-      if (v.length === 1 && v >= 'A' && v <= 'Z') {
-        return socios.some(s => s.id === v) ? v : null;
-      }
-      
-      // Se for firestoreId, busca e retorna a letra
-      const socio = socios.find(s => String(s.firestoreId) === v);
-      return socio ? socio.id : null;
-    }
-    
-    // Infere alocações de um recebimento (rateio 50/50 ou custom)
-    function inferirAlocacoesRecebimento(recebimento, obra) {
-      // Se já tem alocações explícitas, usar
-      if (recebimento.alocacoes && Array.isArray(recebimento.alocacoes)) {
-        return recebimento.alocacoes;
-      }
-      
-      // Inferir baseado na obra
-      const socioAId = resolveSocioCanonicalId(obra?.socioAId);
-      const socioBId = resolveSocioCanonicalId(obra?.socioBId);
-      
-      if (!socioAId) return [];
-      
-      const valor = recebimento.valor || 0;
-      
-      // Se obra tem só um sócio, tudo para ele
-      if (!socioBId) {
-        return [{ socioId: socioAId, valor: valor }];
-      }
-      
-      // Rateio 50/50 default (mesmo que recebidoPor seja só um)
-      const percentA = recebimento.percentualA || 50;
-      const percentB = recebimento.percentualB || 50;
-      
-      return [
-        { socioId: socioAId, valor: (percentA / 100) * valor },
-        { socioId: socioBId, valor: (percentB / 100) * valor }
-      ];
-    }
-    
-    // Preenche select com sócios da obra (função centralizada)
-    function preencherSelectSociosDaObra(selectEl, obra, opcoes = {}) {
-      if (!selectEl) return;
-      
-      const { incluirAmbos = true, incluirVazio = false } = opcoes;
-      const socioAId = obra?.socioAId;
-      const socioBId = obra?.socioBId;
-      
-      const valorAtual = selectEl.value;
-      const items = [];
-      
-      // Opção vazia
-      if (incluirVazio) {
-        items.push({ value: "", label: "Selecione..." });
-      }
-      
-      // Sócios da obra - VALUE CANÔNICO (A/B), LABEL com nome real
-      if (socioAId) items.push({ 
-        value: resolveSocioCanonicalId(socioAId) || "A",  // ✅ CANÔNICO
-        label: socioNomePorQualquerId(socioAId) 
-      });
-      if (socioBId) items.push({ 
-        value: resolveSocioCanonicalId(socioBId) || "B",  // ✅ CANÔNICO
-        label: socioNomePorQualquerId(socioBId) 
-      });
-      
-      // Opção Ambos - mostra nomes reais
-      if (incluirAmbos && socioAId && socioBId) {
-        items.push({
-          value: "AMBOS",
-          label: `Ambos (50/50) — ${socioNomePorQualquerId(socioAId)} + ${socioNomePorQualquerId(socioBId)}`
-        });
-      }
-      
-      // Renderizar
-      selectEl.innerHTML = items
-        .map(o => `<option value="${String(o.value)}">${escapeHtml(o.label)}</option>`)
-        .join("");
-      
-      // Restaurar valor se ainda existir
-      if (valorAtual && [...selectEl.options].some(opt => opt.value === valorAtual)) {
-        selectEl.value = valorAtual;
-      }
-    }
-    
-    // Atualiza TODOS os selects marcados com data-socio-select
-    function atualizarTodosSelectsDeSocio() {
-      if (!OBRA_ID) return;
-      
-      const obra = state.obras.find(o => o.id === OBRA_ID);
-      if (!obra) return;
-      
-      // Garantir que config.socios existe
-      if (!state.config || !state.config.socios || state.config.socios.length === 0) {
-        console.log("⚠️ atualizarTodosSelectsDeSocio: config.socios ainda não inicializado");
-        return;
-      }
-      
-      document.querySelectorAll("[data-socio-select]").forEach(sel => {
-        const incluirVazio = sel.id === 'add-usuario-socio' || sel.id === 'uni-proprietario' || sel.id === 'unid-new-proprietario';
-        const incluirAmbos = sel.id !== 'ac-de' && sel.id !== 'ac-para';
-        preencherSelectSociosDaObra(sel, obra, { incluirAmbos, incluirVazio });
-      });
-    }
-    
-    // Normaliza valores antigos ("Sócio A" → ID do socioA da obra)
-    function normalizarSocioValor(valor, obra) {
-      if (!valor) return valor;
-      
-      // Já é "AMBOS" normalizado
-      if (String(valor).toUpperCase() === "AMBOS") return "AMBOS";
-      
-      // Detecta "ambos" em português
-      if (String(valor).toLowerCase().includes("ambos")) return "AMBOS";
-      
-      // Extrai letra de "Sócio A" e mapeia para ID
-      const m = String(valor).match(/s[oó]cio\s*([A-Z])/i);
-      if (m && obra) {
-        const letra = m[1].toUpperCase();
-        if (letra === 'A') return obra.socioAId;
-        if (letra === 'B') return obra.socioBId;
-      }
-      
-      return valor; // Já é um ID
-    }
-
-    // Garante que state.config.socios está válido antes de renderizar
-    function garantirSociosMapeados() {
-      // Se config.socios está vazio mas temos socios, mapear
-      if ((!state.config?.socios || state.config.socios.length === 0) && state.socios.length > 0) {
-        console.log("🔄 Remapeando sócios antes de renderizar...");
-        
-        state.config.socios = state.socios.map((socio, index) => {
-          const firestoreId = socio.firestoreId || socio.firestoreID || socio.uid || socio.id;
-          
-          return {
-            id: String.fromCharCode(65 + index),
-            nome: socio.nome,
-            firestoreId: firestoreId
-          };
-        });
-        
-        console.log("✓ Remapeamento concluído:", state.config.socios);
-      }
-      
-      // Validar integridade: garantir que nenhum firestoreId seja "A" ou "B"
-      if (state.config?.socios) {
-        let temProblema = false;
-        state.config.socios.forEach(s => {
-          if (s.firestoreId && s.firestoreId.length === 1 && s.firestoreId >= 'A' && s.firestoreId <= 'Z') {
-            console.error(`❌ ERRO: firestoreId "${s.firestoreId}" é uma letra, não um ID real!`);
-            temProblema = true;
-          }
-        });
-        
-        if (temProblema) {
-          console.error("❌ state.config.socios está corrompido. Será necessário remapear do Firestore.");
-          // Forçar reload dos sócios
-          if (state.socios.length > 0) {
-            state.config.socios = state.socios.map((socio, index) => ({
-              id: String.fromCharCode(65 + index),
-              nome: socio.nome,
-              firestoreId: socio.id // Usar o ID do documento original
-            }));
-            console.log("✓ Remapeamento forçado concluído:", state.config.socios);
-          }
-        }
-      }
-    }
-
-    // ========================================
-    // 🌍 EQUALIZAÇÃO GLOBAL CONSOLIDADA
-    // ========================================
-
-    /**
-     * Calcula a posição financeira consolidada de cada sócio através de TODAS as obras.
-     * Retorna objeto com estrutura:
-     * {
-     *   socioId: {
-     *     nome: "Victor Castro",
-     *     caixaFisico: 10000,        // Total recebido fisicamente - pago fisicamente
-     *     direitoPorCompetencia: 5000, // Alocações 50/50 de recebimentos e custos
-     *     contasReceber: 10000,      // Valores vendidos confirmados mas não recebidos
-     *     totalConsolidado: 25000    // caixa + direito + CR
-     *   }
-     * }
-     */
-    async function calcularPosicaoGlobalConsolidada() {
-      const posicoes = {};
-
-      // Inicializar para cada sócio
-      state.socios.forEach(socio => {
-        posicoes[socio.id] = {
-          id: socio.id,
-          nome: socio.nome,
-          caixaFisico: 0,
-          direitoPorCompetencia: 0,
-          contasReceber: 0,
-          totalConsolidado: 0,
-          detalheCaixa: {
-            recebidoFisico: 0,
-            pagoFisico: 0
-          },
-          detalheDireito: {
-            receitaPorAlocacao: 0,
-            custoPorAlocacao: 0
-          }
-        };
-      });
-
-      // Iterar por TODAS as obras
-      for (const obra of state.obras) {
-        const obraId = obra.id;
-
-        try {
-          // 1) RECEBIMENTOS - Posição de CAIXA (quem recebeu fisicamente)
-          const recebimentosSnap = await getDocs(collection(db, "obras", obraId, "recebimentos"));
-          recebimentosSnap.forEach(doc => {
-            const rec = doc.data();
-            const recebidoPor = resolveSocioCanonicalId(rec.recebidoPor);
-            const valor = rec.valor || 0;
-
-            if (posicoes[recebidoPor]) {
-              posicoes[recebidoPor].detalheCaixa.recebidoFisico += valor;
-            }
-
-            // Posição de DIREITO (competência - alocações 50/50)
-            const alocacoes = inferirAlocacoesRecebimento(rec, obra);
-            alocacoes.forEach(aloc => {
-              const socioId = resolveSocioCanonicalId(aloc.socioId);
-              if (posicoes[socioId]) {
-                posicoes[socioId].detalheDireito.receitaPorAlocacao += aloc.valor;
-              }
-            });
-          });
-
-          // 2) LANÇAMENTOS (Custos) - Posição de CAIXA (quem pagou fisicamente)
-          const lancamentosSnap = await getDocs(collection(db, "obras", obraId, "lancamentos"));
-          lancamentosSnap.forEach(doc => {
-            const lanc = doc.data();
-            const pago = lanc.pago;
-            const valor = lanc.valor || 0;
-
-            // Custos por quem pagou (simplificação - pode melhorar com rateio)
-            // Por padrão vamos usar rateio 50/50 para custos também
-            const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
-            const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
-
-            if (pago) {
-              // Custo pago fisicamente
-              const pagoPor = resolveSocioCanonicalId(lanc.pagoPor || socioAId);
-              if (posicoes[pagoPor]) {
-                posicoes[pagoPor].detalheCaixa.pagoFisico += valor;
-              }
-            }
-
-            // Custos por competência (50/50 por padrão)
-            const rateios = lanc.rateios || [];
-            if (rateios.length > 0) {
-              rateios.forEach(rat => {
-                const socioId = resolveSocioCanonicalId(rat.socioId);
-                const valorRateio = rat.valor || 0;
-                if (posicoes[socioId]) {
-                  posicoes[socioId].detalheDireito.custoPorAlocacao += valorRateio;
-                }
-              });
-            } else {
-              // Rateio 50/50 default
-              const metade = valor / 2;
-              if (posicoes[socioAId]) posicoes[socioAId].detalheDireito.custoPorAlocacao += metade;
-              if (posicoes[socioBId]) posicoes[socioBId].detalheDireito.custoPorAlocacao += metade;
-            }
-          });
-
-          // 3) CONTAS A RECEBER - Valores vendidos confirmados mas não recebidos
-          const crSnap = await getDocs(collection(db, "obras", obraId, "contasReceber"));
-          crSnap.forEach(doc => {
-            const cr = doc.data();
-            if (cr.status !== 'recebido') {
-              const valor = cr.valor || 0;
-
-              // Distribuir CR conforme alocações (50/50 por padrão ou custom)
-              const alocacoes = cr.alocacoes || [];
-              if (alocacoes.length > 0) {
-                alocacoes.forEach(aloc => {
-                  const socioId = resolveSocioCanonicalId(aloc.socioId);
-                  if (posicoes[socioId]) {
-                    posicoes[socioId].contasReceber += aloc.valor;
-                  }
-                });
-              } else {
-                // 50/50 default
-                const metade = valor / 2;
-                const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
-                const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
-                if (posicoes[socioAId]) posicoes[socioAId].contasReceber += metade;
-                if (posicoes[socioBId]) posicoes[socioBId].contasReceber += metade;
-              }
-            }
-          });
-
-        } catch (err) {
-          console.error(`Erro ao processar obra ${obraId}:`, err);
-        }
-      }
-
-      // Calcular totais consolidados
-      Object.values(posicoes).forEach(pos => {
-        pos.caixaFisico = pos.detalheCaixa.recebidoFisico - pos.detalheCaixa.pagoFisico;
-        pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
-        pos.totalConsolidado = pos.caixaFisico + pos.direitoPorCompetencia + pos.contasReceber;
-      });
-
-      return posicoes;
-    }
-
-    /**
-     * Calcula a equalização global entre sócios (quem deve transferir para quem).
-     * Retorna dois modos:
-     * - modoA (Caixa): Equalizar apenas posição de caixa físico (curto prazo)
-     * - modoB (Estratégico): Equalizar caixa + contas a receber (visão futura)
-     */
-    async function calcularEqualizacaoGlobal() {
-      const posicoes = await calcularPosicaoGlobalConsolidada();
-      const socioIds = Object.keys(posicoes);
-
-      if (socioIds.length !== 2) {
-        return {
-          erro: 'Sistema suporta apenas 2 sócios no momento',
-          posicoes
-        };
-      }
-
-      const [socioA, socioB] = socioIds;
-      const posA = posicoes[socioA];
-      const posB = posicoes[socioB];
-
-      // MODO A: Equalização por Caixa (imediata)
-      const mediaCaixa = (posA.caixaFisico + posB.caixaFisico) / 2;
-      const saldoACaixa = posA.caixaFisico - mediaCaixa;
-      const saldoBCaixa = posB.caixaFisico - mediaCaixa;
-
-      let modoA = {
-        tipo: 'Caixa Físico',
-        descricao: 'Equalização imediata baseada em quem recebeu/pagou de fato',
-        mediaCaixa,
-        transferencia: null
-      };
-
-      if (Math.abs(saldoACaixa) > 0.01) {
-        if (saldoACaixa > 0) {
-          // A tem excesso de caixa, deve repassar para B
-          modoA.transferencia = {
-            de: socioA,
-            deNome: posA.nome,
-            para: socioB,
-            paraNome: posB.nome,
-            valor: Math.abs(saldoACaixa)
-          };
-        } else {
-          // B tem excesso de caixa, deve repassar para A
-          modoA.transferencia = {
-            de: socioB,
-            deNome: posB.nome,
-            para: socioA,
-            paraNome: posA.nome,
-            valor: Math.abs(saldoBCaixa)
-          };
-        }
-      }
-
-      // MODO B: Equalização Estratégica (Caixa + CR)
-      const totalA = posA.caixaFisico + posA.contasReceber;
-      const totalB = posB.caixaFisico + posB.contasReceber;
-      const mediaTotal = (totalA + totalB) / 2;
-      const saldoATotal = totalA - mediaTotal;
-      const saldoBTotal = totalB - mediaTotal;
-
-      let modoB = {
-        tipo: 'Caixa + Contas a Receber',
-        descricao: 'Equalização estratégica considerando valores a receber futuros',
-        mediaTotal,
-        transferencia: null
-      };
-
-      if (Math.abs(saldoATotal) > 0.01) {
-        if (saldoATotal > 0) {
-          // A tem excesso total, deve repassar para B
-          modoB.transferencia = {
-            de: socioA,
-            deNome: posA.nome,
-            para: socioB,
-            paraNome: posB.nome,
-            valor: Math.abs(saldoATotal)
-          };
-        } else {
-          // B tem excesso total, deve repassar para A
-          modoB.transferencia = {
-            de: socioB,
-            deNome: posB.nome,
-            para: socioA,
-            paraNome: posA.nome,
-            valor: Math.abs(saldoBTotal)
-          };
-        }
-      }
-
-      return {
-        posicoes,
-        modoA,
-        modoB,
-        diferenca: modoA.transferencia && modoB.transferencia 
-          ? Math.abs((modoA.transferencia.valor || 0) - (modoB.transferencia.valor || 0))
-          : 0
-      };
-    }
-
     // VIEW DE BALANÇO GLOBAL
     async function renderBalancoGlobal() {
-      garantirSociosMapeados(); // Garantir antes de processar
-      
       const container = $("balanco-global-content");
       if (!container) return;
       
@@ -2532,19 +919,20 @@
       state.socios.forEach(socio => {
         balancoPorSocio[socio.id] = {
           nome: socio.nome,
-          totalInvestido: 0,        // Custos pagos (CAIXA)
-          recebidoCaixa: 0,         // 💵 CAIXA: Quem recebeu fisicamente
-          direitoCompetencia: 0,    // 📋 DIREITO: Competência (50/50 ou %)
-          vgvPrevisto: 0,           // Valor geral de vendas previsto
-          vendasConfirmadas: 0,     // Vendas realmente fechadas
-          equalizacoes: [],         // Equalização por obra
-          obras: []                 // Detalhamento por obra
+          totalInvestido: 0,      // Custos pagos
+          totalRecebido: 0,        // Receitas recebidas
+          vgvPrevisto: 0,          // Valor geral de vendas previsto
+          vendasConfirmadas: 0,    // Vendas realmente fechadas
+          equalizacoes: [],        // Equalização por obra
+          obras: []                // Detalhamento por obra
         };
       });
 
       // Para cada obra, carregar dados e calcular
       for (const obra of state.obras) {
-        console.log(`🏗️ Processando obra: ${obra.nome}`);
+        // Aplicar filtro de data se existir
+        if (dataInicio && obra.dataInicio && obra.dataInicio < dataInicio) continue;
+        if (dataFim && obra.dataInicio && obra.dataInicio > dataFim) continue;
         
         const obraInfo = {
           nome: obra.nome,
@@ -2582,82 +970,9 @@
             const proprietarioId = unidade.proprietario;
             console.log(`    🏠 Unidade: ${unidade.nome}, Proprietário ID: ${proprietarioId}`);
             
-            // Se unidade não tem proprietário válido, processa lançamentos por percentuais
             if (!proprietarioId || !balancoPorSocio[proprietarioId]) {
-              console.log(`      ⚠️ Proprietário não encontrado - processando por percentuais`);
-              
-              // Buscar IDs dos sócios da obra
-              const socioAId = obra.socioAId;
-              const socioBId = obra.socioBId;
-              
-              if (!socioAId && !socioBId) {
-                console.log(`      ❌ Obra sem sócios vinculados, pulando unidade`);
-                return;
-              }
-              
-              // Processar lançamentos desta unidade
-              lancamentos.forEach(l => {
-                if (l.unidadeId === unidade.id) {
-                  const valor = l.valor || 0;
-                  const percentA = l.victorPercent || l.percentualA || 50;
-                  const percentB = l.gustavoPercent || l.percentualB || 50;
-                  
-                  const valorA = (percentA / 100) * valor;
-                  const valorB = (percentB / 100) * valor;
-                  
-                  console.log(`      💳 Lançamento R$ ${valor} (${l.descricao})`);
-                  
-                  if (socioAId && balancoPorSocio[socioAId]) {
-                    balancoPorSocio[socioAId].totalInvestido += valorA;
-                    console.log(`        👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
-                  }
-                  
-                  if (socioBId && balancoPorSocio[socioBId]) {
-                    balancoPorSocio[socioBId].totalInvestido += valorB;
-                    console.log(`        👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
-                  }
-                  
-                  obraInfo.custos += valor;
-                }
-              });
-              
-              // Processar recebimentos desta unidade
-              recebimentos.forEach(rec => {
-                if (rec.unidadeId === unidade.id) {
-                  const valor = rec.valor || 0;
-                  
-                  // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
-                  const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
-                  const recebidoPorCanonical = recebidoPorRaw;
-                  const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
-                  
-                  if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
-                    balancoPorSocio[recebidoPorFirestoreId].recebidoCaixa += valor;
-                    console.log(`      💵 CAIXA: ${balancoPorSocio[recebidoPorFirestoreId].nome} recebeu R$ ${valor.toFixed(2)}`);
-                  }
-                  
-                  // 📋 DIREITO (Competência): 50/50 ou percentual definido
-                  const percentA = rec.victorPercent || rec.percentualA || 50;
-                  const percentB = rec.gustavoPercent || rec.percentualB || 50;
-                  
-                  const valorA = (percentA / 100) * valor;
-                  const valorB = (percentB / 100) * valor;
-                  
-                  if (socioAId && balancoPorSocio[socioAId]) {
-                    balancoPorSocio[socioAId].direitoCompetencia += valorA;
-                    console.log(`      📋 DIREITO: ${balancoPorSocio[socioAId].nome} tem direito a R$ ${valorA.toFixed(2)} (${percentA}%)`);
-                  }
-                  
-                  if (socioBId && balancoPorSocio[socioBId]) {
-                    balancoPorSocio[socioBId].direitoCompetencia += valorB;
-                    console.log(`      📋 DIREITO: ${balancoPorSocio[socioBId].nome} tem direito a R$ ${valorB.toFixed(2)} (${percentB}%)`);
-                  }
-                  
-                  obraInfo.receitas += valor;
-                }
-              });
-              
-              return; // Pular processamento normal
+              console.log(`      ⚠️ Proprietário não encontrado ou inválido`);
+              return;
             }
 
             let custoUnidade = 0;
@@ -2685,33 +1000,8 @@
             // Receitas da unidade (recebimentos confirmados)
             recebimentos.forEach(rec => {
               if (rec.unidadeId === unidade.id) {
-                const valor = rec.valor || 0;
-                receitaUnidade += valor;
-                
-                console.log(`      💰 Recebimento: R$ ${valor} (Recebido por: ${rec.recebidoPor || 'N/A'})`);
-                
-                // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
-                const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
-                const recebidoPorCanonical = recebidoPorRaw;
-                const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
-                
-                if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
-                  balancoPorSocio[recebidoPorFirestoreId].recebidoCaixa += valor;
-                  console.log(`        💵 CAIXA: ${balancoPorSocio[recebidoPorFirestoreId].nome} recebeu fisicamente R$ ${valor.toFixed(2)}`);
-                }
-                
-                // 📋 DIREITO (Competência): alocações 50/50 ou customizadas
-                const alocacoes = inferirAlocacoesRecebimento(rec, obra);
-                alocacoes.forEach(aloc => {
-                  const canonicalId = resolveSocioCanonicalId(aloc.socioId);
-                  if (canonicalId) {
-                    const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
-                    if (socioFirestoreId && balancoPorSocio[socioFirestoreId]) {
-                      balancoPorSocio[socioFirestoreId].direitoCompetencia += aloc.valor;
-                      console.log(`        📋 DIREITO: ${balancoPorSocio[socioFirestoreId].nome} tem direito a R$ ${aloc.valor.toFixed(2)}`);
-                    }
-                  }
-                });
+                receitaUnidade += rec.valor || 0;
+                console.log(`      💰 Recebimento: R$ ${rec.valor}`);
               }
             });
 
@@ -2722,7 +1012,7 @@
             
             // Acumular no sócio
             balancoPorSocio[proprietarioId].totalInvestido += custoUnidade;
-            // ❌ REMOVIDO: totalRecebido (já processado em recebidoCaixa + direitoCompetencia)
+            balancoPorSocio[proprietarioId].totalRecebido += receitaUnidade;
             balancoPorSocio[proprietarioId].vgvPrevisto += vgvUnidade;
             balancoPorSocio[proprietarioId].vendasConfirmadas += receitaUnidade;
             
@@ -2731,97 +1021,17 @@
             obraInfo.vgv += vgvUnidade;
           });
 
-          // ✅ Processar lançamentos sem unidade vinculada (obra geral)
-          // Esses lançamentos precisam ser distribuídos entre os sócios baseado nos percentuais
-          const lancamentosSemUnidade = lancamentos.filter(l => !l.unidadeId);
-          console.log(`  🔄 ${lancamentosSemUnidade.length} lançamentos sem unidade (rateio por sócio)`);
-          
-          lancamentosSemUnidade.forEach(lanc => {
-            // Aplicar filtro de data no lançamento
-            if (dataInicio && lanc.data && lanc.data < dataInicio) return;
-            if (dataFim && lanc.data && lanc.data > dataFim) return;
-            
-            const valor = lanc.valor || 0;
-            console.log(`    💳 Lançamento geral: R$ ${valor} (${lanc.descricao})`);
-            
-            // Buscar IDs dos sócios da obra
-            const socioAId = obra.socioAId;
-            const socioBId = obra.socioBId;
-            
-            if (!socioAId && !socioBId) {
-              console.log(`      ⚠️ Obra sem sócios vinculados, ignorando lançamento`);
-              return;
-            }
-            
-            // Usar percentuais do lançamento ou 50/50 por padrão
-            const percentA = lanc.victorPercent || lanc.percentualA || 50;
-            const percentB = lanc.gustavoPercent || lanc.percentualB || 50;
-            
-            const valorA = (percentA / 100) * valor;
-            const valorB = (percentB / 100) * valor;
-            
-            if (socioAId && balancoPorSocio[socioAId]) {
-              balancoPorSocio[socioAId].totalInvestido += valorA;
-              console.log(`      👤 ${balancoPorSocio[socioAId].nome}: +R$ ${valorA.toFixed(2)} (${percentA}%)`);
-            }
-            
-            if (socioBId && balancoPorSocio[socioBId]) {
-              balancoPorSocio[socioBId].totalInvestido += valorB;
-              console.log(`      👤 ${balancoPorSocio[socioBId].nome}: +R$ ${valorB.toFixed(2)} (${percentB}%)`);
-            }
-            
-            obraInfo.custos += valor;
-          });
-
-          // ✅ Processar recebimentos sem unidade vinculada (sinais, vendas gerais)
-          const recebimentosSemUnidade = recebimentos.filter(r => !r.unidadeId);
-          console.log(`  💰 ${recebimentosSemUnidade.length} recebimentos sem unidade (rateio por sócio)`);
-          
-          recebimentosSemUnidade.forEach(receb => {
-            // Aplicar filtro de data no recebimento
-            if (dataInicio && receb.data && receb.data < dataInicio) return;
-            if (dataFim && receb.data && receb.data > dataFim) return;
-            
-            const valor = receb.valor || 0;
-            console.log(`    💵 Recebimento geral: R$ ${valor} (Recebido por: ${receb.recebidoPor || 'N/A'})`);
-            
-            // 💵 CAIXA: Quem recebeu fisicamente (normalizar para canônico)
-            const recebidoPorRaw = receb.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(receb.recebidoPor) || receb.recebidoPor);
-            const recebidoPorCanonical = recebidoPorRaw;
-            const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorCanonical)?.firestoreId;
-            
-            if (recebidoPorFirestoreId && balancoPorSocio[recebidoPorFirestoreId]) {
-              balancoPorSocio[recebidoPorFirestoreId].recebidoCaixa += valor;
-              console.log(`      💵 CAIXA: ${balancoPorSocio[recebidoPorFirestoreId].nome} recebeu R$ ${valor.toFixed(2)}`);
-            }
-            
-            // 📋 DIREITO (Competência): alocações 50/50 ou customizadas
-            const alocacoes = inferirAlocacoesRecebimento(receb, obra);
-            alocacoes.forEach(aloc => {
-              const canonicalId = resolveSocioCanonicalId(aloc.socioId);
-              if (canonicalId) {
-                const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
-                if (socioFirestoreId && balancoPorSocio[socioFirestoreId]) {
-                  balancoPorSocio[socioFirestoreId].direitoCompetencia += aloc.valor;
-                  console.log(`      📋 DIREITO: ${balancoPorSocio[socioFirestoreId].nome} tem direito a R$ ${aloc.valor.toFixed(2)}`);
-                }
-              }
-            });
-            
-            obraInfo.receitas += valor;
-          });
-
           // ✅ MIGRAÇÃO: Adicionar investimentos iniciais da obra (sistema antigo)
           if (obra.investimentoA && obra.socioAId && balancoPorSocio[obra.socioAId]) {
             const investA = obra.investimentoA || 0;
-            console.log(`  💰 Investimento Inicial ${balancoPorSocio[obra.socioAId].nome}: R$ ${investA}`);
+            console.log(`  💰 Investimento Inicial Sócio A: R$ ${investA}`);
             balancoPorSocio[obra.socioAId].totalInvestido += investA;
             obraInfo.custos += investA;
           }
           
           if (obra.investimentoB && obra.socioBId && balancoPorSocio[obra.socioBId]) {
             const investB = obra.investimentoB || 0;
-            console.log(`  💰 Investimento Inicial ${balancoPorSocio[obra.socioBId].nome}: R$ ${investB}`);
+            console.log(`  💰 Investimento Inicial Sócio B: R$ ${investB}`);
             balancoPorSocio[obra.socioBId].totalInvestido += investB;
             obraInfo.custos += investB;
           }
@@ -2850,7 +1060,7 @@
         return;
       }
       
-      // Calcular acertos consolidados (baseado em CAIXA - DIREITO)
+      // Calcular acertos consolidados
       const acertosConsolidados = [];
       if (state.socios.length >= 2) {
         for (let i = 0; i < state.socios.length; i++) {
@@ -2860,36 +1070,35 @@
             const dadosA = balancoPorSocio[socioA.id];
             const dadosB = balancoPorSocio[socioB.id];
             
-            // 💵 Acerto = RecebidoCaixa - DireitoCompetencia
-            const acertoA = dadosA.recebidoCaixa - dadosA.direitoCompetencia;
-            const acertoB = dadosB.recebidoCaixa - dadosB.direitoCompetencia;
+            const investidoA = dadosA.totalInvestido;
+            const investidoB = dadosB.totalInvestido;
+            const totalInvestido = investidoA + investidoB;
+            const deveriaInvestirCada = totalInvestido / 2;
+            const diferencaA = investidoA - deveriaInvestirCada;
+            const diferencaB = investidoB - deveriaInvestirCada;
             
             let acertoValor = 0;
             let pagador = '';
             let recebedor = '';
             
-            // Quem tem acerto positivo (recebeu mais que o direito) deve repassar
-            if (acertoA > 0.01) {
-              acertoValor = Math.abs(acertoA);
-              pagador = socioA.nome; // A recebeu mais, deve repassar
-              recebedor = socioB.nome; // B tem direito a receber
-            } else if (acertoB > 0.01) {
-              acertoValor = Math.abs(acertoB);
-              pagador = socioB.nome; // B recebeu mais, deve repassar
-              recebedor = socioA.nome; // A tem direito a receber
+            if (diferencaA > 0) {
+              acertoValor = diferencaA;
+              recebedor = socioA.nome;
+              pagador = socioB.nome;
+            } else if (diferencaB > 0) {
+              acertoValor = diferencaB;
+              recebedor = socioB.nome;
+              pagador = socioA.nome;
             }
             
-            if (acertoValor > 0.01) {
+            if (acertoValor > 0) {
               acertosConsolidados.push({
                 pagador,
                 recebedor,
                 valor: acertoValor,
-                recebidoCaixaA: dadosA.recebidoCaixa,
-                recebidoCaixaB: dadosB.recebidoCaixa,
-                direitoA: dadosA.direitoCompetencia,
-                direitoB: dadosB.direitoCompetencia,
-                acertoA,
-                acertoB,
+                investidoA,
+                investidoB,
+                deveriaInvestirCada,
                 socioANome: socioA.nome,
                 socioBNome: socioB.nome
               });
@@ -2904,22 +1113,11 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           ${state.socios.map(socio => {
             const dados = balancoPorSocio[socio.id];
+            const saldoAtual = dados.totalRecebido - dados.totalInvestido;
             
-            // 🎯 CÁLCULO DO ACERTO: RecebidoCaixa - DireitoCompetência
-            const acertoNecessario = dados.recebidoCaixa - dados.direitoCompetencia;
-            const deveRepassar = acertoNecessario > 0; // Recebeu mais que o direito
-            const temAReceber = acertoNecessario < 0; // Recebeu menos que o direito
-            
-            // Saldo considerando custos também
-            const saldoFinal = (dados.recebidoCaixa + dados.direitoCompetencia) / 2 - dados.totalInvestido;
-            
-            // Determinar status
-            const statusLabel = deveRepassar ? 'Deve Repassar' : temAReceber ? 'Tem a Receber' : 'Equalizado';
-            const statusColor = temAReceber ? 'green' : deveRepassar ? 'orange' : 'gray';
-            
-            // ROI Real (baseado em direito de competência)
+            // ROI Real (baseado em receitas confirmadas)
             const roiReal = dados.totalInvestido > 0 
-              ? ((dados.direitoCompetencia - dados.totalInvestido) / dados.totalInvestido) * 100 
+              ? ((dados.totalRecebido - dados.totalInvestido) / dados.totalInvestido) * 100 
               : 0;
             
             // ROI Previsto (baseado no VGV previsto)
@@ -2935,10 +1133,12 @@
             const dataAtual = new Date().toLocaleDateString('pt-BR');
 
             return `
-              <div class="card p-6 border-l-4 ${temAReceber ? 'border-green-500' : deveRepassar ? 'border-orange-500' : 'border-gray-300'}">
+              <div class="card p-6 ${saldoAtual >= 0 ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'}">
                 <div class="flex items-center justify-between mb-4">
                   <h3 class="font-black text-2xl text-gray-800">👔 ${escapeHtml(socio.nome)}</h3>
-                  <span class="badge bg-${statusColor}-100 text-${statusColor}-800">${statusLabel}</span>
+                  ${saldoAtual >= 0 
+                    ? '<span class="badge bg-green-100 text-green-800">Credor</span>' 
+                    : '<span class="badge bg-red-100 text-red-800">Devedor</span>'}
                 </div>
                 
                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
@@ -2948,55 +1148,30 @@
                 
                 <div class="space-y-3 mb-6">
                   <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">💳 Total Investido (Custos):</span>
+                    <span class="text-sm text-gray-600">💳 Total Investido:</span>
                     <span class="font-bold text-red-600">R$ ${dados.totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                   </div>
                   
-                  <div class="border-t border-gray-200 pt-3">
-                    <div class="font-bold text-gray-800 mb-2">💰 Recebimentos:</div>
-                    
-                    <div class="bg-green-50 border border-green-200 rounded p-3 mb-2">
-                      <div class="flex justify-between items-center mb-1">
-                        <span class="text-sm text-green-800">💵 Recebido (Caixa):</span>
-                        <span class="font-black text-green-700 text-lg">R$ ${dados.recebidoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                      </div>
-                      <div class="text-xs text-green-600">Quem recebeu fisicamente</div>
-                    </div>
-                    
-                    <div class="bg-blue-50 border border-blue-200 rounded p-3">
-                      <div class="flex justify-between items-center mb-1">
-                        <span class="text-sm text-blue-800">📋 Direito (Competência):</span>
-                        <span class="font-black text-blue-700 text-lg">R$ ${dados.direitoCompetencia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                      </div>
-                      <div class="text-xs text-blue-600">Direito econômico (50/50 ou %)</div>
-                    </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">💰 Total Recebido:</span>
+                    <span class="font-bold text-green-600">R$ ${dados.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                   </div>
                   
-                  ${Math.abs(acertoNecessario) > 0.01 ? `
-                    <div class="border-t-2 border-${statusColor}-300 pt-3 mt-3">
-                      <div class="bg-${statusColor}-50 border-2 border-${statusColor}-400 rounded-lg p-4">
-                        <div class="font-bold text-${statusColor}-900 mb-2">
-                          ${deveRepassar ? '⚠️ Precisa Repassar:' : '✅ Tem a Receber:'}
-                        </div>
-                        <div class="text-3xl font-black text-${statusColor}-700">
-                          R$ ${Math.abs(acertoNecessario).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                        </div>
-                        <div class="text-xs text-${statusColor}-600 mt-2">
-                          ${deveRepassar 
-                            ? 'Recebeu em caixa mais que seu direito' 
-                            : 'Outro sócio recebeu valores que pertencem a você'}
-                        </div>
-                      </div>
+                  <div class="border-t-2 border-gray-300 pt-3 mt-3">
+                    <div class="flex justify-between items-center">
+                      <span class="font-bold text-gray-800">🎯 SALDO ATUAL:</span>
+                      <span class="text-2xl font-black ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${saldoAtual >= 0 ? '+' : ''}R$ ${Math.abs(saldoAtual).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
                     </div>
-                  ` : `
-                    <div class="border-t-2 border-gray-300 pt-3 mt-3">
-                      <div class="bg-gray-100 border border-gray-300 rounded-lg p-4 text-center">
-                        <div class="text-2xl mb-2">✅</div>
-                        <div class="font-bold text-gray-700">Caixa Equalizado</div>
-                        <div class="text-xs text-gray-600 mt-1">Recebido = Direito</div>
-                      </div>
+                    <div class="text-xs text-gray-500 mt-1 text-right">
+                      ${saldoAtual > 0 
+                        ? 'Tem a receber' 
+                        : saldoAtual < 0 
+                          ? 'Deve à sociedade' 
+                          : 'Equalizado'}
                     </div>
-                  `}
+                  </div>
                 </div>
                 
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -3046,88 +1221,55 @@
           }).join('')}
         </div>
         
-        <!-- 🌍 NOVA SEÇÃO: EQUALIZAÇÃO GLOBAL CONSOLIDADA -->
-        <div class="mt-8" id="equalizacao-global-section">
-          <div class="card p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-300">
-            <h2 class="font-black text-3xl mb-2 text-purple-900">🌍 Equalização Global Consolidada</h2>
-            <p class="text-sm text-gray-700 mb-6">Análise consolidada de TODAS as obras com diferentes modos de equalização</p>
-            
-            <div class="bg-white rounded-lg border border-purple-200 p-4 mb-6">
-              <button id="calcular-equalizacao-global" class="btn btn-dark w-full">
-                🔄 Calcular Equalização Global
-              </button>
-            </div>
-            
-            <div id="equalizacao-global-result" class="hidden">
-              <!-- Resultado será inserido aqui via JS -->
-            </div>
-          </div>
-        </div>
-        
         ${acertosConsolidados.length > 0 ? `
-          <div class="card p-6 mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-400">
-            <h3 class="font-black text-2xl mb-4 text-orange-900">💡 Acerto Sugerido Consolidado</h3>
-            <p class="text-sm text-gray-700 mb-4">Equalização baseada em <strong>Caixa vs. Direito</strong> (todas as obras)</p>
+          <div class="card p-6 mt-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300">
+            <h3 class="font-black text-2xl mb-4 text-blue-900">💡 Acerto Sugerido Consolidado</h3>
+            <p class="text-sm text-gray-700 mb-4">Equalização considerando TODAS as obras</p>
             
             ${acertosConsolidados.map(acerto => `
-              <div class="bg-white rounded-lg border-2 border-orange-500 p-6 mb-4">
+              <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-4">
                 <div class="flex items-center justify-between mb-4">
                   <div class="text-2xl font-black text-gray-800">
                     ${acerto.pagador} → ${acerto.recebedor}
                   </div>
-                  <div class="text-3xl font-black text-orange-600">
+                  <div class="text-3xl font-black text-blue-600">
                     R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                   </div>
                 </div>
                 
-                <div class="bg-orange-50 rounded-lg p-4 space-y-3 text-sm">
-                  <div class="font-bold text-orange-900 mb-3">📊 Como chegamos nesse valor:</div>
+                <div class="bg-blue-50 rounded-lg p-4 space-y-2 text-sm">
+                  <div class="font-bold text-blue-900 mb-2">📊 Cálculo detalhado:</div>
                   
-                  <!-- Sócio A -->
-                  <div class="bg-white border border-green-200 rounded p-3">
-                    <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">📋 Direito (50/50):</span>
-                      <span class="font-bold text-blue-600">R$ ${acerto.direitoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Diferença (Caixa - Direito):</span>
-                      <span class="font-black text-lg ${acerto.acertoA >= 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoA >= 0 ? '+' : ''}R$ ${acerto.acertoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">💳 ${acerto.socioANome} investiu:</span>
+                    <span class="font-bold text-red-600">R$ ${acerto.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                   </div>
                   
-                  <!-- Sócio B -->
-                  <div class="bg-white border border-green-200 rounded p-3">
-                    <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">📋 Direito (50/50):</span>
-                      <span class="font-bold text-blue-600">R$ ${acerto.direitoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Diferença (Caixa - Direito):</span>
-                      <span class="font-black text-lg ${acerto.acertoB >= 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoB >= 0 ? '+' : ''}R$ ${acerto.acertoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">💳 ${acerto.socioBNome} investiu:</span>
+                    <span class="font-bold text-red-600">R$ ${acerto.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                   </div>
                   
-                  <div class="bg-yellow-100 border border-yellow-400 rounded p-4 mt-3">
-                    <div class="font-bold text-yellow-900 mb-2">💡 Conclusão:</div>
+                  <div class="border-t border-blue-200 pt-2 mt-2"></div>
+                  
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">💰 Total investido (ambos):</span>
+                    <span class="font-bold text-purple-600">R$ ${(acerto.investidoA + acerto.investidoB).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  
+                  <div class="flex justify-between">
+                    <span class="text-gray-700">⚖️ Cada um deveria ter investido (50/50):</span>
+                    <span class="font-bold text-blue-600">R$ ${acerto.deveriaInvestirCada.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  
+                  <div class="border-t border-blue-200 pt-2 mt-2"></div>
+                  
+                  <div class="bg-yellow-100 border border-yellow-300 rounded p-3 mt-3">
+                    <div class="font-bold text-yellow-900 mb-1">💡 Como equalizar:</div>
                     <div class="text-yellow-800">
-                      <strong>${acerto.pagador}</strong> recebeu fisicamente mais do que seu direito econômico. 
-                      Para equalizar, deve transferir 
-                      <strong class="text-xl text-orange-700">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                      para <strong>${acerto.recebedor}</strong>.
+                      <strong>${acerto.pagador}</strong> deve transferir 
+                      <strong class="text-xl">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                      para <strong>${acerto.recebedor}</strong>
                     </div>
                   </div>
                 </div>
@@ -3146,253 +1288,6 @@
       `;
 
       container.innerHTML = html;
-      
-      // 🌍 Adicionar listener para botão de Equalização Global
-      const btnEqualizacao = $("calcular-equalizacao-global");
-      if (btnEqualizacao) {
-        btnEqualizacao.onclick = async () => {
-          btnEqualizacao.disabled = true;
-          btnEqualizacao.innerHTML = '<div class="loader inline-block mr-2"></div> Calculando...';
-          
-          try {
-            const resultado = await calcularEqualizacaoGlobal();
-            renderEqualizacaoGlobalResult(resultado);
-          } catch (err) {
-            console.error('Erro ao calcular equalização global:', err);
-            showToast('❌ Erro ao calcular equalização global', 'error');
-          } finally {
-            btnEqualizacao.disabled = false;
-            btnEqualizacao.innerHTML = '🔄 Recalcular Equalização Global';
-          }
-        };
-      }
-    }
-    
-    /**
-     * Renderiza o resultado da Equalização Global nos dois modos
-     */
-    function renderEqualizacaoGlobalResult(resultado) {
-      const container = $("equalizacao-global-result");
-      if (!container) return;
-      
-      if (resultado.erro) {
-        container.innerHTML = `
-          <div class="bg-red-50 border border-red-300 rounded-lg p-4 text-red-800">
-            ❌ ${resultado.erro}
-          </div>
-        `;
-        container.classList.remove("hidden");
-        return;
-      }
-      
-      const { posicoes, modoA, modoB, diferenca } = resultado;
-      
-      // Converter posicoes object para array
-      const posArray = Object.values(posicoes);
-      
-      let html = `
-        <!-- Resumo de Posições Consolidadas -->
-        <div class="bg-white rounded-lg border-2 border-purple-400 p-6 mb-6">
-          <h3 class="font-black text-xl mb-4 text-purple-900">📊 Posição Consolidada por Sócio</h3>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${posArray.map(pos => `
-              <div class="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-300 rounded-lg p-4">
-                <div class="font-black text-lg text-gray-800 mb-3">👤 ${escapeHtml(pos.nome)}</div>
-                
-                <div class="space-y-2 text-sm">
-                  <div class="bg-white rounded p-2">
-                    <div class="font-bold text-green-700 mb-1">💵 Caixa Físico</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Recebido:</span>
-                      <span class="font-bold text-green-600">+R$ ${pos.detalheCaixa.recebidoFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Pago:</span>
-                      <span class="font-bold text-red-600">-R$ ${pos.detalheCaixa.pagoFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-1 mt-1">
-                      <span class="font-bold">Saldo Caixa:</span>
-                      <span class="font-black text-lg ${pos.caixaFisico >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${pos.caixaFisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div class="bg-white rounded p-2">
-                    <div class="font-bold text-blue-700 mb-1">📋 Direito (Competência)</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Receita alocada:</span>
-                      <span class="font-bold text-green-600">+R$ ${pos.detalheDireito.receitaPorAlocacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Custo alocado:</span>
-                      <span class="font-bold text-red-600">-R$ ${pos.detalheDireito.custoPorAlocacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-1 mt-1">
-                      <span class="font-bold">Saldo Direito:</span>
-                      <span class="font-black text-lg ${pos.direitoPorCompetencia >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${pos.direitoPorCompetencia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div class="bg-yellow-50 border border-yellow-300 rounded p-2">
-                    <div class="font-bold text-yellow-800 mb-1">💰 Contas a Receber</div>
-                    <div class="text-2xl font-black text-yellow-700">
-                      R$ ${pos.contasReceber.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                    </div>
-                    <div class="text-xs text-yellow-600">Vendas confirmadas não recebidas</div>
-                  </div>
-                  
-                  <div class="bg-purple-100 border-2 border-purple-400 rounded p-2">
-                    <div class="font-bold text-purple-900 mb-1">🎯 Total Consolidado</div>
-                    <div class="text-2xl font-black text-purple-700">
-                      R$ ${pos.totalConsolidado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-        
-        <!-- Modo A: Caixa Puro -->
-        <div class="bg-white rounded-lg border-2 border-green-400 p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="font-black text-xl text-green-900">💵 MODO A: Equalização por Caixa (Imediata)</h3>
-              <p class="text-sm text-gray-600 mt-1">${modoA.descricao}</p>
-            </div>
-            <span class="badge bg-green-100 text-green-800 text-lg px-4 py-2">Curto Prazo</span>
-          </div>
-          
-          ${modoA.transferencia ? `
-            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-500 rounded-lg p-6">
-              <div class="flex items-center justify-between mb-4">
-                <div class="text-2xl font-black text-gray-800">
-                  ${escapeHtml(modoA.transferencia.deNome)} → ${escapeHtml(modoA.transferencia.paraNome)}
-                </div>
-                <div class="text-4xl font-black text-green-600">
-                  R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </div>
-              </div>
-              
-              <div class="bg-white rounded p-4 text-sm">
-                <div class="font-bold text-green-900 mb-2">📊 Explicação:</div>
-                <p class="text-gray-700">
-                  <strong>${escapeHtml(modoA.transferencia.deNome)}</strong> recebeu mais dinheiro fisicamente do que 
-                  <strong>${escapeHtml(modoA.transferencia.paraNome)}</strong>. Para equalizar o caixa entre os sócios, 
-                  é necessário transferir <strong class="text-green-600">R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                  AGORA.
-                </p>
-              </div>
-            </div>
-          ` : `
-            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
-              <div class="text-4xl mb-3">✅</div>
-              <div class="font-bold text-gray-800 text-xl">Caixa Equalizado!</div>
-              <p class="text-gray-600 mt-2">Ambos os sócios têm saldo de caixa equivalente.</p>
-            </div>
-          `}
-        </div>
-        
-        <!-- Modo B: Caixa + CR -->
-        <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="font-black text-xl text-blue-900">🎯 MODO B: Equalização Estratégica (Caixa + CR)</h3>
-              <p class="text-sm text-gray-600 mt-1">${modoB.descricao}</p>
-            </div>
-            <span class="badge bg-blue-100 text-blue-800 text-lg px-4 py-2">Visão Futura</span>
-          </div>
-          
-          ${modoB.transferencia ? `
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-500 rounded-lg p-6">
-              <div class="flex items-center justify-between mb-4">
-                <div class="text-2xl font-black text-gray-800">
-                  ${escapeHtml(modoB.transferencia.deNome)} → ${escapeHtml(modoB.transferencia.paraNome)}
-                </div>
-                <div class="text-4xl font-black text-blue-600">
-                  R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </div>
-              </div>
-              
-              <div class="bg-white rounded p-4 text-sm">
-                <div class="font-bold text-blue-900 mb-2">📊 Explicação:</div>
-                <p class="text-gray-700">
-                  Considerando <strong>caixa atual + valores a receber futuros</strong>, 
-                  <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> está com mais recursos consolidados. 
-                  Para equalizar a posição estratégica, deve transferir 
-                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>.
-                </p>
-                <p class="text-gray-600 mt-2 text-xs">
-                  💡 Este valor é menor que o Modo A porque considera receitas futuras que vão equilibrar naturalmente.
-                </p>
-              </div>
-            </div>
-          ` : `
-            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
-              <div class="text-4xl mb-3">✅</div>
-              <div class="font-bold text-gray-800 text-xl">Posição Estratégica Equalizada!</div>
-              <p class="text-gray-600 mt-2">Considerando valores futuros, não há necessidade de repasse imediato.</p>
-            </div>
-          `}
-        </div>
-        
-        <!-- Comparação entre Modos -->
-        ${modoA.transferencia && modoB.transferencia && diferenca > 0.01 ? `
-          <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg p-6">
-            <h3 class="font-black text-lg text-purple-900 mb-3">🔍 Comparação entre Modos</h3>
-            
-            <div class="bg-white rounded p-4">
-              <div class="flex justify-between items-center mb-4">
-                <span class="text-gray-700">Diferença entre modos:</span>
-                <span class="text-2xl font-black text-purple-600">
-                  R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </span>
-              </div>
-              
-              <div class="bg-yellow-50 border border-yellow-300 rounded p-3">
-                <div class="font-bold text-yellow-900 mb-2">💡 O que isso significa?</div>
-                <p class="text-yellow-800 text-sm">
-                  A diferença de <strong>R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                  representa o impacto das <strong>Contas a Receber</strong> na equalização. 
-                  Se vocês esperarem receber os valores pendentes, o repasse necessário diminui em aproximadamente esse montante.
-                </p>
-              </div>
-            </div>
-          </div>
-        ` : ''}
-        
-        <!-- Recomendações -->
-        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 rounded-lg p-6 mt-6">
-          <h3 class="font-black text-lg text-amber-900 mb-3">💡 Recomendações</h3>
-          
-          <div class="space-y-3 text-sm">
-            <div class="bg-white rounded p-3 border-l-4 border-green-500">
-              <div class="font-bold text-green-900">✅ Use o MODO A (Caixa) se:</div>
-              <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
-                <li>Precisam equalizar rapidamente</li>
-                <li>Um sócio está com fluxo de caixa apertado</li>
-                <li>Querem manter justiça imediata</li>
-              </ul>
-            </div>
-            
-            <div class="bg-white rounded p-3 border-l-4 border-blue-500">
-              <div class="font-bold text-blue-900">🎯 Use o MODO B (Estratégico) se:</div>
-              <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
-                <li>Têm valores confirmados a receber em breve</li>
-                <li>Querem evitar movimentações desnecessárias</li>
-                <li>Confiam que os recebimentos futuros vão equilibrar naturalmente</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      container.innerHTML = html;
-      container.classList.remove("hidden");
     }
     
     function limparFiltrosBalanco() {
@@ -3454,10 +1349,6 @@
         
         showToast(`✅ Migração concluída! ${totalMigrado} unidades atualizadas.`, 'success');
         
-        // Executar equalização final
-        showToast('🔄 Processando equalização de recebimentos...', 'info');
-        await finalizeMigracaoEqualizacao();
-        
         // Recarregar balanço
         setTimeout(() => {
           renderBalancoGlobal();
@@ -3466,77 +1357,6 @@
       } catch (err) {
         console.error('❌ Erro na migração:', err);
         showToast('❌ Erro ao migrar. Veja o console.', 'error');
-      }
-    };
-    
-    // Finaliza migração gerando acertos automáticos baseados em recebimentos
-    async function finalizeMigracaoEqualizacao() {
-      try {
-        let totalAcertosCriados = 0;
-        
-        for (const obra of state.obras) {
-          console.log(`🔄 Equalizando recebimentos da obra: ${obra.nome}`);
-          
-          // Carregar recebimentos
-          const recebimentosSnap = await getDocs(collection(db, "obras", obra.id, "recebimentos"));
-          const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          
-          // Carregar acertos existentes para evitar duplicação
-          const acertosSnap = await getDocs(collection(db, "obras", obra.id, "acertos"));
-          const acertosExistentes = acertosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          
-          // Para cada recebimento, verificar se precisa de acerto
-          for (const recebimento of recebimentos) {
-            // Pular se já foi processado (tem recebimentoOrigemId em algum acerto)
-            const jaProcessado = acertosExistentes.some(a => a.recebimentoOrigemId === recebimento.id);
-            if (jaProcessado) {
-              console.log(`  ⏭️ Recebimento ${recebimento.id} já processado`);
-              continue;
-            }
-            
-            // Inferir alocações
-            const alocacoes = inferirAlocacoesRecebimento(recebimento, obra);
-            const recebidoPorCanonical = resolveSocioCanonicalId(recebimento.recebidoPor);
-            
-            if (!recebidoPorCanonical || alocacoes.length === 0) continue;
-            
-            // Para cada sócio que tem direito mas NÃO recebeu
-            for (const aloc of alocacoes) {
-              const socioComDireito = resolveSocioCanonicalId(aloc.socioId);
-              
-              if (socioComDireito && socioComDireito !== recebidoPorCanonical && aloc.valor > 0) {
-                // Criar acerto pendente
-                const descricao = `Equalização migração: ${socioNomePorQualquerId(recebidoPorCanonical)} recebeu R$ ${recebimento.valor.toFixed(2)} mas R$ ${aloc.valor.toFixed(2)} pertence a ${socioNomePorQualquerId(socioComDireito)}`;
-                
-                await addDoc(collection(db, "obras", obra.id, "acertos"), {
-                  data: recebimento.data || new Date().toISOString().split('T')[0],
-                  de: recebidoPorCanonical,
-                  para: socioComDireito,
-                  valor: aloc.valor,
-                  descricao: descricao,
-                  status: 'pendente',
-                  recebimentoOrigemId: recebimento.id,
-                  migracaoAuto: true,
-                  createdAt: serverTimestamp(),
-                  createdBy: state.user?.email || 'sistema'
-                });
-                
-                totalAcertosCriados++;
-                console.log(`  ✅ Acerto criado: ${socioNomePorQualquerId(recebidoPorCanonical)} → ${socioNomePorQualquerId(socioComDireito)}: R$ ${aloc.valor.toFixed(2)}`);
-              }
-            }
-          }
-        }
-        
-        if (totalAcertosCriados > 0) {
-          showToast(`✅ ${totalAcertosCriados} acertos criados automaticamente`, 'success');
-        } else {
-          showToast('✅ Nenhum acerto pendente necessário', 'success');
-        }
-        
-      } catch (err) {
-        console.error('❌ Erro na equalização:', err);
-        showToast('⚠️ Erro ao processar equalização', 'warning');
       }
     }
 
@@ -3820,7 +1640,7 @@
         <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
           <div class="flex-1">
             <div class="font-bold text-gray-800">${escapeHtml(u.email)}</div>
-            <div class="text-sm text-gray-600">${escapeHtml(socioNomePorQualquerId(u.socioId))} • ${u.role || 'socio'}</div>
+            <div class="text-sm text-gray-600">${escapeHtml(socioNome)} • ${u.role || 'socio'}</div>
           </div>
           <button onclick="window.removerUsuario(${idx})" class="btn btn-danger text-sm">
             🗑️ Remover
@@ -3909,8 +1729,6 @@
 
     // DASHBOARD
     function renderDashboard() {
-      garantirSociosMapeados(); // Garantir antes de renderizar
-      
       renderAlertasVencimento();
       
       const lancs = getLancamentosFiltrados();
@@ -4089,9 +1907,8 @@
       const lucroPorSocio = lucroLiquidoReal / 2;
       const roiPorSocio = investimentoPorSocio > 0 ? ((lucroPorSocio / investimentoPorSocio) * 100) : 0;
 
-      // Buscar nomes reais dos sócios da obra (obra já foi declarado no início da função)
-      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
 
       const html = `
         <div class="card p-6">
@@ -4546,9 +2363,9 @@
     }
 
     function renderAnaliseDetalhada(lancs, rats) {
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
       const obra = state.obras.find(o => o.id === OBRA_ID);
-      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
 
       // Verificar permissões
       const meuSocioId = getSocioIdForUser(OBRA_ID);
@@ -5055,9 +2872,8 @@
     }
 
     function renderLucroSection(lucroData) {
-      const obra = state.obras.find(o => o.id === OBRA_ID);
-      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
 
       let html = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -5590,8 +3406,6 @@
 
     // RECEBIMENTOS VIEW
     function renderRecebimentosView() {
-      garantirSociosMapeados(); // Garantir antes de renderizar
-      
       // Hydrate unidade select
       const unidSel = $("receb-unidade");
       unidSel.innerHTML = '<option value="">Selecione...</option>' +
@@ -5607,7 +3421,6 @@
         return;
       }
 
-      const obra = state.obras.find(o => o.id === OBRA_ID);
       const sorted = [...state.recebimentos].sort((a, b) => 
         new Date(b.data || 0) - new Date(a.data || 0)
       );
@@ -5635,14 +3448,11 @@
                 quitacao: '✅ Quitação',
                 outro: '📝 Outro'
               };
-              
-              // Resolver nome do sócio que recebeu - funciona com letra (A/B) ou firestoreId
-              const recebidoPorId = normalizarSocioValor(r.recebidoPor, obra);
-              let recebidoPorLabel = '👥 Ambos';
-              if (recebidoPorId && recebidoPorId !== 'AMBOS') {
-                recebidoPorLabel = `👤 ${socioNomePorQualquerId(recebidoPorId)}`;
-              }
-              
+              const recebidoLabels = {
+                A: '👤 Sócio A',
+                B: '👤 Sócio B',
+                ambos: '👥 50/50'
+              };
               return `
                 <tr>
                   <td>${new Date(r.data).toLocaleDateString('pt-BR')}</td>
@@ -5650,7 +3460,7 @@
                   <td>${tipoLabels[r.tipo] || r.tipo}</td>
                   <td class="font-bold ok">R$ ${r.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td>${escapeHtml(r.formaPagamento || 'N/A')}</td>
-                  <td><span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">${recebidoPorLabel}</span></td>
+                  <td><span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">${recebidoLabels[r.recebidoPor || 'ambos']}</span></td>
                   <td class="text-xs muted">${escapeHtml(r.observacoes || '-')}</td>
                   <td>
                     <button onclick="window.deleteRecebimento('${r.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
@@ -5671,218 +3481,21 @@
       container.innerHTML = html;
     }
 
-    // CONTAS A RECEBER VIEW
-    function renderContasReceberView() {
-      garantirSociosMapeados();
-      renderContasReceberList();
-      
-      // Handlers
-      const btnCreate = $("cr-create-btn");
-      const btnCancel = $("cr-cancel-btn");
-      const formContainer = $("cr-form-container");
-      const form = $("cr-form");
-      
-      if (btnCreate) {
-        btnCreate.onclick = () => {
-          formContainer.classList.remove("hidden");
-          $("cr-data").value = new Date().toISOString().split('T')[0];
-        };
-      }
-      
-      if (btnCancel) {
-        btnCancel.onclick = () => {
-          formContainer.classList.add("hidden");
-          form.reset();
-        };
-      }
-      
-      if (form) {
-        form.onsubmit = async (e) => {
-          e.preventDefault();
-          
-          const data = $("cr-data").value;
-          const descricao = $("cr-descricao").value.trim();
-          const valor = parseFloat($("cr-valor").value) || 0;
-          const status = $("cr-status").value;
-          const percentA = parseFloat($("cr-percent-a").value) || 50;
-          const percentB = parseFloat($("cr-percent-b").value) || 50;
-          
-          if (!data || !descricao || valor <= 0) {
-            showToast('Preencha todos os campos obrigatórios', 'warning');
-            return;
-          }
-          
-          if (Math.abs(percentA + percentB - 100) > 0.01) {
-            showToast('A soma dos percentuais deve ser 100%', 'warning');
-            return;
-          }
-          
-          try {
-            const obra = state.obras.find(o => o.id === OBRA_ID);
-            const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
-            const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
-            
-            const alocacoes = [
-              { socioId: socioAId, valor: (percentA / 100) * valor },
-              { socioId: socioBId, valor: (percentB / 100) * valor }
-            ];
-            
-            await addDoc(refs(OBRA_ID).contasReceberCol, {
-              data,
-              descricao,
-              valor,
-              status,
-              alocacoes,
-              createdAt: serverTimestamp(),
-              createdBy: state.user.email
-            });
-            
-            showToast('✅ Conta a Receber cadastrada!', 'success');
-            formContainer.classList.add("hidden");
-            form.reset();
-          } catch (err) {
-            console.error(err);
-            showToast('❌ Erro ao cadastrar', 'error');
-          }
-        };
-      }
-    }
-    
-    function renderContasReceberList() {
-      const container = $("cr-list");
-      if (!container) return;
-      
-      if (state.contasReceber.length === 0) {
-        container.innerHTML = '<p class="text-center muted py-8">Nenhuma Conta a Receber cadastrada</p>';
-        return;
-      }
-      
-      // Calcular totais
-      const totalPrevisto = state.contasReceber.filter(cr => cr.status === 'previsto').reduce((sum, cr) => sum + (cr.valor || 0), 0);
-      const totalConfirmado = state.contasReceber.filter(cr => cr.status === 'confirmado').reduce((sum, cr) => sum + (cr.valor || 0), 0);
-      const totalRecebido = state.contasReceber.filter(cr => cr.status === 'recebido').reduce((sum, cr) => sum + (cr.valor || 0), 0);
-      
-      let html = `
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div class="card p-4 bg-yellow-50 border-yellow-300">
-            <div class="text-sm text-yellow-700 mb-1">⏳ Previsto</div>
-            <div class="text-2xl font-black text-yellow-800">R$ ${totalPrevisto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-          </div>
-          <div class="card p-4 bg-blue-50 border-blue-300">
-            <div class="text-sm text-blue-700 mb-1">✅ Confirmado</div>
-            <div class="text-2xl font-black text-blue-800">R$ ${totalConfirmado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-          </div>
-          <div class="card p-4 bg-green-50 border-green-300">
-            <div class="text-sm text-green-700 mb-1">💰 Recebido</div>
-            <div class="text-2xl font-black text-green-800">R$ ${totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-          </div>
-        </div>
-        
-        <div class="space-y-3">
-          ${state.contasReceber.map(cr => {
-            const statusColors = {
-              previsto: 'yellow',
-              confirmado: 'blue',
-              recebido: 'green'
-            };
-            const statusLabels = {
-              previsto: '⏳ Previsto',
-              confirmado: '✅ Confirmado',
-              recebido: '💰 Recebido'
-            };
-            const color = statusColors[cr.status] || 'gray';
-            const label = statusLabels[cr.status] || cr.status;
-            
-            const alocacoesHtml = (cr.alocacoes || []).map(aloc => {
-              const nome = socioNomePorQualquerId(aloc.socioId);
-              const percent = (aloc.valor / cr.valor * 100).toFixed(1);
-              return `${nome}: R$ ${aloc.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${percent}%)`;
-            }).join(' | ');
-            
-            return `
-              <div class="card p-4 border-l-4 border-${color}-500 hover:shadow-lg transition-shadow">
-                <div class="flex items-center justify-between mb-3">
-                  <div class="flex-1">
-                    <div class="font-bold text-gray-800">${escapeHtml(cr.descricao)}</div>
-                    <div class="text-sm text-gray-600 mt-1">📅 ${new Date(cr.data).toLocaleDateString('pt-BR')}</div>
-                  </div>
-                  <div class="text-right">
-                    <div class="text-2xl font-black text-${color}-600">R$ ${(cr.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                    <span class="badge bg-${color}-100 text-${color}-800">${label}</span>
-                  </div>
-                </div>
-                
-                ${alocacoesHtml ? `
-                  <div class="bg-gray-50 rounded p-2 text-xs text-gray-700 mt-2">
-                    <strong>Distribuição:</strong> ${alocacoesHtml}
-                  </div>
-                ` : ''}
-                
-                <div class="flex gap-2 mt-3">
-                  ${cr.status !== 'recebido' ? `
-                    <button onclick="baixarContaReceber('${cr.id}')" class="btn btn-sm btn-green">
-                      ✅ Marcar como Recebido
-                    </button>
-                  ` : ''}
-                  <button onclick="editarContaReceber('${cr.id}')" class="btn btn-sm btn-soft">
-                    ✏️ Editar
-                  </button>
-                  <button onclick="deletarContaReceber('${cr.id}')" class="btn btn-sm btn-soft text-red-600">
-                    🗑️ Excluir
-                  </button>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      `;
-      
-      container.innerHTML = html;
-    }
-    
-    // Funções auxiliares para CR
-    window.baixarContaReceber = async function(crId) {
-      if (!confirm('Marcar esta Conta a Receber como recebida?\n\nIsso atualizará o status para "Recebido".')) {
-        return;
-      }
-      
-      try {
-        await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId), {
-          status: 'recebido',
-          dataRecebimento: new Date().toISOString().split('T')[0]
-        });
-        
-        showToast('✅ Conta a Receber baixada!', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('❌ Erro ao baixar CR', 'error');
-      }
-    };
-    
-    window.editarContaReceber = async function(crId) {
-      // Implementação simplificada - pode melhorar depois
-      showToast('💡 Funcionalidade de edição em desenvolvimento', 'info');
-    };
-    
-    window.deletarContaReceber = async function(crId) {
-      if (!confirm('Tem certeza que deseja excluir esta Conta a Receber?')) {
-        return;
-      }
-      
-      try {
-        await deleteDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId));
-        showToast('✅ Conta a Receber excluída!', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('❌ Erro ao excluir', 'error');
-      }
-    };
-
     // ACERTOS VIEW
     function renderAcertosView() {
-      garantirSociosMapeados(); // Garantir antes de renderizar
-      
-      // Acertos são preenchidos dinamicamente com os sócios da obra via data-socio-select
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
+
+      $("ac-de").innerHTML = `
+        <option value="A">${escapeHtml(socioA)}</option>
+        <option value="B">${escapeHtml(socioB)}</option>
+      `;
+
+      $("ac-para").innerHTML = `
+        <option value="A">${escapeHtml(socioA)}</option>
+        <option value="B">${escapeHtml(socioB)}</option>
+      `;
+
       renderAcertosList();
     }
 
@@ -5893,8 +3506,9 @@
         return;
       }
 
-      const obra = state.obras.find(o => o.id === OBRA_ID);
-      
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
+
       const html = `
         <table class="table w-full">
           <thead>
@@ -5908,23 +3522,18 @@
             </tr>
           </thead>
           <tbody>
-            ${state.acertos.map(a => {
-              const deId = normalizarSocioValor(a.de, obra);
-              const paraId = normalizarSocioValor(a.para, obra);
-              
-              return `
+            ${state.acertos.map(a => `
               <tr>
                 <td>${new Date(a.data).toLocaleDateString('pt-BR')}</td>
-                <td>${escapeHtml(socioNomePorQualquerId(deId))}</td>
-                <td>${escapeHtml(socioNomePorQualquerId(paraId))}</td>
+                <td>${escapeHtml(a.de === 'A' ? socioA : socioB)}</td>
+                <td>${escapeHtml(a.para === 'A' ? socioA : socioB)}</td>
                 <td class="font-bold">R$ ${a.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>${escapeHtml(a.descricao)}</td>
                 <td>
                   <button onclick="window.deleteAcerto('${a.id}')" class="text-red-600 hover:underline">🗑️</button>
                 </td>
               </tr>
-            `;
-            }).join('')}
+            `).join('')}
           </tbody>
         </table>
       `;
@@ -5934,19 +3543,8 @@
 
     // CONFIG VIEW
     function renderConfigView() {
-      // Sistema de sócios migrado para coleção global - estes campos são legacy
-      // Desabilitar campos para evitar confusão
-      const socioAInput = $("socio-a");
-      const socioBInput = $("socio-b");
-      
-      if (socioAInput) {
-        socioAInput.value = "Use o botão '👔 Sócios' no topo";
-        socioAInput.disabled = true;
-      }
-      if (socioBInput) {
-        socioBInput.value = "Use o botão '👔 Sócios' no topo";
-        socioBInput.disabled = true;
-      }
+      $("socio-a").value = state.config.socioA || "";
+      $("socio-b").value = state.config.socioB || "";
 
       renderDeducoesList();
     }
@@ -6310,12 +3908,6 @@
     }
 
     async function saveSocios() {
-      // Sistema migrado para coleção global de sócios
-      // Use o botão "👔 Sócios" no topo para gerenciar sócios
-      showToast('⚠️ Sistema migrado! Use o botão "👔 Sócios" no topo da tela', 'warning');
-      return;
-      
-      /* Código obsoleto - manter comentado por compatibilidade
       const socioA = $("socio-a").value.trim() || "Sócio A";
       const socioB = $("socio-b").value.trim() || "Sócio B";
 
@@ -6330,7 +3922,6 @@
         console.error(err);
         showToast('Erro ao salvar sócios', 'error');
       }
-      */
     }
 
     async function addLancamento(e) {
@@ -6526,113 +4117,6 @@
       }
     }
 
-    // Gera acerto automático quando recebimento precisa ser redistribuído
-    async function gerarAcertoAutomatico(recebimentoId, recebimento) {
-      try {
-        const obra = state.obras.find(o => o.id === OBRA_ID);
-        if (!obra) return;
-        
-        // Inferir alocações (quem tem DIREITO ao dinheiro)
-        const alocacoes = inferirAlocacoesRecebimento(recebimento, obra);
-        
-        // Descobrir quem recebeu FISICAMENTE
-        const recebidoPorCanonical = resolveSocioCanonicalId(recebimento.recebidoPor);
-        
-        if (!recebidoPorCanonical || alocacoes.length === 0) return;
-        
-        // Para cada sócio que tem direito ao dinheiro mas NÃO recebeu
-        for (const aloc of alocacoes) {
-          const socioComDireito = resolveSocioCanonicalId(aloc.socioId);
-          
-          // Se quem tem direito é diferente de quem recebeu, gerar acerto
-          if (socioComDireito && socioComDireito !== recebidoPorCanonical && aloc.valor > 0) {
-            
-            // Buscar acertos pendentes existentes no sentido INVERSO (netting)
-            const acertosInversos = state.acertos.filter(a => 
-              resolveSocioCanonicalId(a.de) === socioComDireito &&
-              resolveSocioCanonicalId(a.para) === recebidoPorCanonical &&
-              (!a.status || a.status === 'pendente')
-            );
-            
-            const totalInverso = acertosInversos.reduce((sum, a) => sum + (a.valor || 0), 0);
-            
-            // Netting: compensar dívidas opostas
-            let valorLiquido = aloc.valor - totalInverso;
-            
-            if (valorLiquido > 0) {
-              // Criar acerto: quem recebeu deve passar para quem tem direito
-              const descricao = `Repasse automático: ${socioNomePorQualquerId(recebidoPorCanonical)} recebeu ${recebimento.tipo || 'valor'} de R$ ${recebimento.valor.toFixed(2)} mas parte pertence a ${socioNomePorQualquerId(socioComDireito)} (${((aloc.valor / recebimento.valor) * 100).toFixed(0)}%)`;
-              
-              await addDoc(refs(OBRA_ID).acertosCol, {
-                data: recebimento.data,
-                de: recebidoPorCanonical,
-                para: socioComDireito,
-                valor: valorLiquido,
-                descricao: descricao,
-                status: 'pendente',
-                recebimentoOrigemId: recebimentoId,
-                createdAt: serverTimestamp(),
-                createdBy: state.user.email
-              });
-              
-              console.log(`✅ Acerto automático criado: ${socioNomePorQualquerId(recebidoPorCanonical)} → ${socioNomePorQualquerId(socioComDireito)}: R$ ${valorLiquido.toFixed(2)}`);
-            } else if (totalInverso > aloc.valor) {
-              // Marcar acertos inversos como parcialmente compensados
-              console.log(`💰 Netting aplicado: dívida compensada em R$ ${aloc.valor.toFixed(2)}`);
-            }
-          }
-        }
-      } catch (err) {
-        console.error('❌ Erro ao gerar acerto automático:', err);
-        // Não bloquear o fluxo principal
-      }
-    }
-
-    /**
-     * Tenta baixar automaticamente uma Conta a Receber quando um recebimento é registrado.
-     * Procura por CRs confirmadas com valor similar e sugere baixa.
-     */
-    async function tentarBaixarCRAutomatica(valorRecebido, unidadeId, tipoRecebimento) {
-      try {
-        // Buscar CRs não recebidas (previstas ou confirmadas)
-        const crsPendentes = state.contasReceber.filter(cr => 
-          cr.status === 'confirmado' || cr.status === 'previsto'
-        );
-        
-        if (crsPendentes.length === 0) return;
-        
-        // Procurar CR com valor similar (tolerância de 5%)
-        const tolerancia = 0.05;
-        const crCompativel = crsPendentes.find(cr => {
-          const diferenca = Math.abs(cr.valor - valorRecebido) / cr.valor;
-          return diferenca <= tolerancia;
-        });
-        
-        if (crCompativel) {
-          // Sugerir baixa automática
-          const confirmar = confirm(
-            `💰 Detectamos uma Conta a Receber compatível com este recebimento:\n\n` +
-            `CR: ${crCompativel.descricao}\n` +
-            `Valor: R$ ${crCompativel.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` +
-            `Deseja marcar esta CR como recebida automaticamente?`
-          );
-          
-          if (confirmar) {
-            await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crCompativel.id), {
-              status: 'recebido',
-              dataRecebimento: new Date().toISOString().split('T')[0],
-              recebimentoVinculadoId: unidadeId
-            });
-            
-            showToast('✅ Conta a Receber baixada automaticamente!', 'success');
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao tentar baixar CR automaticamente:', err);
-        // Não bloquear o fluxo principal
-      }
-    }
-
     async function addRecebimento(e) {
       e.preventDefault();
 
@@ -6641,13 +4125,8 @@
       const tipo = $("receb-tipo").value;
       const valor = parseFloat($("receb-valor").value);
       const formaPagamento = $("receb-forma").value;
-      let recebidoPor = $("receb-recebido-por").value;
+      const recebidoPor = $("receb-recebido-por").value;
       const observacoes = $("receb-obs").value.trim();
-
-      // 🛡️ BLINDAGEM: Normalizar recebidoPor para canônico A/B/AMBOS
-      if (recebidoPor !== "AMBOS") {
-        recebidoPor = resolveSocioCanonicalId(recebidoPor) || recebidoPor;
-      }
 
       if (!data || !unidadeId || !valor || !recebidoPor) {
         showToast('Preencha todos os campos obrigatórios', 'warning');
@@ -6655,7 +4134,7 @@
       }
 
       try {
-        const recebimentoRef = await addDoc(refs(OBRA_ID).recebimentosCol, {
+        await addDoc(refs(OBRA_ID).recebimentosCol, {
           data,
           unidadeId,
           tipo,
@@ -6666,23 +4145,8 @@
           createdAt: serverTimestamp(),
           createdBy: state.user.email
         });
-        
         $("receb-form").reset();
         showToast('Recebimento registrado com sucesso!', 'success');
-        
-        // Gerar acerto automático se necessário
-        await gerarAcertoAutomatico(recebimentoRef.id, {
-          data,
-          unidadeId,
-          tipo,
-          valor,
-          recebidoPor,
-          observacoes
-        });
-        
-        // 💰 Tentar baixar automaticamente CR relacionada
-        await tentarBaixarCRAutomatica(valor, unidadeId, tipo);
-        
       } catch (err) {
         console.error(err);
         showToast('Erro ao registrar recebimento', 'error');
@@ -7049,10 +4513,11 @@
     }
 
     function computeEqualizacao() {
+      const socioA = state.config.socioA || "Sócio A";
+      const socioB = state.config.socioB || "Sócio B";
+
       // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
       const obra = state.obras.find(o => o.id === OBRA_ID);
-      const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
-      const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
       const investimentoA = obra?.investimentoA || 0;
       const investimentoB = obra?.investimentoB || 0;
 
@@ -7209,9 +4674,6 @@
     function exportPDF() {
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      // Buscar obra uma única vez
-      const obra = state.obras.find(o => o.id === OBRA_ID);
 
       // Header com logo e título
       pdf.setFillColor(15, 23, 42);
@@ -7222,6 +4684,8 @@
       pdf.text("🏗️ VG CONSTRUTORA", 105, 15, { align: 'center' });
       pdf.setFontSize(14);
       pdf.text("RELATÓRIO GERENCIAL COMPLETO", 105, 25, { align: 'center' });
+
+      const obra = state.obras.find(o => o.id === OBRA_ID);
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(11);
       pdf.text(`Obra: ${obra?.nome || "N/A"}`, 14, 45);
@@ -7326,11 +4790,7 @@
       const investimentoPorSocio = custoTotal / 2;
       const lucroPorSocio = lucroData.lucroLiquido / 2;
 
-      // Buscar nomes dos sócios (obra já foi declarado no início da função)
-      const socioANome = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : 'Sócio A';
-      const socioBNome = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : 'Sócio B';
-
-      pdf.text(`👤 ${socioANome}`, 14, y);
+      pdf.text(`👤 ${state.config.socioA || 'Sócio A'}`, 14, y);
       pdf.text(`Investimento: R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 6);
       pdf.setFont(undefined, 'bold');
       pdf.setTextColor(5, 150, 105);
@@ -7339,7 +4799,7 @@
       pdf.setFont(undefined, 'normal');
 
       y += 22;
-      pdf.text(`👤 ${socioBNome}`, 14, y);
+      pdf.text(`👤 ${state.config.socioB || 'Sócio B'}`, 14, y);
       pdf.text(`Investimento: R$ ${investimentoPorSocio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 24, y + 6);
       pdf.setFont(undefined, 'bold');
       pdf.setTextColor(5, 150, 105);
@@ -7405,6 +4865,4 @@
       showToast('Relatório PDF gerado com sucesso!', 'success');
     }
 
-  </script>
-</body>
-</html>
+  
