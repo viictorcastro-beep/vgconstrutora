@@ -1989,6 +1989,16 @@
         </div>
       `;
 
+      const posicoes = await calcularPosicaoGlobalConsolidada();
+      const pagosPorObra = {};
+      Object.values(posicoes).forEach(pos => {
+        (pos.detalhesObras || []).forEach(d => {
+          if (!pagosPorObra[d.obraId]) pagosPorObra[d.obraId] = {};
+          const pago = d.pagoFisicoSemAcerto ?? d.pagoFisico ?? 0;
+          pagosPorObra[d.obraId][pos.id] = (pagosPorObra[d.obraId][pos.id] || 0) + pago;
+        });
+      });
+
       const resumoPorObra = await Promise.all(state.obras.map(async (obra) => {
         const [unidadesSnap, lancSnap, recebSnap, crSnap] = await Promise.all([
           getDocs(collection(db, "obras", obra.id, "unidades")),
@@ -2059,6 +2069,8 @@
         const socioA = obra.socioAId ? socioNomePorQualquerId(obra.socioAId) : '—';
         const socioB = obra.socioBId ? socioNomePorQualquerId(obra.socioBId) : '—';
 
+        const investimentosPorSocioEspelhado = pagosPorObra[obra.id] || null;
+
         return {
           id: obra.id,
           nome: obra.nome || obra.id,
@@ -2072,7 +2084,7 @@
           crAberto,
           invTotal,
           investimentoCustos,
-          investimentosPorSocio,
+          investimentosPorSocio: investimentosPorSocioEspelhado || investimentosPorSocio,
           vgvPrevisto,
           socioA,
           socioB,
@@ -2955,6 +2967,8 @@
                 obraNome: obra.nome || obraId,
                 recebidoFisico: d.recebidoFisico,
                 pagoFisico: d.pagoFisico,
+                recebidoFisicoSemAcerto: d.recebidoFisicoSemAcerto,
+                pagoFisicoSemAcerto: d.pagoFisicoSemAcerto,
                 receitaPorAlocacao: d.receitaPorAlocacao,
                 custoPorAlocacao: d.custoPorAlocacao,
                 contasReceber: d.contasReceber,
