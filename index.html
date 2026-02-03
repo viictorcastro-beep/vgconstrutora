@@ -2850,7 +2850,7 @@
         return;
       }
       
-      // Calcular acertos consolidados (baseado em CAIXA - DIREITO)
+      // Calcular acertos consolidados (baseado em SALDO REAL considerando INVESTIMENTOS + RECEBIMENTOS)
       const acertosConsolidados = [];
       if (state.socios.length >= 2) {
         for (let i = 0; i < state.socios.length; i++) {
@@ -2860,23 +2860,35 @@
             const dadosA = balancoPorSocio[socioA.id];
             const dadosB = balancoPorSocio[socioB.id];
             
-            // 💵 Acerto = RecebidoCaixa - DireitoCompetencia
-            const acertoA = dadosA.recebidoCaixa - dadosA.direitoCompetencia;
-            const acertoB = dadosB.recebidoCaixa - dadosB.direitoCompetencia;
+            // 🎯 NOVO CÁLCULO: Saldo Real = Recebido (Caixa) - Investido
+            const saldoRealA = dadosA.recebidoCaixa - dadosA.totalInvestido;
+            const saldoRealB = dadosB.recebidoCaixa - dadosB.totalInvestido;
+            
+            // 🎯 Total Consolidado
+            const totalInvestido = dadosA.totalInvestido + dadosB.totalInvestido;
+            const totalRecebidoCaixa = dadosA.recebidoCaixa + dadosB.recebidoCaixa;
+            const saldoTotal = totalRecebidoCaixa - totalInvestido;
+            
+            // 🎯 Saldo Ideal 50/50
+            const saldoIdeal = saldoTotal / 2;
+            
+            // 🎯 Acerto necessário = Diferença entre Saldo Real e Saldo Ideal
+            const acertoA = saldoRealA - saldoIdeal;
+            const acertoB = saldoRealB - saldoIdeal;
             
             let acertoValor = 0;
             let pagador = '';
             let recebedor = '';
             
-            // Quem tem acerto positivo (recebeu mais que o direito) deve repassar
+            // Quem tem saldo real acima do ideal deve repassar
             if (acertoA > 0.01) {
               acertoValor = Math.abs(acertoA);
-              pagador = socioA.nome; // A recebeu mais, deve repassar
-              recebedor = socioB.nome; // B tem direito a receber
+              pagador = socioA.nome; // A tem saldo acima do ideal
+              recebedor = socioB.nome; // B tem saldo abaixo do ideal
             } else if (acertoB > 0.01) {
               acertoValor = Math.abs(acertoB);
-              pagador = socioB.nome; // B recebeu mais, deve repassar
-              recebedor = socioA.nome; // A tem direito a receber
+              pagador = socioB.nome; // B tem saldo acima do ideal
+              recebedor = socioA.nome; // A tem saldo abaixo do ideal
             }
             
             if (acertoValor > 0.01) {
@@ -2884,14 +2896,22 @@
                 pagador,
                 recebedor,
                 valor: acertoValor,
+                // Dados detalhados para exibição
+                investidoA: dadosA.totalInvestido,
+                investidoB: dadosB.totalInvestido,
                 recebidoCaixaA: dadosA.recebidoCaixa,
                 recebidoCaixaB: dadosB.recebidoCaixa,
+                saldoRealA,
+                saldoRealB,
+                saldoIdeal,
                 direitoA: dadosA.direitoCompetencia,
                 direitoB: dadosB.direitoCompetencia,
                 acertoA,
                 acertoB,
                 socioANome: socioA.nome,
-                socioBNome: socioB.nome
+                socioBNome: socioB.nome,
+                totalInvestido,
+                totalRecebidoCaixa
               });
             }
           }
@@ -2905,17 +2925,21 @@
           ${state.socios.map(socio => {
             const dados = balancoPorSocio[socio.id];
             
-            // 🎯 CÁLCULO DO ACERTO: RecebidoCaixa - DireitoCompetência
+            // 🎯 NOVO CÁLCULO: Saldo Real = Recebido (Caixa) - Investido
+            const saldoReal = dados.recebidoCaixa - dados.totalInvestido;
+            
+            // 🎯 Para determinar se deve repassar ou tem a receber, precisamos comparar com o outro sócio
+            // Mas como não sabemos qual é o "outro" aqui, vamos mostrar o saldo real
+            // A equalização será mostrada na seção consolidada
+            
+            // Cálculo do acerto baseado em Caixa vs. Direito (para exibição secundária)
             const acertoNecessario = dados.recebidoCaixa - dados.direitoCompetencia;
             const deveRepassar = acertoNecessario > 0; // Recebeu mais que o direito
             const temAReceber = acertoNecessario < 0; // Recebeu menos que o direito
             
-            // Saldo considerando custos também
-            const saldoFinal = (dados.recebidoCaixa + dados.direitoCompetencia) / 2 - dados.totalInvestido;
-            
-            // Determinar status
-            const statusLabel = deveRepassar ? 'Deve Repassar' : temAReceber ? 'Tem a Receber' : 'Equalizado';
-            const statusColor = temAReceber ? 'green' : deveRepassar ? 'orange' : 'gray';
+            // Determinar status baseado no saldo real
+            const statusLabel = saldoReal >= 0 ? 'Saldo Positivo' : 'Saldo Negativo';
+            const statusColor = saldoReal >= 0 ? 'green' : 'red';
             
             // ROI Real (baseado em direito de competência)
             const roiReal = dados.totalInvestido > 0 
@@ -2935,7 +2959,7 @@
             const dataAtual = new Date().toLocaleDateString('pt-BR');
 
             return `
-              <div class="card p-6 border-l-4 ${temAReceber ? 'border-green-500' : deveRepassar ? 'border-orange-500' : 'border-gray-300'}">
+              <div class="card p-6 border-l-4 ${saldoReal >= 0 ? 'border-green-500' : 'border-red-500'}">
                 <div class="flex items-center justify-between mb-4">
                   <h3 class="font-black text-2xl text-gray-800">👔 ${escapeHtml(socio.nome)}</h3>
                   <span class="badge bg-${statusColor}-100 text-${statusColor}-800">${statusLabel}</span>
@@ -2972,31 +2996,38 @@
                     </div>
                   </div>
                   
+                  <!-- 🆕 SALDO REAL -->
+                  <div class="border-t-2 border-${statusColor}-300 pt-3 mt-3">
+                    <div class="bg-${statusColor}-50 border-2 border-${statusColor}-400 rounded-lg p-4">
+                      <div class="font-bold text-${statusColor}-900 mb-2">
+                        💰 Saldo Real (Recebido - Investido):
+                      </div>
+                      <div class="text-3xl font-black text-${statusColor}-700">
+                        R$ ${saldoReal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </div>
+                      <div class="text-xs text-${statusColor}-600 mt-2">
+                        ${saldoReal >= 0 
+                          ? 'Recebeu mais do que investiu' 
+                          : 'Ainda não recuperou todo o investimento'}
+                      </div>
+                    </div>
+                  </div>
+                  
                   ${Math.abs(acertoNecessario) > 0.01 ? `
-                    <div class="border-t-2 border-${statusColor}-300 pt-3 mt-3">
-                      <div class="bg-${statusColor}-50 border-2 border-${statusColor}-400 rounded-lg p-4">
-                        <div class="font-bold text-${statusColor}-900 mb-2">
-                          ${deveRepassar ? '⚠️ Precisa Repassar:' : '✅ Tem a Receber:'}
+                    <div class="mt-3">
+                      <div class="bg-gray-100 border border-gray-300 rounded-lg p-3">
+                        <div class="text-xs text-gray-600 mb-1">
+                          ${deveRepassar ? '⚠️ Diferença Caixa vs Direito:' : '✅ Diferença Caixa vs Direito:'}
                         </div>
-                        <div class="text-3xl font-black text-${statusColor}-700">
-                          R$ ${Math.abs(acertoNecessario).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        <div class="text-lg font-bold text-gray-700">
+                          ${deveRepassar ? 'Recebeu' : 'Deixou de receber'} R$ ${Math.abs(acertoNecessario).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                         </div>
-                        <div class="text-xs text-${statusColor}-600 mt-2">
-                          ${deveRepassar 
-                            ? 'Recebeu em caixa mais que seu direito' 
-                            : 'Outro sócio recebeu valores que pertencem a você'}
+                        <div class="text-xs text-gray-500 mt-1">
+                          (Ver seção "Acerto Consolidado" abaixo para equalização completa)
                         </div>
                       </div>
                     </div>
-                  ` : `
-                    <div class="border-t-2 border-gray-300 pt-3 mt-3">
-                      <div class="bg-gray-100 border border-gray-300 rounded-lg p-4 text-center">
-                        <div class="text-2xl mb-2">✅</div>
-                        <div class="font-bold text-gray-700">Caixa Equalizado</div>
-                        <div class="text-xs text-gray-600 mt-1">Recebido = Direito</div>
-                      </div>
-                    </div>
-                  `}
+                  ` : ''}
                 </div>
                 
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -3067,7 +3098,7 @@
         ${acertosConsolidados.length > 0 ? `
           <div class="card p-6 mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-400">
             <h3 class="font-black text-2xl mb-4 text-orange-900">💡 Acerto Sugerido Consolidado</h3>
-            <p class="text-sm text-gray-700 mb-4">Equalização baseada em <strong>Caixa vs. Direito</strong> (todas as obras)</p>
+            <p class="text-sm text-gray-700 mb-4">Equalização <strong>50/50</strong> considerando <strong>Investimentos + Recebimentos</strong> (todas as obras)</p>
             
             ${acertosConsolidados.map(acerto => `
               <div class="bg-white rounded-lg border-2 border-orange-500 p-6 mb-4">
@@ -3083,39 +3114,82 @@
                 <div class="bg-orange-50 rounded-lg p-4 space-y-3 text-sm">
                   <div class="font-bold text-orange-900 mb-3">📊 Como chegamos nesse valor:</div>
                   
+                  <!-- Totais Consolidados -->
+                  <div class="bg-blue-50 border border-blue-300 rounded p-3 mb-4">
+                    <div class="font-bold text-blue-900 mb-2">🌍 Consolidado (Ambos Sócios):</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-700">💳 Total Investido:</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-700">💵 Total Recebido (Caixa):</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.totalRecebidoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-blue-400 pt-2 mt-2">
+                      <span class="font-bold text-blue-900">Saldo Total:</span>
+                      <span class="font-black text-lg ${(acerto.totalRecebidoCaixa - acerto.totalInvestido) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${(acerto.totalRecebidoCaixa - acerto.totalInvestido).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-blue-700">💰 Saldo Ideal 50/50 (cada):</span>
+                      <span class="font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                  </div>
+                  
                   <!-- Sócio A -->
-                  <div class="bg-white border border-green-200 rounded p-3">
+                  <div class="bg-white border-2 ${acerto.saldoRealA > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
                     <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 Investiu:</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">💵 Recebeu (Caixa):</span>
                       <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">📋 Direito (50/50):</span>
-                      <span class="font-bold text-blue-600">R$ ${acerto.direitoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
                     <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Diferença (Caixa - Direito):</span>
-                      <span class="font-black text-lg ${acerto.acertoA >= 0 ? 'text-orange-600' : 'text-green-600'}">
+                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
+                      <span class="font-black text-lg ${acerto.saldoRealA >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${acerto.saldoRealA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
+                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t-2 ${acerto.acertoA > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
+                      <span class="font-black">Diferença:</span>
+                      <span class="font-black text-xl ${acerto.acertoA > 0 ? 'text-orange-600' : 'text-green-600'}">
                         ${acerto.acertoA >= 0 ? '+' : ''}R$ ${acerto.acertoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                       </span>
                     </div>
                   </div>
                   
                   <!-- Sócio B -->
-                  <div class="bg-white border border-green-200 rounded p-3">
+                  <div class="bg-white border-2 ${acerto.saldoRealB > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
                     <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 Investiu:</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">💵 Recebeu (Caixa):</span>
                       <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">📋 Direito (50/50):</span>
-                      <span class="font-bold text-blue-600">R$ ${acerto.direitoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
                     <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Diferença (Caixa - Direito):</span>
-                      <span class="font-black text-lg ${acerto.acertoB >= 0 ? 'text-orange-600' : 'text-green-600'}">
+                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
+                      <span class="font-black text-lg ${acerto.saldoRealB >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        R$ ${acerto.saldoRealB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
+                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between border-t-2 ${acerto.acertoB > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
+                      <span class="font-black">Diferença:</span>
+                      <span class="font-black text-xl ${acerto.acertoB > 0 ? 'text-orange-600' : 'text-green-600'}">
                         ${acerto.acertoB >= 0 ? '+' : ''}R$ ${acerto.acertoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                       </span>
                     </div>
@@ -3124,10 +3198,13 @@
                   <div class="bg-yellow-100 border border-yellow-400 rounded p-4 mt-3">
                     <div class="font-bold text-yellow-900 mb-2">💡 Conclusão:</div>
                     <div class="text-yellow-800">
-                      <strong>${acerto.pagador}</strong> recebeu fisicamente mais do que seu direito econômico. 
-                      Para equalizar, deve transferir 
+                      <strong>${acerto.pagador}</strong> tem um saldo real acima do ideal 50/50. 
+                      Para equalizar perfeitamente a sociedade, deve transferir 
                       <strong class="text-xl text-orange-700">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
                       para <strong>${acerto.recebedor}</strong>.
+                    </div>
+                    <div class="text-xs text-yellow-700 mt-2">
+                      ✅ Após o acerto, ambos terão o mesmo saldo: R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                     </div>
                   </div>
                 </div>
