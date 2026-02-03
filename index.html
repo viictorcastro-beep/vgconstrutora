@@ -2284,9 +2284,11 @@
      * }
      */
     async function calcularPosicaoGlobalConsolidada() {
+      console.log('\n🔍 [EQ GLOBAL] Iniciando cálculo...');
+      
       const posicoes = {};
 
-      // Inicializar para cada sócio
+      // Inicializar para cada sócio usando Firestore ID
       state.socios.forEach(socio => {
         posicoes[socio.id] = {
           id: socio.id,
@@ -2306,107 +2308,131 @@
         };
       });
 
+      // 🎯 USAR A MESMA LÓGICA DO renderBalancoGlobal() QUE FUNCIONA CORRETAMENTE
       // Iterar por TODAS as obras
       for (const obra of state.obras) {
         const obraId = obra.id;
+        console.log(`  📊 Processando obra: ${obra.nome}`);
 
         try {
-          // 1) RECEBIMENTOS - Posição de CAIXA (quem recebeu fisicamente)
+          // Carregar dados da obra
+          const unidadesSnap = await getDocs(collection(db, "obras", obraId, "unidades"));
+          const unidades = unidadesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          
+          const lancamentosSnap = await getDocs(collection(db, "obras", obraId, "lancamentos"));
+          const lancamentos = lancamentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          
           const recebimentosSnap = await getDocs(collection(db, "obras", obraId, "recebimentos"));
-          recebimentosSnap.forEach(doc => {
-            const rec = doc.data();
-            const recebidoPor = resolveSocioCanonicalId(rec.recebidoPor);
-            const valor = rec.valor || 0;
+          const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-            if (posicoes[recebidoPor]) {
-              posicoes[recebidoPor].detalheCaixa.recebidoFisico += valor;
+          // 1️⃣ PROCESSAR LANÇAMENTOS (CUSTOS/INVESTIMENTOS)
+          lancamentos.forEach(l => {
+            const valor = l.valor || 0;
+            const percentA = l.victorPercent || l.percentualA || 50;
+            const percentB = l.gustavoPercent || l.percentualB || 50;
+            
+            const valorA = (percentA / 100) * valor;
+            const valorB = (percentB / 100) * valor;
+            
+            if (obra.socioAId && posicoes[obra.socioAId]) {
+              posicoes[obra.socioAId].detalheCaixa.pagoFisico += valorA;
+              posicoes[obra.socioAId].detalheDireito.custoPorAlocacao += valorA;
             }
+            
+            if (obra.socioBId && posicoes[obra.socioBId]) {
+              posicoes[obra.socioBId].detalheCaixa.pagoFisico += valorB;
+              posicoes[obra.socioBId].detalheDireito.custoPorAlocacao += valorB;
+            }
+          });
 
-            // Posição de DIREITO (competência - alocações 50/50)
+          // 2️⃣ PROCESSAR RECEBIMENTOS
+          recebimentos.forEach(rec => {
+            const valor = rec.valor || 0;
+            
+            // 💵 CAIXA: Quem recebeu fisicamente
+            const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
+            const recebidoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === recebidoPorRaw)?.firestoreId;
+            
+            if (recebidoPorFirestoreId && posicoes[recebidoPorFirestoreId]) {
+              posicoes[recebidoPorFirestoreId].detalheCaixa.recebidoFisico += valor;
+            }
+            
+            // 📋 DIREITO: Alocações 50/50 ou percentual customizado
             const alocacoes = inferirAlocacoesRecebimento(rec, obra);
             alocacoes.forEach(aloc => {
-              const socioId = resolveSocioCanonicalId(aloc.socioId);
-              if (posicoes[socioId]) {
-                posicoes[socioId].detalheDireito.receitaPorAlocacao += aloc.valor;
+              const canonicalId = resolveSocioCanonicalId(aloc.socioId);
+              if (canonicalId) {
+                const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
+                if (socioFirestoreId && posicoes[socioFirestoreId]) {
+                  posicoes[socioFirestoreId].detalheDireito.receitaPorAlocacao += aloc.valor;
+                }
               }
             });
           });
 
-          // 2) LANÇAMENTOS (Custos) - Posição de CAIXA (quem pagou fisicamente)
-          const lancamentosSnap = await getDocs(collection(db, "obras", obraId, "lancamentos"));
-          lancamentosSnap.forEach(doc => {
-            const lanc = doc.data();
-            const pago = lanc.pago;
-            const valor = lanc.valor || 0;
+          // 3️⃣ INVESTIMENTOS INICIAIS DA OBRA (CRÍTICO! Estava faltando!)
+          if (obra.investimentoA && obra.socioAId && posicoes[obra.socioAId]) {
+            const investA = obra.investimentoA || 0;
+            console.log(`    💰 Investimento Inicial ${posicoes[obra.socioAId].nome}: R$ ${investA.toFixed(2)}`);
+            posicoes[obra.socioAId].detalheCaixa.pagoFisico += investA;
+            posicoes[obra.socioAId].detalheDireito.custoPorAlocacao += investA;
+          }
+          
+          if (obra.investimentoB && obra.socioBId && posicoes[obra.socioBId]) {
+            const investB = obra.investimentoB || 0;
+            console.log(`    💰 Investimento Inicial ${posicoes[obra.socioBId].nome}: R$ ${investB.toFixed(2)}`);
+            posicoes[obra.socioBId].detalheCaixa.pagoFisico += investB;
+            posicoes[obra.socioBId].detalheDireito.custoPorAlocacao += investB;
+          }
 
-            // Custos por quem pagou (simplificação - pode melhorar com rateio)
-            // Por padrão vamos usar rateio 50/50 para custos também
-            const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
-            const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
-
-            if (pago) {
-              // Custo pago fisicamente
-              const pagoPor = resolveSocioCanonicalId(lanc.pagoPor || socioAId);
-              if (posicoes[pagoPor]) {
-                posicoes[pagoPor].detalheCaixa.pagoFisico += valor;
-              }
-            }
-
-            // Custos por competência (50/50 por padrão)
-            const rateios = lanc.rateios || [];
-            if (rateios.length > 0) {
-              rateios.forEach(rat => {
-                const socioId = resolveSocioCanonicalId(rat.socioId);
-                const valorRateio = rat.valor || 0;
-                if (posicoes[socioId]) {
-                  posicoes[socioId].detalheDireito.custoPorAlocacao += valorRateio;
-                }
-              });
-            } else {
-              // Rateio 50/50 default
-              const metade = valor / 2;
-              if (posicoes[socioAId]) posicoes[socioAId].detalheDireito.custoPorAlocacao += metade;
-              if (posicoes[socioBId]) posicoes[socioBId].detalheDireito.custoPorAlocacao += metade;
-            }
-          });
-
-          // 3) CONTAS A RECEBER - Valores vendidos confirmados mas não recebidos
+          // 4️⃣ CONTAS A RECEBER (opcional, para modo estratégico)
           const crSnap = await getDocs(collection(db, "obras", obraId, "contasReceber"));
           crSnap.forEach(doc => {
             const cr = doc.data();
             if (cr.status !== 'recebido') {
               const valor = cr.valor || 0;
-
-              // Distribuir CR conforme alocações (50/50 por padrão ou custom)
               const alocacoes = cr.alocacoes || [];
+              
               if (alocacoes.length > 0) {
                 alocacoes.forEach(aloc => {
-                  const socioId = resolveSocioCanonicalId(aloc.socioId);
-                  if (posicoes[socioId]) {
-                    posicoes[socioId].contasReceber += aloc.valor;
+                  const canonicalId = resolveSocioCanonicalId(aloc.socioId);
+                  if (canonicalId) {
+                    const socioFirestoreId = (state?.config?.socios || []).find(s => s.id === canonicalId)?.firestoreId;
+                    if (socioFirestoreId && posicoes[socioFirestoreId]) {
+                      posicoes[socioFirestoreId].contasReceber += aloc.valor;
+                    }
                   }
                 });
               } else {
                 // 50/50 default
                 const metade = valor / 2;
-                const socioAId = resolveSocioCanonicalId(obra?.socioAId || 'A');
-                const socioBId = resolveSocioCanonicalId(obra?.socioBId || 'B');
-                if (posicoes[socioAId]) posicoes[socioAId].contasReceber += metade;
-                if (posicoes[socioBId]) posicoes[socioBId].contasReceber += metade;
+                if (obra.socioAId && posicoes[obra.socioAId]) posicoes[obra.socioAId].contasReceber += metade;
+                if (obra.socioBId && posicoes[obra.socioBId]) posicoes[obra.socioBId].contasReceber += metade;
               }
             }
           });
 
         } catch (err) {
-          console.error(`Erro ao processar obra ${obraId}:`, err);
+          console.error(`❌ Erro ao processar obra ${obraId}:`, err);
         }
       }
 
       // Calcular totais consolidados
+      console.log('\n📊 [EQ GLOBAL] Totais consolidados:');
       Object.values(posicoes).forEach(pos => {
         pos.caixaFisico = pos.detalheCaixa.recebidoFisico - pos.detalheCaixa.pagoFisico;
         pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
         pos.totalConsolidado = pos.caixaFisico + pos.direitoPorCompetencia + pos.contasReceber;
+        
+        console.log(`  ${pos.nome}:`);
+        console.log(`    - Recebido (Caixa): R$ ${pos.detalheCaixa.recebidoFisico.toFixed(2)}`);
+        console.log(`    - Pago (Caixa): R$ ${pos.detalheCaixa.pagoFisico.toFixed(2)}`);
+        console.log(`    - Saldo Caixa: R$ ${pos.caixaFisico.toFixed(2)}`);
+        console.log(`    - Receita Direito: R$ ${pos.detalheDireito.receitaPorAlocacao.toFixed(2)}`);
+        console.log(`    - Custo Direito: R$ ${pos.detalheDireito.custoPorAlocacao.toFixed(2)}`);
+        console.log(`    - Saldo Direito: R$ ${pos.direitoPorCompetencia.toFixed(2)}`);
+        console.log(`    - Contas a Receber: R$ ${pos.contasReceber.toFixed(2)}`);
+        console.log(`    - Total Consolidado: R$ ${pos.totalConsolidado.toFixed(2)}`);
       });
 
       return posicoes;
@@ -2433,37 +2459,59 @@
       const posA = posicoes[socioA];
       const posB = posicoes[socioB];
 
-      // MODO A: Equalização por Caixa (imediata)
-      const mediaCaixa = (posA.caixaFisico + posB.caixaFisico) / 2;
-      const saldoACaixa = posA.caixaFisico - mediaCaixa;
-      const saldoBCaixa = posB.caixaFisico - mediaCaixa;
+      console.log('\n🎯 [EQ GLOBAL] Calculando acerto:');
+      console.log(`  ${posA.nome}:`);
+      console.log(`    - Saldo Caixa: R$ ${posA.caixaFisico.toFixed(2)}`);
+      console.log(`  ${posB.nome}:`);
+      console.log(`    - Saldo Caixa: R$ ${posB.caixaFisico.toFixed(2)}`);
+
+      // 🎯 MODO A: Equalização por Saldo Real de Caixa (Recebido - Pago)
+      // Esse é o saldo que cada um TEM depois de investir e receber
+      // Para equalizar 50/50, cada um deveria ter a MESMA posição
+      const totalRecebido = posA.detalheCaixa.recebidoFisico + posB.detalheCaixa.recebidoFisico;
+      const totalPago = posA.detalheCaixa.pagoFisico + posB.detalheCaixa.pagoFisico;
+      const saldoTotalCaixa = totalRecebido - totalPago;
+      const saldoIdealCaixa = saldoTotalCaixa / 2;
+
+      console.log(`  Total Recebido (ambos): R$ ${totalRecebido.toFixed(2)}`);
+      console.log(`  Total Pago (ambos): R$ ${totalPago.toFixed(2)}`);
+      console.log(`  Saldo Total: R$ ${saldoTotalCaixa.toFixed(2)}`);
+      console.log(`  Saldo Ideal 50/50 (cada): R$ ${saldoIdealCaixa.toFixed(2)}`);
+
+      const diferencaA = posA.caixaFisico - saldoIdealCaixa;
+      const diferencaB = posB.caixaFisico - saldoIdealCaixa;
+
+      console.log(`  ${posA.nome} - Diferença: R$ ${diferencaA.toFixed(2)}`);
+      console.log(`  ${posB.nome} - Diferença: R$ ${diferencaB.toFixed(2)}`);
 
       let modoA = {
-        tipo: 'Caixa Físico',
-        descricao: 'Equalização imediata baseada em quem recebeu/pagou de fato',
-        mediaCaixa,
+        tipo: 'Caixa Físico (Saldo Real)',
+        descricao: 'Equalização baseada em investimentos + recebimentos reais',
+        saldoIdeal: saldoIdealCaixa,
         transferencia: null
       };
 
-      if (Math.abs(saldoACaixa) > 0.01) {
-        if (saldoACaixa > 0) {
-          // A tem excesso de caixa, deve repassar para B
+      if (Math.abs(diferencaA) > 0.01) {
+        if (diferencaA > 0) {
+          // A tem saldo acima do ideal, deve repassar para B
           modoA.transferencia = {
             de: socioA,
             deNome: posA.nome,
             para: socioB,
             paraNome: posB.nome,
-            valor: Math.abs(saldoACaixa)
+            valor: Math.abs(diferencaA)
           };
+          console.log(`  ✅ Acerto: ${posA.nome} → ${posB.nome} = R$ ${Math.abs(diferencaA).toFixed(2)}`);
         } else {
-          // B tem excesso de caixa, deve repassar para A
+          // B tem saldo acima do ideal, deve repassar para A
           modoA.transferencia = {
             de: socioB,
             deNome: posB.nome,
             para: socioA,
             paraNome: posA.nome,
-            valor: Math.abs(saldoBCaixa)
+            valor: Math.abs(diferencaB)
           };
+          console.log(`  ✅ Acerto: ${posB.nome} → ${posA.nome} = R$ ${Math.abs(diferencaB).toFixed(2)}`);
         }
       }
 
