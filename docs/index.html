@@ -1756,6 +1756,8 @@
         }
         
         hydrateObrasSelect();
+        // Lançar acerto pendente QD61 LT32 (uma vez)
+        garantirAcertoPendenteQd61Lt32().catch(err => console.error('Erro ao lançar acerto pendente QD61 LT32:', err));
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
         showToast("Erro ao carregar obras", "error");
@@ -2297,6 +2299,53 @@
           }
         }
       }
+    }
+
+    async function garantirAcertoPendenteQd61Lt32() {
+      if (!isAdmin()) return;
+      if (localStorage.getItem('acerto_qd61_2044_pendente') === '1') return;
+
+      const obra = state.obras.find(o =>
+        (o.nome && o.nome.toLowerCase().includes('qd61') && o.nome.toLowerCase().includes('lt32')) ||
+        (o.id && o.id.toLowerCase().includes('qd61') && o.id.toLowerCase().includes('lt32'))
+      );
+      if (!obra) return;
+
+      garantirSociosMapeados();
+      const sociosCfg = state?.config?.socios || [];
+      const socioGustavo = sociosCfg.find(s => (s.nome || '').toLowerCase().includes('gustavo'));
+      const socioVictor = sociosCfg.find(s => (s.nome || '').toLowerCase().includes('victor'));
+      if (!socioGustavo || !socioVictor) return;
+
+      const de = socioGustavo.id;
+      const para = socioVictor.id;
+      const valor = 2044.33;
+      const descricao = 'Acerto pendente QD61 LT32 (ajuste legado)';
+      const data = new Date().toISOString().split('T')[0];
+
+      const acertosSnap = await getDocs(collection(db, "obras", obra.id, "acertos"));
+      const existe = acertosSnap.docs.some(doc => {
+        const a = doc.data();
+        return String(a.de) === String(de)
+          && String(a.para) === String(para)
+          && Math.abs((a.valor || 0) - valor) < 0.01
+          && String(a.descricao || '').includes('Acerto pendente QD61 LT32');
+      });
+
+      if (!existe) {
+        await addDoc(collection(db, "obras", obra.id, "acertos"), {
+          data,
+          de,
+          para,
+          valor,
+          descricao,
+          createdAt: serverTimestamp(),
+          createdBy: state.user?.email || 'system'
+        });
+        showToast('✅ Acerto pendente QD61 LT32 lançado (R$ 2.044,33)', 'success');
+      }
+
+      localStorage.setItem('acerto_qd61_2044_pendente', '1');
     }
 
     // ========================================
