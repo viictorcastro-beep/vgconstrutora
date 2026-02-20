@@ -748,12 +748,13 @@
         <div class="card p-6 mb-6">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <div class="font-black text-xl">🔍 Revisão em Lote — Lançamentos Pendentes</div>
-              <p class="text-sm text-gray-500 mt-1">Todos os lançamentos com dados incompletos (sem descrição, etapa genérica, sem comprovante, etc). Edite inline e salve em massa.</p>
+              <div class="font-black text-xl">🔍 Revisão Inteligente — Enriquecimento de Lançamentos</div>
+              <p class="text-sm text-gray-500 mt-1">Analisa campos originais da migração (categoria legada, fornecedor, descrição) e sugere a etapa/tipo corretos automaticamente.</p>
             </div>
             <div class="flex gap-2">
               <button id="revisao-reload" class="btn btn-soft text-sm">🔄 Recarregar</button>
-              <button id="revisao-salvar" class="btn btn-green text-sm" disabled>💾 Salvar Alterações (0)</button>
+              <button id="revisao-aceitar-todos" class="btn btn-indigo text-sm" disabled>✨ Aceitar Todas Sugestões</button>
+              <button id="revisao-salvar" class="btn btn-green text-sm" disabled>💾 Salvar (0)</button>
             </div>
           </div>
           <div class="flex gap-3 mb-4 flex-wrap">
@@ -7400,19 +7401,87 @@
       }
     }
 
-    // ══════════════════════════════════════════════
-    // REVISÃO EM LOTE — Editor de lançamentos incompletos
-    // ══════════════════════════════════════════════
-    let _revisaoPendentes = []; // Cache dos lançamentos carregados
-    let _revisaoAlterados = new Map(); // id → {campo: valor}
+    // ══════════════════════════════════════════════════════════════
+    // REVISÃO INTELIGENTE — Motor de enriquecimento de lançamentos
+    // Analisa dados originais da migração e sugere classificações
+    // ══════════════════════════════════════════════════════════════
+    let _revisaoPendentes = [];
+    let _revisaoAlterados = new Map();
+    let _revisaoSugestoes = new Map(); // uid → { etapaId, tipoCustoId, descricao, confianca }
 
+    // ─── MOTOR DE INFERÊNCIA NLP ───────────────────────────
+    const _INFERENCIA_ETAPAS = [
+      { id: "terreno_regularizacao", kw: ["terreno", "lote", "regulariza", "matrícula", "matricula", "escritura", "itbi", "ri ", "registro de imóve", "registro de imovel", "cartório", "cartorio", "desmembra", "topografia", "topográf"] },
+      { id: "projetos_aprovacoes", kw: ["projeto", "aprovação", "aprovacao", "alvará", "alvara", "engenheiro", "arquiteto", "crea", "cau", "art ", "rrt ", "planta", "cálculo estrutural", "calculo estrutural", "habite-se", "habite se", "habitese"] },
+      { id: "preparacao_implantacao", kw: ["limpeza terreno", "demolição", "demolicao", "terraplanagem", "aterro", "escavação", "escavacao", "retroescavadeira", "bota-fora", "bota fora", "sondagem", "implantação", "implantacao", "cerca provisória", "tapume", "barraco obra", "container obra"] },
+      { id: "fundacao", kw: ["fundação", "fundacao", "sapata", "baldrame", "estaca", "radier", "viga baldr", "impermeabilização fundação", "impermeabilizacao fundacao", "forma fundação", "concreto fundação", "alicerce", "blocos de fundação"] },
+      { id: "estrutura", kw: ["estrutura", "viga", "laje", "pilar", "concreto", "cimento", "ferro", "aço", "aco ", "armação", "armacao", "forma de madeira", "escoramento", "concretagem", "betoneira", "tela soldada", "treliça", "vergalhão", "vergalhao"] },
+      { id: "alvenaria_vedacoes", kw: ["alvenaria", "vedação", "vedacao", "tijolo", "bloco cerâm", "bloco ceram", "bloco de concreto", "argamassa", "chapisco", "reboco", "emboço", "emboco", "contra-piso", "contrapiso", "massa corrida", "massa fina", "pedreiro", "assentamento"] },
+      { id: "cobertura", kw: ["telhado", "cobertura", "telha", "madeiramento", "caibro", "ripa", "cumeeira", "calha", "rufo", "terça", "terca", "tesoura telhado", "estrutura metálica cobertura", "manta telhado"] },
+      { id: "esquadrias_vidros", kw: ["esquadria", "vidro", "janela", "porta", "portão", "portao", "grade", "alumínio", "aluminio", "blindex", "box ", "serralheria", "serralheiro", "fechadura", "dobradiça", "dobradica", "trinco", "batente", "marco porta"] },
+      { id: "eletrica_telecom", kw: ["elétric", "eletric", "telecom", "fio ", "cabo ", "tomada", "interruptor", "disjuntor", "quadro de luz", "quadro elétric", "quadro eletric", "eletroduto", "conduíte", "conduite", "iluminação", "iluminacao", "luminária", "luminaria", "lâmpada", "lampada", "cftv", "interfone", "antena", "automação", "automacao", "sensor"] },
+      { id: "hidraulica_sanitaria", kw: ["hidráulic", "hidraulic", "sanitári", "sanitari", "tubo", "registro", "encanamento", "caixa d'água", "caixa d agua", "caixa dagua", "esgoto", "fossa", "cisterna", "bomba", "pressurizador", "aquecedor", "boiler", "conexão pvc", "conexao pvc", "joelho", "tê ", "cap ", "sifão", "sifao", "ralo", "vaso sanitário", "vaso sanitario", "cuba", "pia", "torneira", "misturador", "chuveiro", "ducha"] },
+      { id: "revestimentos", kw: ["revestimento", "porcelanato", "azulejo", "piso", "cerâmic", "ceramic", "pastilha", "pedra", "mármore", "marmore", "granito", "soleira", "rodapé", "rodape", "rejunte", "argamassa colante", "assentamento piso", "nivelamento piso", "meia-cana"] },
+      { id: "gesso_forros", kw: ["gesso", "forro", "drywall", "sanca", "tabica", "moldura gesso", "placa de gesso", "gesseiro", "rebaixamento", "parede drywall", "divisória", "divisoria"] },
+      { id: "pintura", kw: ["pintura", "tinta", "verniz", "textura", "grafiato", "massa corrida", "selador", "primer", "pintor", "rolo pintura", "trincha", "lixa pintura", "stain", "impermeabilizante parede", "esmalte"] },
+      { id: "marcenaria", kw: ["marcenaria", "planejado", "armário", "armario", "móvel", "movel", "bancada", "prateleira", "nichos", "marceneiro", "mdf ", "mdp ", "compensado", "madeira", "carpintaria", "closet", "guarda-roupa"] },
+      { id: "externo_paisagismo", kw: ["paisagismo", "externo", "jardim", "grama", "muro", "calçada", "calcada", "piscina", "churrasqueira", "área gourmet", "area gourmet", "pergolado", "deck", "cerca", "portaria", "guarita", "quintal", "garagem", "estacionamento", "meio-fio", "drenagem"] },
+      { id: "pos_obra", kw: ["pós-obra", "pos-obra", "pos obra", "assistência técnica", "assistencia tecnica", "garantia", "reparo", "conserto", "manutenção", "manutencao", "retoque", "infiltração", "infiltracao", "trinca", "rachadura"] },
+      { id: "administracao_financeiro", kw: ["administrativ", "financeiro", "contábil", "contabil", "banco", "tarifa", "juros", "multa", "imposto", "tributo", "iss ", "inss", "fgts", "seguro obra", "contador", "honorário", "honorario", "taxa prefeitura", "despachante", "nota fiscal"] },
+      { id: "comercializacao_venda", kw: ["venda", "comissão", "comissao", "corretor", "corretagem", "marketing", "propaganda", "placa", "stand", "imobiliária", "imobiliaria", "anúncio", "anuncio", "fotografia", "drone", "tour virtual"] }
+    ];
+
+    const _INFERENCIA_TIPOS = [
+      { id: "material", kw: ["material", "cimento", "tijolo", "areia", "brita", "bloco", "tinta", "argamassa", "porcelanato", "tubo", "fio", "cabo", "cerâmica", "ceramica", "rejunte", "piso", "azulejo", "telha", "madeira", "mdf", "compensado", "ferro", "aço", "aco", "vergalhão", "vergalhao", "tela", "cola", "impermeabilizante", "manta", "veda", "massa", "selador", "primer", "gesso", "placa", "drywall", "pedra", "mármore", "marmore", "granito", "vidro", "alumínio", "aluminio", "concreto", "sifão", "sifao", "ralo", "conexão", "conexao", "joelho", "registro", "válvula", "valvula", "chuveiro", "torneira", "interruptor", "tomada", "disjuntor", "luminária", "luminaria", "lâmpada", "lampada", "fechadura", "dobradiça", "trinco", "parafuso", "prego", "bucha"] },
+      { id: "mao_obra", kw: ["mão de obra", "mao de obra", "pedreiro", "pintor", "eletricista", "encanador", "bombeiro hidráulico", "jardineiro", "serralheiro", "gesseiro", "marceneiro", "carpinteiro", "azulejista", "marmorista", "vidraceiro", "instalador", "montador", "diária", "diaria", "empreitada", "serviço", "servico", "prestação de serviço", "prestacao de servico", "mestre de obras", "ajudante", "servente"] },
+      { id: "frete_entrega", kw: ["frete", "entrega", "transporte", "carreto", "caminhão", "caminhao", "caçamba", "cacamba", "bota-fora", "bota fora", "remoção", "remocao", "mudança", "mudanca", "guindaste", "munck"] },
+      { id: "locacao_equipamento", kw: ["aluguel", "locação", "locacao", "andaime", "equipamento", "betoneira", "vibrador", "compactador", "serra", "furadeira", "martelo demolição", "container", "gerador", "bomba", "escora", "forma"] },
+      { id: "taxas_licencas", kw: ["taxa", "licença", "licenca", "prefeitura", "cartório", "cartorio", "imposto", "tributo", "iss", "inss", "fgts", "alvará", "alvara", "habite-se", "habite se", "certidão", "certidao", "crea", "cau", "art ", "rrt ", "registro", "anotação", "anotacao", "emolumento", "itbi", "escritura"] },
+      { id: "consumiveis", kw: ["epi", "parafuso", "cola", "limpeza", "luva", "rolo", "lixa", "fita", "broca", "disco", "espátula", "espatula", "trincha", "pincel", "balde", "colher pedreiro", "desempenadeira", "nível", "nivel", "trena", "proteção", "protecao"] },
+      { id: "aquisicao_terreno", kw: ["aquisição terreno", "aquisicao terreno", "compra terreno", "compra do lote", "compra lote", "sinal terreno", "entrada terreno", "parcela terreno", "terreno"] }
+    ];
+
+    function _inferirClassificacao(textoCompleto) {
+      const t = textoCompleto.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos pra match
+
+      let melhorEtapa = null, melhorEtapaScore = 0;
+      let melhorTipo = null, melhorTipoScore = 0;
+
+      for (const regra of _INFERENCIA_ETAPAS) {
+        let score = 0;
+        for (const kw of regra.kw) {
+          const kwNorm = kw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          if (t.includes(kwNorm)) score++;
+        }
+        if (score > melhorEtapaScore) { melhorEtapaScore = score; melhorEtapa = regra.id; }
+      }
+
+      for (const regra of _INFERENCIA_TIPOS) {
+        let score = 0;
+        for (const kw of regra.kw) {
+          const kwNorm = kw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          if (t.includes(kwNorm)) score++;
+        }
+        if (score > melhorTipoScore) { melhorTipoScore = score; melhorTipo = regra.id; }
+      }
+
+      return {
+        etapaId: melhorEtapa,
+        etapaScore: melhorEtapaScore,
+        tipoCustoId: melhorTipo,
+        tipoScore: melhorTipoScore
+      };
+    }
+
+    // ─── RENDER PRINCIPAL ──────────────────────────────────
     async function renderRevisaoEmLote() {
       const container = $("revisao-list");
-      container.innerHTML = '<div class="text-center py-8"><div class="loader"></div><p class="mt-4 text-gray-600">Carregando lançamentos de todas as obras...</p></div>';
+      container.innerHTML = '<div class="text-center py-8"><div class="loader"></div><p class="mt-4 text-gray-600">Analisando lançamentos de todas as obras com motor de inferência...</p></div>';
       _revisaoAlterados.clear();
+      _revisaoSugestoes.clear();
       _revisaoAtualizarBotaoSalvar();
 
-      // Popular filtro de obras
       const filtroObra = $("revisao-filtro-obra");
       filtroObra.innerHTML = '<option value="">Todas as obras</option>' +
         state.obras.map(o => `<option value="${o.id}">${escapeHtml(o.nome || o.id)}</option>`).join('');
@@ -7420,31 +7489,61 @@
       try {
         const todos = [];
         for (const obra of state.obras) {
-          const lancSnap = await getDocs(collection(db, "obras", obra.id, "lancamentos"));
-          const fornSnap = await getDocs(collection(db, "obras", obra.id, "fornecedores"));
+          // Carregar lançamentos + categorias legadas + fornecedores
+          const [lancSnap, catSnap, fornSnap] = await Promise.all([
+            getDocs(collection(db, "obras", obra.id, "lancamentos")),
+            getDocs(collection(db, "obras", obra.id, "categorias")),
+            getDocs(collection(db, "obras", obra.id, "fornecedores"))
+          ]);
+          const categorias = new Map(catSnap.docs.map(d => [d.id, d.data()]));
           const fornecedores = new Map(fornSnap.docs.map(d => [d.id, d.data()]));
-          
+
           lancSnap.forEach(docSnap => {
-            const l = { id: docSnap.id, _ref: docSnap.ref, obraId: obra.id, obraNome: obra.nome || obra.id, ...docSnap.data() };
+            const raw = docSnap.data();
+            const l = { id: docSnap.id, obraId: obra.id, obraNome: obra.nome || obra.id, ...raw };
+
+            // Enriquecer com nomes legados
+            l._catNome = categorias.get(l.categoriaId)?.nome || '';
             l._fornNome = fornecedores.get(l.fornecedorId)?.nome || '';
+
+            // Montar texto completo para inferência
+            l._textoAnalise = [
+              l.descricao || '',
+              l._catNome,
+              l._fornNome,
+              l.categoriaId || '',
+              l.obs || '',
+              l.observacao || '',
+              l.notas || '',
+              l.nota || ''
+            ].join(' ');
+
             todos.push(l);
           });
         }
 
-        // Classificar quais são "incompletos"
+        // Filtrar incompletos
         _revisaoPendentes = todos.filter(l => _lancamentoIncompleto(l));
-        _revisaoPendentes.sort((a, b) => (b.valor || 0) - (a.valor || 0)); // Maiores primeiro
+        _revisaoPendentes._totalGeral = todos.length;
+        _revisaoPendentes.sort((a, b) => (b.valor || 0) - (a.valor || 0));
+
+        // Rodar inferência em todos
+        _revisaoPendentes.forEach(l => {
+          const uid = l.obraId + '::' + l.id;
+          const inferido = _inferirClassificacao(l._textoAnalise);
+          _revisaoSugestoes.set(uid, inferido);
+        });
 
         _revisaoRenderTabela();
 
-        // Bind filtros
         filtroObra.onchange = _revisaoRenderTabela;
         $("revisao-filtro-campo").onchange = _revisaoRenderTabela;
         $("revisao-reload").onclick = renderRevisaoEmLote;
         $("revisao-salvar").onclick = _revisaoSalvarAlteracoes;
+        $("revisao-aceitar-todos").onclick = _revisaoAceitarTodos;
       } catch (err) {
         console.error('Erro ao carregar revisão:', err);
-        container.innerHTML = '<p class="text-center text-red-600 py-8">Erro ao carregar lançamentos</p>';
+        container.innerHTML = '<p class="text-center text-red-600 py-8">Erro ao carregar lançamentos: ' + escapeHtml(err.message) + '</p>';
       }
     }
 
@@ -7479,8 +7578,16 @@
         });
       }
 
-      $("revisao-stats").innerHTML = `📊 <strong>${filtrados.length}</strong> de ${_revisaoPendentes.length} pendentes (total no sistema: ${_revisaoPendentes.length + (_revisaoPendentes._totalGeral || 0)})`;
-      _revisaoPendentes._totalGeral = _revisaoPendentes._totalGeral || 0;
+      // Contar sugestões com score > 0
+      let comSugestao = 0;
+      filtrados.forEach(l => {
+        const uid = l.obraId + '::' + l.id;
+        const sug = _revisaoSugestoes.get(uid);
+        if (sug && (sug.etapaScore > 0 || sug.tipoScore > 0)) comSugestao++;
+      });
+
+      $("revisao-stats").innerHTML = `📊 <strong>${filtrados.length}</strong> pendentes | 🤖 <strong>${comSugestao}</strong> com sugestão automática | Total no sistema: ${_revisaoPendentes._totalGeral || 0}`;
+      $("revisao-aceitar-todos").disabled = comSugestao === 0;
 
       if (filtrados.length === 0) {
         container.innerHTML = '<div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center"><div class="text-4xl mb-2">✅</div><div class="text-lg font-bold text-green-800">Nenhum lançamento pendente de revisão!</div></div>';
@@ -7489,13 +7596,14 @@
 
       const etapasCatalogo = state.etapas.length ? state.etapas : CATALOGO_ETAPAS_SEED;
       const tiposCatalogo = state.tiposCusto.length ? state.tiposCusto : CATALOGO_TIPOS_CUSTO_SEED;
+      const etapasMap = new Map(etapasCatalogo.map(e => [e.id, e.nome]));
+      const tiposMap = new Map(tiposCatalogo.map(t => [t.id, t.nome]));
 
       const etapasOptions = etapasCatalogo.filter(e => e.ativo !== false)
         .map(e => `<option value="${e.id}">${escapeHtml(e.nome)}</option>`).join('');
       const tiposOptions = tiposCatalogo.filter(t => t.ativo !== false)
         .map(t => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
 
-      // Coletar fornecedores de todas as obras
       const allFornecedores = new Map();
       state.fornecedores.forEach(f => allFornecedores.set(f.id, f.nome));
       const fornOptions = [...allFornecedores.entries()]
@@ -7504,75 +7612,90 @@
       const totalValor = filtrados.reduce((s, l) => s + (l.valor || 0), 0);
 
       const html = `
-        <div class="text-sm text-gray-600 mb-3">💰 Valor total dos itens: <strong>R$ ${totalValor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></div>
-        <table class="table w-full text-sm">
+        <div class="text-sm text-gray-600 mb-3">💰 Valor total: <strong>R$ ${totalValor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></div>
+        <table class="table w-full text-xs">
           <thead>
-            <tr class="bg-gray-50">
-              <th class="text-left" style="min-width:100px">Obra</th>
-              <th class="text-left" style="min-width:90px">Valor</th>
-              <th class="text-left" style="min-width:120px">Competência</th>
-              <th class="text-left" style="min-width:120px">Vencimento</th>
-              <th class="text-left" style="min-width:160px">Etapa</th>
-              <th class="text-left" style="min-width:140px">Tipo</th>
-              <th class="text-left" style="min-width:140px">Fornecedor</th>
-              <th class="text-left" style="min-width:200px">Descrição</th>
-              <th class="text-left" style="min-width:200px">Comprovante</th>
-              <th class="text-left" style="min-width:60px">Status</th>
+            <tr class="bg-gray-100">
+              <th class="text-left p-2" style="min-width:80px">Obra</th>
+              <th class="text-left p-2" style="min-width:75px">Valor</th>
+              <th class="text-left p-2" style="min-width:130px">🔎 Fonte Original</th>
+              <th class="text-left p-2" style="min-width:105px">Competência</th>
+              <th class="text-left p-2" style="min-width:105px">Vencimento</th>
+              <th class="text-left p-2" style="min-width:155px">Etapa</th>
+              <th class="text-left p-2" style="min-width:130px">Tipo</th>
+              <th class="text-left p-2" style="min-width:130px">Fornecedor</th>
+              <th class="text-left p-2" style="min-width:160px">Descrição</th>
+              <th class="text-left p-2" style="min-width:160px">Comprovante</th>
             </tr>
           </thead>
           <tbody>
-            ${filtrados.map((l, idx) => {
+            ${filtrados.map(l => {
+              const uid = l.obraId + '::' + l.id;
+              const sug = _revisaoSugestoes.get(uid) || {};
               const dataComp = l.dataCompetencia || l.data || '';
               const dataVenc = l.dataVencimento || '';
-              const descricao = (l.descricao && !l.descricao.startsWith('[migrado')) ? l.descricao : '';
+              const descAtual = (l.descricao && !l.descricao.startsWith('[migrado')) ? l.descricao : '';
               const comprovante = l.comprovante || l.anexoUrl || '';
               const etapaAtual = l.etapaId || 'administracao_financeiro';
               const tipoAtual = l.tipoCustoId || 'outros';
               const fornAtual = l.fornecedorId || '';
-              const uid = l.obraId + '::' + l.id;
 
-              // Flags visuais de campos faltando
-              const flags = [];
-              if (!descricao) flags.push('📝');
-              if (etapaAtual === 'administracao_financeiro') flags.push('🏗️');
-              if (tipoAtual === 'outros') flags.push('🏷️');
-              if (!comprovante) flags.push('📎');
-              if (!dataVenc) flags.push('📅');
-              if (!fornAtual) flags.push('🏢');
+              // Qual etapa/tipo mostrar? Se tem sugestão melhor, usar
+              const etapaShow = (sug.etapaScore > 0 && etapaAtual === 'administracao_financeiro') ? sug.etapaId : etapaAtual;
+              const tipoShow = (sug.tipoScore > 0 && tipoAtual === 'outros') ? sug.tipoCustoId : tipoAtual;
+
+              // Badge de sugestão
+              const sugBadge = (sug.etapaScore > 0 || sug.tipoScore > 0)
+                ? `<span class="text-green-600 font-bold" title="Sugestão automática baseada em: ${escapeHtml(l._textoAnalise.substring(0, 100))}">🤖</span>`
+                : '';
+
+              // Fonte original: mostra categoria legada + campos brutos
+              const fonteOriginal = [
+                l._catNome ? `📁 ${l._catNome}` : '',
+                l._fornNome ? `🏢 ${l._fornNome}` : '',
+                l.descricao ? `📝 ${l.descricao.substring(0, 40)}` : ''
+              ].filter(Boolean).join('<br>') || '<span class="text-gray-400">sem dados</span>';
+
+              // Se sugestão difere do atual, highlight
+              const etapaHighlight = (etapaShow !== etapaAtual) ? 'border-2 border-green-400 bg-green-50' : '';
+              const tipoHighlight = (tipoShow !== tipoAtual) ? 'border-2 border-green-400 bg-green-50' : '';
+
+              // Sugerir descrição baseada nos dados originais se não tem
+              const descSugestao = !descAtual ? [l._catNome, l._fornNome].filter(Boolean).join(' - ') : descAtual;
 
               return `
               <tr class="border-b hover:bg-yellow-50" data-uid="${uid}">
-                <td class="text-xs text-gray-600 py-2">${escapeHtml(l.obraNome)}</td>
-                <td class="font-bold text-sm py-2">R$ ${(l.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                <td class="py-2">
-                  <input type="date" value="${dataComp}" class="input text-xs" style="max-width:140px" onchange="window._revisaoMarcar('${uid}','dataCompetencia',this.value)" />
+                <td class="py-2 px-1 text-gray-600">${escapeHtml(l.obraNome)} ${sugBadge}</td>
+                <td class="py-2 px-1 font-bold">R$ ${(l.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td class="py-2 px-1 text-[10px] leading-tight text-gray-500">${fonteOriginal}</td>
+                <td class="py-2 px-1">
+                  <input type="date" value="${dataComp}" class="input text-xs p-1" onchange="window._revisaoMarcar('${uid}','dataCompetencia',this.value)" />
                 </td>
-                <td class="py-2">
-                  <input type="date" value="${dataVenc}" class="input text-xs" style="max-width:140px" onchange="window._revisaoMarcar('${uid}','dataVencimento',this.value)" />
+                <td class="py-2 px-1">
+                  <input type="date" value="${dataVenc}" class="input text-xs p-1" onchange="window._revisaoMarcar('${uid}','dataVencimento',this.value)" />
                 </td>
-                <td class="py-2">
-                  <select class="select text-xs" style="max-width:170px" onchange="window._revisaoMarcar('${uid}','etapaId',this.value)">
-                    ${etapasOptions.replace(`value="${etapaAtual}"`, `value="${etapaAtual}" selected`)}
+                <td class="py-2 px-1">
+                  <select class="select text-xs p-1 ${etapaHighlight}" onchange="window._revisaoMarcar('${uid}','etapaId',this.value)">
+                    ${etapasOptions.replace(`value="${etapaShow}"`, `value="${etapaShow}" selected`)}
                   </select>
                 </td>
-                <td class="py-2">
-                  <select class="select text-xs" style="max-width:150px" onchange="window._revisaoMarcar('${uid}','tipoCustoId',this.value)">
-                    ${tiposOptions.replace(`value="${tipoAtual}"`, `value="${tipoAtual}" selected`)}
+                <td class="py-2 px-1">
+                  <select class="select text-xs p-1 ${tipoHighlight}" onchange="window._revisaoMarcar('${uid}','tipoCustoId',this.value)">
+                    ${tiposOptions.replace(`value="${tipoShow}"`, `value="${tipoShow}" selected`)}
                   </select>
                 </td>
-                <td class="py-2">
-                  <select class="select text-xs" style="max-width:150px" onchange="window._revisaoMarcar('${uid}','fornecedorId',this.value)">
-                    <option value="">Selecione...</option>
+                <td class="py-2 px-1">
+                  <select class="select text-xs p-1" onchange="window._revisaoMarcar('${uid}','fornecedorId',this.value)">
+                    <option value="">—</option>
                     ${fornOptions.replace(fornAtual ? `value="${fornAtual}"` : '____NOMATCH____', fornAtual ? `value="${fornAtual}" selected` : '____NOMATCH____')}
                   </select>
                 </td>
-                <td class="py-2">
-                  <input type="text" value="${escapeHtml(descricao)}" placeholder="Descrição..." class="input text-xs" style="min-width:180px" onchange="window._revisaoMarcar('${uid}','descricao',this.value)" />
+                <td class="py-2 px-1">
+                  <input type="text" value="${escapeHtml(descSugestao)}" placeholder="Descrição..." class="input text-xs p-1" style="min-width:150px" onchange="window._revisaoMarcar('${uid}','descricao',this.value)" />
                 </td>
-                <td class="py-2">
-                  <input type="url" value="${escapeHtml(comprovante)}" placeholder="https://drive.google.com/..." class="input text-xs" style="min-width:180px" onchange="window._revisaoMarcar('${uid}','comprovante',this.value)" />
+                <td class="py-2 px-1">
+                  <input type="url" value="${escapeHtml(comprovante)}" placeholder="https://drive..." class="input text-xs p-1" style="min-width:150px" onchange="window._revisaoMarcar('${uid}','comprovante',this.value)" />
                 </td>
-                <td class="py-2 text-center">${flags.join('')}</td>
               </tr>
             `;
             }).join('')}
@@ -7583,11 +7706,63 @@
       container.innerHTML = html;
     }
 
+    // ─── ACEITAR TODAS AS SUGESTÕES ─────────────────────────
+    window._revisaoAceitarTodos = () => {
+      const filtroObra = $("revisao-filtro-obra").value;
+      const filtroCampo = $("revisao-filtro-campo").value;
+
+      let filtrados = _revisaoPendentes;
+      if (filtroObra) filtrados = filtrados.filter(l => l.obraId === filtroObra);
+
+      let aceitos = 0;
+      filtrados.forEach(l => {
+        const uid = l.obraId + '::' + l.id;
+        const sug = _revisaoSugestoes.get(uid);
+        if (!sug) return;
+
+        const etapaAtual = l.etapaId || 'administracao_financeiro';
+        const tipoAtual = l.tipoCustoId || 'outros';
+        const descAtual = l.descricao || '';
+
+        if (!_revisaoAlterados.has(uid)) _revisaoAlterados.set(uid, {});
+        const alt = _revisaoAlterados.get(uid);
+
+        // Aceitar etapa sugerida se a atual é genérica
+        if (sug.etapaScore > 0 && etapaAtual === 'administracao_financeiro') {
+          alt.etapaId = sug.etapaId;
+          aceitos++;
+        }
+
+        // Aceitar tipo sugerido se o atual é genérico
+        if (sug.tipoScore > 0 && tipoAtual === 'outros') {
+          alt.tipoCustoId = sug.tipoCustoId;
+          aceitos++;
+        }
+
+        // Sugerir descrição se não tem
+        if (!descAtual || descAtual.startsWith('[migrado')) {
+          const descSugestao = [l._catNome, l._fornNome].filter(Boolean).join(' - ');
+          if (descSugestao) {
+            alt.descricao = descSugestao;
+            aceitos++;
+          }
+        }
+
+        // Se competência faltando mas tem data, copiar
+        if (!l.dataCompetencia && l.data) {
+          alt.dataCompetencia = l.data;
+        }
+      });
+
+      _revisaoAtualizarBotaoSalvar();
+      _revisaoRenderTabela(); // Re-render com dados aceitos
+      showToast(`🤖 ${aceitos} sugestões aceitas! Revise e clique Salvar.`, 'success');
+    };
+
     window._revisaoMarcar = (uid, campo, valor) => {
       if (!_revisaoAlterados.has(uid)) _revisaoAlterados.set(uid, {});
       _revisaoAlterados.get(uid)[campo] = valor;
 
-      // Highlight row
       const row = document.querySelector(`tr[data-uid="${CSS.escape(uid)}"]`);
       if (row) row.classList.add('bg-blue-50');
 
@@ -7597,7 +7772,7 @@
     function _revisaoAtualizarBotaoSalvar() {
       const btn = $("revisao-salvar");
       const count = _revisaoAlterados.size;
-      btn.textContent = `💾 Salvar Alterações (${count})`;
+      btn.textContent = `💾 Salvar (${count})`;
       btn.disabled = count === 0;
     }
 
@@ -7606,44 +7781,33 @@
       btn.disabled = true;
       btn.textContent = '⏳ Salvando...';
 
-      let salvos = 0;
-      let erros = 0;
+      let salvos = 0, erros = 0;
 
       try {
-        // Agrupar por obra para batch writes
-        const porObra = new Map();
         for (const [uid, campos] of _revisaoAlterados.entries()) {
           const [obraId, lancId] = uid.split('::');
-          if (!porObra.has(obraId)) porObra.set(obraId, []);
-          porObra.set(obraId, [...porObra.get(obraId), { lancId, campos }]);
-        }
+          try {
+            const ref = doc(db, "obras", obraId, "lancamentos", lancId);
+            const update = { ...campos };
 
-        for (const [obraId, items] of porObra.entries()) {
-          for (const item of items) {
-            try {
-              const ref = doc(db, "obras", obraId, "lancamentos", item.lancId);
-              const update = { ...item.campos };
+            // Sync campos redundantes
+            if (update.dataCompetencia) update.data = update.dataCompetencia;
+            if (update.comprovante) update.anexoUrl = update.comprovante;
 
-              // Sync campos redundantes
-              if (update.dataCompetencia) update.data = update.dataCompetencia;
-              if (update.comprovante) update.anexoUrl = update.comprovante;
-              
-              update._revisaoAt = serverTimestamp();
-              update._revisaoBy = state.user?.email || 'system';
+            update._revisaoAt = serverTimestamp();
+            update._revisaoBy = state.user?.email || 'system';
 
-              await updateDoc(ref, update);
-              salvos++;
-            } catch (err) {
-              console.error(`Erro ao salvar ${obraId}/${item.lancId}:`, err);
-              erros++;
-            }
+            await updateDoc(ref, update);
+            salvos++;
+          } catch (err) {
+            console.error(`Erro ao salvar ${obraId}/${lancId}:`, err);
+            erros++;
           }
         }
 
         _revisaoAlterados.clear();
         showToast(`✅ ${salvos} lançamento(s) atualizado(s)${erros > 0 ? ` | ❌ ${erros} erro(s)` : ''}`, erros > 0 ? 'warning' : 'success');
 
-        // Recarregar
         await renderRevisaoEmLote();
       } catch (err) {
         console.error('Erro ao salvar em lote:', err);
