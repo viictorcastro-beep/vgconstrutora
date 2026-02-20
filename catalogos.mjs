@@ -26,7 +26,8 @@ export const CATALOGO_TIPOS_CUSTO_SEED = [
   { id: "locacao_equipamento", nome: "Locação/Equipamento", ordem: 4, ativo: true, sistema: true },
   { id: "taxas_licencas", nome: "Taxas/Licenças", ordem: 5, ativo: true, sistema: true },
   { id: "consumiveis", nome: "Consumíveis", ordem: 6, ativo: true, sistema: true },
-  { id: "outros", nome: "Outros", ordem: 7, ativo: true, sistema: true }
+  { id: "outros", nome: "Outros", ordem: 7, ativo: true, sistema: true },
+  { id: "aquisicao_terreno", nome: "Aquisição do Terreno", ordem: 8, ativo: true, sistema: true }
 ];
 
 function normalizeSeedItem(item) {
