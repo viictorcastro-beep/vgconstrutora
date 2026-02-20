@@ -2872,7 +2872,7 @@
       const de = socioGustavo.firestoreId;
       const para = socioVictor.firestoreId;
       const valor = 2044.33;
-      const descricao = 'Acerto pendente QD61 LT32 (ajuste legado)';
+      const descricao = 'Acerto QD61 LT32 (legado já abatido)';
       const data = new Date().toISOString().split('T')[0];
 
       const acertosSnap = await getDocs(collection(db, "obras", obra.id, "acertos"));
@@ -2888,24 +2888,14 @@
         if (match) existenteId = doc.id;
       });
 
-      if (!existenteId) {
-        await addDoc(collection(db, "obras", obra.id, "acertos"), {
-          data,
-          de,
-          para,
-          valor,
-          descricao,
-          considerarNaEqualizacao: true,
-          createdAt: serverTimestamp(),
-          createdBy: state.user?.email || 'system'
-        });
-        showToast('✅ Acerto pendente QD61 LT32 lançado (R$ 2.044,33)', 'success');
-      } else {
+      if (existenteId) {
         await updateDoc(doc(db, "obras", obra.id, "acertos", existenteId), {
           de,
           para,
-          considerarNaEqualizacao: true,
-          descricao
+          considerarNaEqualizacao: false,
+          descricao,
+          updatedAt: serverTimestamp(),
+          updatedBy: state.user?.email || 'system'
         });
       }
 
