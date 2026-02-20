@@ -1968,6 +1968,7 @@
         hydrateSociosObraSelect();
         hydrateProprietarioSelect();
         renderListaSocios();
+        garantirAcertoPendenteQd61Lt32().catch(err => console.error('Erro ao garantir acerto QD61 LT32:', err));
       }, (err) => {
         console.error("❌ Erro ao carregar sócios:", err);
       }));
@@ -2087,6 +2088,7 @@
         
         hydrateObrasSelect();
         migrarEntradaTerrenoQd20Lt2().catch(err => console.error('Erro ao migrar entrada do terreno QD20 LT2:', err));
+        garantirAcertoPendenteQd61Lt32().catch(err => console.error('Erro ao garantir acerto QD61 LT32:', err));
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
         showToast("Erro ao carregar obras", "error");
@@ -2855,7 +2857,7 @@
 
     async function garantirAcertoPendenteQd61Lt32() {
       if (!isAdmin()) return;
-      if (localStorage.getItem('acerto_qd61_2044_pendente_v4') === '1') return;
+      if (localStorage.getItem('acerto_qd61_2044_pendente_v5') === '1') return;
 
       const obra = state.obras.find(o =>
         (o.nome && o.nome.toLowerCase().includes('qd61') && o.nome.toLowerCase().includes('lt32')) ||
@@ -2911,7 +2913,7 @@
         });
       }
 
-      localStorage.setItem('acerto_qd61_2044_pendente_v4', '1');
+      localStorage.setItem('acerto_qd61_2044_pendente_v5', '1');
     }
 
     async function migrarEntradaTerrenoQd20Lt2() {
