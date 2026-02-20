@@ -3226,16 +3226,12 @@
             const paraId = resolveSocioFirestoreId(a.para) || resolveSocioFirestoreId(normalizarSocioValor(a.para, obra));
 
             if (deId && posicoes[deId]) {
-              posicoes[deId].detalheCaixa.pagoFisico += valor;
               posicoes[deId].acertosPago += valor;
               addDetalheObra(deId, 'acertosPago', valor);
-              addDetalheObra(deId, 'pagoFisico', valor);
             }
             if (paraId && posicoes[paraId]) {
-              posicoes[paraId].detalheCaixa.recebidoFisico += valor;
               posicoes[paraId].acertosRecebido += valor;
               addDetalheObra(paraId, 'acertosRecebido', valor);
-              addDetalheObra(paraId, 'recebidoFisico', valor);
             }
           });
 
@@ -3325,7 +3321,7 @@
       console.log('\n📊 [EQ GLOBAL] Totais consolidados:');
       const posicoesArray = Object.values(posicoes);
       const totalNetGlobal = posicoesArray.reduce(
-        (sum, pos) => sum + ((pos.detalheCaixa.recebidoFisico || 0) - (pos.detalheCaixa.pagoFisico || 0)),
+        (sum, pos) => sum + ((pos.detalheCaixaSemAcerto.recebidoFisico || 0) - (pos.detalheCaixaSemAcerto.pagoFisico || 0)),
         0
       );
       const mediaNetGlobal = posicoesArray.length ? totalNetGlobal / posicoesArray.length : 0;
@@ -3333,7 +3329,7 @@
       posicoesArray.forEach(pos => {
         pos.caixaFisico = pos.detalheCaixa.recebidoFisico - pos.detalheCaixa.pagoFisico;
         pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
-        const netGlobal = (pos.detalheCaixa.recebidoFisico || 0) - (pos.detalheCaixa.pagoFisico || 0);
+        const netGlobal = (pos.detalheCaixaSemAcerto.recebidoFisico || 0) - (pos.detalheCaixaSemAcerto.pagoFisico || 0);
         pos.posicaoLiquida = mediaNetGlobal - netGlobal;
         pos.totalConsolidado = pos.posicaoLiquida + pos.contasReceber;
 
@@ -3409,6 +3405,14 @@
           };
           console.log(`  ✅ Acerto: ${posA.nome} → ${posB.nome} = R$ ${Math.abs(posicaoLiquidaA).toFixed(2)}`);
         }
+      }
+
+      if (modoA.transferencia) {
+        const dePos = posicoes[modoA.transferencia.de];
+        const paraPos = posicoes[modoA.transferencia.para];
+        const abatimento = (dePos?.acertosPago || 0) - (paraPos?.acertosPago || 0);
+        const valorAjustado = Math.max(0, (modoA.transferencia.valor || 0) - abatimento);
+        modoA.transferencia.valor = valorAjustado;
       }
 
       return {
@@ -3774,10 +3778,16 @@
           const totalRecebido = getRecebido(posDe) + getRecebido(posPara);
           const totalLiquido = totalRecebido - totalPago;
 
+          const dePos = posDe;
+          const paraPos = posPara;
+          const abatimento = (dePos?.acertosPago || 0) - (paraPos?.acertosPago || 0);
+          const valorBase = transferencia.valor || 0;
+          const valorAjustado = Math.max(0, valorBase);
+
           acertosConsolidados = [{
             pagador: transferencia.deNome || posDe?.nome || '—',
             recebedor: transferencia.paraNome || posPara?.nome || '—',
-            valor: transferencia.valor || 0,
+            valor: valorAjustado,
             socioANome: posDe?.nome || transferencia.deNome || '—',
             socioBNome: posPara?.nome || transferencia.paraNome || '—',
             pagoA: getPago(posDe),
@@ -3786,8 +3796,8 @@
             recebidoB: getRecebido(posPara),
             liquidoA: getRecebido(posDe) - getPago(posDe),
             liquidoB: getRecebido(posPara) - getPago(posPara),
-            saldoCompletoA: getSaldoCompleto(posDe),
-            saldoCompletoB: getSaldoCompleto(posPara),
+            saldoCompletoA: -(valorAjustado || 0),
+            saldoCompletoB: (valorAjustado || 0),
             totalPago,
             totalRecebido,
             totalLiquido
