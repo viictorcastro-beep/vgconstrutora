@@ -3762,7 +3762,7 @@
           const getRecebido = (p) => p?.detalheCaixa?.recebidoFisico ?? 0;
           const getDireito = (p) => p?.detalheDireito?.receitaPorAlocacao ?? 0;
           const getDeveria = (p) => p?.detalheDireito?.custoPorAlocacao ?? 0;
-          const getSaldoCompleto = (p) => (getPago(p) - getDeveria(p)) - (getRecebido(p) - getDireito(p));
+          const getSaldoCompleto = (p) => p?.posicaoLiquida ?? 0;
 
           const totalPago = getPago(posDe) + getPago(posPara);
           const totalDevido = getDeveria(posDe) + getDeveria(posPara);
