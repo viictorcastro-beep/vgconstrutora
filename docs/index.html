@@ -696,7 +696,8 @@
       <!-- ACERTOS VIEW -->
       <div id="view-ACERTOS" class="view-content hidden">
         <div class="card p-6 mb-6">
-          <div class="font-black text-lg mb-4">🤝 Novo Acerto entre Sócios</div>
+          <div class="font-black text-lg mb-4">🤝 Novo Acerto entre Sócios (Global)</div>
+          <p class="text-sm text-gray-500 mb-4">Acertos são calculados globalmente — somando todas as obras.</p>
           <form id="acerto-form">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
@@ -736,7 +737,7 @@
         </div>
 
         <div class="card p-6">
-          <div class="font-black text-lg mb-4">📋 Histórico de Acertos</div>
+          <div class="font-black text-lg mb-4">📋 Histórico de Acertos (Todas as Obras)</div>
           <div id="acerto-list"></div>
         </div>
       </div>
@@ -1705,12 +1706,19 @@
       };
 
       $("acerto-form").onsubmit = addAcerto;
-      $("acerto-sugerir").onclick = () => {
-        const eq = computeEqualizacao();
-        if (eq && eq.mensagem) {
-          showToast(eq.mensagem, 'info');
-        } else {
-          showToast('✅ Saldos equalizados! Não há acertos pendentes.', 'success');
+      $("acerto-sugerir").onclick = async () => {
+        try {
+          showToast('⏳ Calculando equalização global...', 'info');
+          const resultado = await calcularEqualizacaoGlobal();
+          if (resultado?.modoA?.transferencia && resultado.modoA.transferencia.valor >= 0.01) {
+            const t = resultado.modoA.transferencia;
+            showToast(`${t.deNome} deve transferir R$ ${t.valor.toFixed(2)} para ${t.paraNome}`, 'info');
+          } else {
+            showToast('✅ Saldos equalizados! Não há acertos pendentes.', 'success');
+          }
+        } catch (err) {
+          console.error('Erro ao calcular equalização:', err);
+          showToast('Erro ao calcular equalização', 'error');
         }
       };
 
@@ -7268,65 +7276,89 @@
       }
     };
 
-    // ACERTOS VIEW
+    // ACERTOS VIEW (GLOBAL - carrega de TODAS as obras)
     function renderAcertosView() {
       garantirSociosMapeados(); // Garantir antes de renderizar
       
       // Acertos são preenchidos dinamicamente com os sócios da obra via data-socio-select
-      renderAcertosList();
+      renderAcertosListGlobal();
     }
 
-    function renderAcertosList() {
+    async function renderAcertosListGlobal() {
       const container = $("acerto-list");
-      if (state.acertos.length === 0) {
-        container.innerHTML = '<p class="text-center muted py-8">Nenhum acerto cadastrado</p>';
-        return;
-      }
+      container.innerHTML = '<div class="text-center py-4"><div class="loader"></div><p class="mt-2 text-gray-500 text-sm">Carregando acertos de todas as obras...</p></div>';
 
-      const obra = state.obras.find(o => o.id === OBRA_ID);
-      
-      const html = `
-        <table class="table w-full">
-          <thead>
-            <tr>
-              <th class="text-left">Data</th>
-              <th class="text-left">De</th>
-              <th class="text-left">Para</th>
-              <th class="text-left">Valor</th>
-              <th class="text-left">Descrição</th>
-              <th class="text-left">Considerar</th>
-              <th class="text-left">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.acertos.map(a => {
-              const deId = normalizarSocioValor(a.de, obra);
-              const paraId = normalizarSocioValor(a.para, obra);
-              
-              const considerar = a.considerarNaEqualizacao === true;
-              return `
+      try {
+        // Carregar acertos de TODAS as obras
+        const todosAcertos = [];
+        for (const obra of state.obras) {
+          const acertosSnap = await getDocs(collection(db, "obras", obra.id, "acertos"));
+          acertosSnap.forEach(doc => {
+            todosAcertos.push({
+              id: doc.id,
+              obraId: obra.id,
+              obraNome: obra.nome || obra.id,
+              ...doc.data()
+            });
+          });
+        }
+
+        // Ordenar por data (mais recente primeiro)
+        todosAcertos.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+
+        if (todosAcertos.length === 0) {
+          container.innerHTML = '<p class="text-center muted py-8">Nenhum acerto cadastrado em nenhuma obra</p>';
+          return;
+        }
+
+        const html = `
+          <table class="table w-full">
+            <thead>
               <tr>
-                <td>${new Date(a.data).toLocaleDateString('pt-BR')}</td>
-                <td>${escapeHtml(socioNomePorQualquerId(deId))}</td>
-                <td>${escapeHtml(socioNomePorQualquerId(paraId))}</td>
-                <td class="font-bold">R$ ${a.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td>${escapeHtml(a.descricao)}</td>
-                <td>
-                  <button onclick="window.toggleAcertoEqualizacao('${a.id}', ${considerar ? 'true' : 'false'})" class="text-sm ${considerar ? 'text-green-700' : 'text-gray-500'} hover:underline">
-                    ${considerar ? '✅ Sim' : '⚪ Não'}
-                  </button>
-                </td>
-                <td>
-                  <button onclick="window.deleteAcerto('${a.id}')" class="text-red-600 hover:underline">🗑️</button>
-                </td>
+                <th class="text-left">Data</th>
+                <th class="text-left">Obra</th>
+                <th class="text-left">De</th>
+                <th class="text-left">Para</th>
+                <th class="text-left">Valor</th>
+                <th class="text-left">Descrição</th>
+                <th class="text-left">Considerar</th>
+                <th class="text-left">Ações</th>
               </tr>
-            `;
-            }).join('')}
-          </tbody>
-        </table>
-      `;
+            </thead>
+            <tbody>
+              ${todosAcertos.map(a => {
+                const obra = state.obras.find(o => o.id === a.obraId);
+                const deId = normalizarSocioValor(a.de, obra);
+                const paraId = normalizarSocioValor(a.para, obra);
+                const considerar = a.considerarNaEqualizacao === true;
+                return `
+                <tr>
+                  <td>${a.data ? new Date(a.data).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td class="text-xs text-gray-600">${escapeHtml(a.obraNome)}</td>
+                  <td>${escapeHtml(socioNomePorQualquerId(deId))}</td>
+                  <td>${escapeHtml(socioNomePorQualquerId(paraId))}</td>
+                  <td class="font-bold">R$ ${(a.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td>${escapeHtml(a.descricao || '')}</td>
+                  <td>
+                    <button onclick="window.toggleAcertoGlobal('${a.obraId}', '${a.id}', ${considerar ? 'true' : 'false'})" class="text-sm ${considerar ? 'text-green-700' : 'text-gray-500'} hover:underline">
+                      ${considerar ? '✅ Sim' : '⚪ Não'}
+                    </button>
+                  </td>
+                  <td>
+                    <button onclick="window.deleteAcertoGlobal('${a.obraId}', '${a.id}')" class="text-red-600 hover:underline">🗑️</button>
+                  </td>
+                </tr>
+              `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
 
-      container.innerHTML = html;
+        container.innerHTML = html;
+      } catch (err) {
+        console.error('Erro ao carregar acertos globais:', err);
+        container.innerHTML = '<p class="text-center text-red-600 py-8">Erro ao carregar acertos</p>';
+      }
     }
 
     // CONFIG VIEW
@@ -8347,6 +8379,34 @@
       }
     };
 
+    // Toggle/Delete para acertos GLOBAIS (recebe obraId explícito)
+    window.toggleAcertoGlobal = async (obraId, acertoId, atual) => {
+      try {
+        await updateDoc(doc(db, "obras", obraId, "acertos", acertoId), {
+          considerarNaEqualizacao: !atual,
+          updatedAt: serverTimestamp(),
+          updatedBy: state.user?.email || 'system'
+        });
+        showToast('Acerto atualizado', 'success');
+        renderAcertosListGlobal(); // Recarregar lista global
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao atualizar acerto', 'error');
+      }
+    };
+
+    window.deleteAcertoGlobal = async (obraId, acertoId) => {
+      if (!confirm('Deletar este acerto?')) return;
+      try {
+        await deleteDoc(doc(db, "obras", obraId, "acertos", acertoId));
+        showToast('Acerto deletado', 'success');
+        renderAcertosListGlobal(); // Recarregar lista global
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao deletar acerto', 'error');
+      }
+    };
+
     window.editLancamento = async (id) => {
       const lanc = state.lancamentos.find(l => l.id === id);
       if (!lanc) return;
@@ -8455,45 +8515,49 @@
     };
 
     window.sugerirAcerto = async () => {
-      const eq = computeEqualizacao();
-      if (!eq || !eq.mensagem) {
-        showToast('Não há acerto pendente', 'info');
-        return;
+      try {
+        showToast('⏳ Calculando equalização global...', 'info');
+        const resultado = await calcularEqualizacaoGlobal();
+        
+        if (!resultado || !resultado.modoA || !resultado.modoA.transferencia || resultado.modoA.transferencia.valor < 0.01) {
+          showToast('✅ Saldos equalizados! Não há acertos pendentes.', 'success');
+          return;
+        }
+
+        const t = resultado.modoA.transferencia;
+
+        // Map firestoreId → canonical A/B for the form select
+        const deCanonical = resolveSocioCanonicalId(t.de);
+        const paraCanonical = resolveSocioCanonicalId(t.para);
+
+        if (!deCanonical || !paraCanonical) {
+          showToast('Erro: não foi possível mapear sócios para o formulário', 'error');
+          return;
+        }
+
+        // Navegar para a view de acertos
+        navigateTo('ACERTOS');
+
+        // Aguardar um pouco para garantir que a view foi carregada
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Preencher formulário com valor GLOBAL
+        const hoje = new Date().toISOString().split('T')[0];
+        $("ac-data").value = hoje;
+        $("ac-de").value = deCanonical;
+        $("ac-para").value = paraCanonical;
+        $("ac-valor").value = t.valor.toFixed(2);
+        $("ac-descricao").value = `Equalização global - ${new Date().toLocaleDateString('pt-BR')}`;
+
+        // Focar no campo de descrição
+        $("ac-descricao").focus();
+        $("ac-descricao").select();
+
+        showToast(`✨ ${t.deNome} deve transferir R$ ${t.valor.toFixed(2)} para ${t.paraNome} (global)`, 'success');
+      } catch (err) {
+        console.error('Erro ao calcular equalização global:', err);
+        showToast('Erro ao calcular equalização', 'error');
       }
-
-      // Determinar quem deve pagar para quem
-      let de, para, valor;
-      if (eq.saldoFinalA > 0) {
-        // A tem a receber, B deve pagar para A
-        de = "B";
-        para = "A";
-        valor = Math.abs(eq.saldoFinalA);
-      } else {
-        // B tem a receber, A deve pagar para B
-        de = "A";
-        para = "B";
-        valor = Math.abs(eq.saldoFinalB);
-      }
-
-      // Navegar para a view de acertos
-      navigateTo('ACERTOS');
-
-      // Aguardar um pouco para garantir que a view foi carregada
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Preencher formulário
-      const hoje = new Date().toISOString().split('T')[0];
-      $("ac-data").value = hoje;
-      $("ac-de").value = de;
-      $("ac-para").value = para;
-      $("ac-valor").value = valor.toFixed(2);
-      $("ac-descricao").value = `Equalização automática - ${new Date().toLocaleDateString('pt-BR')}`;
-
-      // Focar no campo de descrição
-      $("ac-descricao").focus();
-      $("ac-descricao").select();
-
-      showToast('✨ Formulário preenchido! Revise e salve o acerto.', 'success');
     };
 
     window.deleteFornecedor = async (id) => {
