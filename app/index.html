@@ -7277,6 +7277,7 @@
               <th class="text-left">Para</th>
               <th class="text-left">Valor</th>
               <th class="text-left">Descrição</th>
+              <th class="text-left">Considerar</th>
               <th class="text-left">Ações</th>
             </tr>
           </thead>
@@ -7285,6 +7286,7 @@
               const deId = normalizarSocioValor(a.de, obra);
               const paraId = normalizarSocioValor(a.para, obra);
               
+              const considerar = a.considerarNaEqualizacao === true;
               return `
               <tr>
                 <td>${new Date(a.data).toLocaleDateString('pt-BR')}</td>
@@ -7292,6 +7294,11 @@
                 <td>${escapeHtml(socioNomePorQualquerId(paraId))}</td>
                 <td class="font-bold">R$ ${a.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>${escapeHtml(a.descricao)}</td>
+                <td>
+                  <button onclick="window.toggleAcertoEqualizacao('${a.id}', ${considerar ? 'true' : 'false'})" class="text-sm ${considerar ? 'text-green-700' : 'text-gray-500'} hover:underline">
+                    ${considerar ? '✅ Sim' : '⚪ Não'}
+                  </button>
+                </td>
                 <td>
                   <button onclick="window.deleteAcerto('${a.id}')" class="text-red-600 hover:underline">🗑️</button>
                 </td>
@@ -8290,6 +8297,19 @@
       } catch (err) {
         console.error(err);
         showToast('Erro ao deletar unidade', 'error');
+      }
+    };
+
+    window.toggleAcertoEqualizacao = async (id, atual) => {
+      try {
+        await updateDoc(doc(db, "obras", OBRA_ID, "acertos", id), {
+          considerarNaEqualizacao: !atual,
+          updatedAt: serverTimestamp(),
+          updatedBy: state.user?.email || 'system'
+        });
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao atualizar acerto', 'error');
       }
     };
 
