@@ -630,7 +630,7 @@
             <p class="text-blue-800 text-sm">
               São valores de <strong>vendas confirmadas</strong> que ainda não viraram dinheiro. 
               Por exemplo: você vendeu 30% de uma obra por R$ 10.000, mas ainda não recebeu o pagamento. 
-              Registre aqui para que o sistema considere esse valor futuro na equalização estratégica.
+              Registre aqui para controle e acompanhamento dos valores futuros a receber.
             </p>
           </div>
           
@@ -3344,10 +3344,8 @@
     }
 
     /**
-     * Calcula a equalização global entre sócios (quem deve transferir para quem).
-     * Retorna dois modos:
-     * - modoA (Caixa): Equalizar apenas posição de caixa físico (curto prazo)
-     * - modoB (Estratégico): Equalizar caixa + contas a receber (visão futura)
+    * Calcula a equalização global entre sócios (quem deve transferir para quem).
+    * Retorna o modo A (Caixa): Equalizar apenas posição de caixa físico (curto prazo)
      */
     async function calcularEqualizacaoGlobal() {
       const posicoes = await calcularPosicaoGlobalConsolidada();
@@ -3403,49 +3401,9 @@
         }
       }
 
-      // MODO B: Equalização Estratégica (Caixa + CR)
-      const totalA = posicaoLiquidaA + posA.contasReceber;
-      const totalB = posicaoLiquidaB + posB.contasReceber;
-      const mediaTotal = (totalA + totalB) / 2;
-      const saldoATotal = totalA - mediaTotal;
-      const saldoBTotal = totalB - mediaTotal;
-
-      let modoB = {
-        tipo: 'Caixa + Contas a Receber',
-        descricao: 'Equalização estratégica considerando valores a receber futuros',
-        mediaTotal,
-        transferencia: null
-      };
-
-      if (Math.abs(saldoATotal) > 0.01) {
-        if (saldoATotal > 0) {
-          // A tem excesso total, deve repassar para B
-          modoB.transferencia = {
-            de: socioA,
-            deNome: posA.nome,
-            para: socioB,
-            paraNome: posB.nome,
-            valor: Math.abs(saldoATotal)
-          };
-        } else {
-          // B tem excesso total, deve repassar para A
-          modoB.transferencia = {
-            de: socioB,
-            deNome: posB.nome,
-            para: socioA,
-            paraNome: posA.nome,
-            valor: Math.abs(saldoBTotal)
-          };
-        }
-      }
-
       return {
         posicoes,
-        modoA,
-        modoB,
-        diferenca: modoA.transferencia && modoB.transferencia 
-          ? Math.abs((modoA.transferencia.valor || 0) - (modoB.transferencia.valor || 0))
-          : 0
+        modoA
       };
     }
 
@@ -4409,76 +4367,6 @@
           `}
         </div>
         
-        <!-- Modo B: Caixa + CR -->
-        <div class="bg-white rounded-lg border-2 border-blue-400 p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="font-black text-xl text-blue-900">🎯 MODO B: Equalização Estratégica (Caixa + CR)</h3>
-              <p class="text-sm text-gray-600 mt-1">${modoB.descricao}</p>
-            </div>
-            <span class="badge bg-blue-100 text-blue-800 text-lg px-4 py-2">Visão Futura</span>
-          </div>
-          
-          ${modoB.transferencia ? `
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-500 rounded-lg p-6">
-              <div class="flex items-center justify-between mb-4">
-                <div class="text-2xl font-black text-gray-800">
-                  ${escapeHtml(modoB.transferencia.deNome)} → ${escapeHtml(modoB.transferencia.paraNome)}
-                </div>
-                <div class="text-4xl font-black text-blue-600">
-                  R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </div>
-              </div>
-              
-              <div class="bg-white rounded p-4 text-sm">
-                <div class="font-bold text-blue-900 mb-2">📊 Explicação:</div>
-                <p class="text-gray-700">
-                  Considerando <strong>caixa atual + valores a receber futuros</strong>, 
-                  <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> está com mais recursos consolidados. 
-                  Para equalizar a posição estratégica, 
-                  <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> deve transferir 
-                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                  para <strong>${escapeHtml(modoB.transferencia.paraNome)}</strong>.
-                </p>
-                <p class="text-gray-600 mt-2 text-xs">
-                  💡 Este valor é menor que o Modo A porque considera receitas futuras que vão equilibrar naturalmente.
-                </p>
-              </div>
-            </div>
-          ` : `
-            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
-              <div class="text-4xl mb-3">✅</div>
-              <div class="font-bold text-gray-800 text-xl">Posição Estratégica Equalizada!</div>
-              <p class="text-gray-600 mt-2">Considerando valores futuros, não há necessidade de repasse imediato.</p>
-            </div>
-          `}
-        </div>
-        
-        <!-- Comparação entre Modos -->
-        ${modoA.transferencia && modoB.transferencia && diferenca > 0.01 ? `
-          <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg p-6">
-            <h3 class="font-black text-lg text-purple-900 mb-3">🔍 Comparação entre Modos</h3>
-            
-            <div class="bg-white rounded p-4">
-              <div class="flex justify-between items-center mb-4">
-                <span class="text-gray-700">Diferença entre modos:</span>
-                <span class="text-2xl font-black text-purple-600">
-                  R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </span>
-              </div>
-              
-              <div class="bg-yellow-50 border border-yellow-300 rounded p-3">
-                <div class="font-bold text-yellow-900 mb-2">💡 O que isso significa?</div>
-                <p class="text-yellow-800 text-sm">
-                  A diferença de <strong>R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                  representa o impacto das <strong>Contas a Receber</strong> na equalização. 
-                  Se vocês esperarem receber os valores pendentes, o repasse necessário diminui em aproximadamente esse montante.
-                </p>
-              </div>
-            </div>
-          </div>
-        ` : ''}
-        
         <!-- Recomendações -->
         <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 rounded-lg p-6 mt-6">
           <h3 class="font-black text-lg text-amber-900 mb-3">💡 Recomendações</h3>
@@ -4490,15 +4378,6 @@
                 <li>Precisam equalizar rapidamente</li>
                 <li>Um sócio está com fluxo de caixa apertado</li>
                 <li>Querem manter justiça imediata</li>
-              </ul>
-            </div>
-            
-            <div class="bg-white rounded p-3 border-l-4 border-blue-500">
-              <div class="font-bold text-blue-900">🎯 Use o MODO B (Estratégico) se:</div>
-              <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
-                <li>Têm valores confirmados a receber em breve</li>
-                <li>Querem evitar movimentações desnecessárias</li>
-                <li>Confiam que os recebimentos futuros vão equilibrar naturalmente</li>
               </ul>
             </div>
           </div>
