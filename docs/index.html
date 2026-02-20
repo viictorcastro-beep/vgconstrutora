@@ -1079,6 +1079,35 @@
         <div class="text-sm text-yellow-700">Os catálogos são padronizados e protegidos contra edições manuais.</div>
       </div>
 
+      <div class="card p-4 mb-5 border border-slate-200">
+        <div class="font-bold mb-2">➕ Criar nova categoria (admin)</div>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div>
+            <div class="text-xs muted mb-1">Tipo *</div>
+            <select id="catalogo-create-tipo" class="select">
+              <option value="etapa">Etapa</option>
+              <option value="tipo">Tipo de custo</option>
+            </select>
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">ID *</div>
+            <input id="catalogo-create-id" class="input" placeholder="ex: 19 ou pintura_externa" />
+          </div>
+          <div class="md:col-span-2">
+            <div class="text-xs muted mb-1">Nome *</div>
+            <input id="catalogo-create-nome" class="input" placeholder="Ex: Pintura Externa" />
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">Ordem (opcional)</div>
+            <input id="catalogo-create-ordem" type="number" class="input" placeholder="Auto" />
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-3">
+          <div id="catalogo-create-msg" class="text-xs muted">Se Ordem estiver vazia, usa o número do ID (se for numérico) ou o próximo disponível.</div>
+          <button id="catalogo-create-btn" class="btn btn-dark">Criar</button>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <div class="font-bold mb-2">🏗️ Etapas</div>
@@ -1343,6 +1372,44 @@
       { id: "outros", nome: "Outros", ordem: 7, ativo: true, sistema: true }
     ];
 
+    function slugifyCatalogoId(value) {
+      return (value || "")
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/[^a-z0-9_]+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    }
+
+    function getNextCatalogoOrder(list) {
+      const ordens = list.map(i => Number(i.ordem)).filter(n => Number.isFinite(n));
+      return ordens.length ? Math.max(...ordens) + 1 : 1;
+    }
+
+    function sortCatalogoItems(items) {
+      return [...items].sort((a, b) => {
+        const aOrd = Number.isFinite(Number(a.ordem)) ? Number(a.ordem) : null;
+        const bOrd = Number.isFinite(Number(b.ordem)) ? Number(b.ordem) : null;
+        if (aOrd !== null && bOrd !== null && aOrd !== bOrd) return aOrd - bOrd;
+        if (aOrd !== null && bOrd === null) return -1;
+        if (aOrd === null && bOrd !== null) return 1;
+        const aId = (a.id || "").toString();
+        const bId = (b.id || "").toString();
+        return aId.localeCompare(bId, "pt-BR", { numeric: true, sensitivity: "base" });
+      });
+    }
+
+    function mergeCatalogoItems(baseItems, extraItems) {
+      const map = new Map();
+      baseItems.forEach(item => map.set(item.id, item));
+      extraItems.forEach(item => {
+        if (!map.has(item.id)) map.set(item.id, item);
+      });
+      return sortCatalogoItems([...map.values()]);
+    }
+
     const listeners = [];
     const obraListeners = [];
 
@@ -1542,7 +1609,8 @@
       document.getElementById("obra-form").onsubmit = createObra;
       $("unid-create").onclick = createUnidade;
       $("forn-create").onclick = createFornecedor;
-      // Catálogos oficiais são read-only no UI
+      const catalogoCreateBtn = $("catalogo-create-btn");
+      if (catalogoCreateBtn) catalogoCreateBtn.onclick = createCatalogoItem;
       $("ded-create").onclick = createDeducao;
 
       // Deduções: controlar estado da base quando tipo mudar
@@ -1749,6 +1817,34 @@
       }
     }
 
+    async function fetchCatalogosFirestore() {
+      const [etapasSnap, tiposSnap] = await Promise.all([
+        getDocs(refs("dummy").catalogoEtapasCol),
+        getDocs(refs("dummy").catalogoTiposCustoCol)
+      ]);
+
+      return {
+        etapas: etapasSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        tipos: tiposSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      };
+    }
+
+    async function mergeCatalogosWithFirestore(baseEtapas, baseTipos) {
+      try {
+        const custom = await fetchCatalogosFirestore();
+        return {
+          etapas: mergeCatalogoItems(baseEtapas, custom.etapas),
+          tipos: mergeCatalogoItems(baseTipos, custom.tipos)
+        };
+      } catch (err) {
+        console.warn("⚠️ Falha ao carregar catálogos do Firestore:", err);
+        return {
+          etapas: sortCatalogoItems(baseEtapas),
+          tipos: sortCatalogoItems(baseTipos)
+        };
+      }
+    }
+
     async function loadCatalogosFromApi() {
       state.catalogosStatus.loading = true;
       state.catalogosStatus.error = null;
@@ -1757,22 +1853,15 @@
       rerender();
 
       try {
-        if (!API_BASE) {
-          state.etapas = [...CATALOGO_ETAPAS_SEED];
-          state.tiposCusto = [...CATALOGO_TIPOS_CUSTO_SEED];
-          state.ready.catalogos = true;
-          state.catalogosStatus.lastLoadedAt = new Date().toISOString();
-          console.log("✅ Catálogos locais (Pages) carregados.");
-          return;
-        }
         console.log(`🔎 Buscando catálogos via API... base=${API_BASE || "(same-origin)"}`);
         const [etapas, tipos] = await Promise.all([
           fetchCatalogo("/api/catalogos/etapas"),
           fetchCatalogo("/api/catalogos/tipos-custo")
         ]);
 
-        state.etapas = etapas.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-        state.tiposCusto = tipos.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+        const merged = await mergeCatalogosWithFirestore(etapas, tipos);
+        state.etapas = merged.etapas;
+        state.tiposCusto = merged.tipos;
         state.ready.catalogos = state.etapas.length > 0 && state.tiposCusto.length > 0;
         state.catalogosStatus.lastLoadedAt = new Date().toISOString();
 
@@ -1780,10 +1869,13 @@
       } catch (err) {
         console.error("❌ Erro ao carregar catálogos:", err);
         if (!API_BASE) {
-          state.etapas = [...CATALOGO_ETAPAS_SEED];
-          state.tiposCusto = [...CATALOGO_TIPOS_CUSTO_SEED];
+          console.warn("⚠️ Catálogos API indisponível, usando seeds locais.");
+          const merged = await mergeCatalogosWithFirestore(CATALOGO_ETAPAS_SEED, CATALOGO_TIPOS_CUSTO_SEED);
+          state.etapas = merged.etapas;
+          state.tiposCusto = merged.tipos;
           state.ready.catalogos = true;
           state.catalogosStatus.error = null;
+          state.catalogosStatus.lastLoadedAt = new Date().toISOString();
         } else {
           state.catalogosStatus.error = `Falha ao carregar catálogos (${err.message || "erro"})`;
         }
@@ -1822,21 +1914,15 @@
       state.dashboardStatus.lastKey = key;
       try {
         if (!API_BASE) {
-          state.dashboardStatus.data = window.getDashboardCustos
-            ? window.getDashboardCustos(filtros)
-            : null;
-          return;
+          const lancs = getCustosFiltradosByFiltros(filtros);
+          state.dashboardStatus.data = buildDashboardResponse(filtros, lancs);
+        } else {
+          state.dashboardStatus.data = await fetchDashboardCustos(filtros);
         }
-        state.dashboardStatus.data = await fetchDashboardCustos(filtros);
       } catch (err) {
         console.error("❌ Erro ao carregar dashboard via API:", err);
-        if (!API_BASE && window.getDashboardCustos) {
-          state.dashboardStatus.data = window.getDashboardCustos(filtros);
-          state.dashboardStatus.error = null;
-        } else {
-          state.dashboardStatus.error = `Falha ao carregar dashboard (${err.message || "erro"})`;
-          state.dashboardStatus.data = null;
-        }
+        state.dashboardStatus.error = `Falha ao carregar dashboard (${err.message || "erro"})`;
+        state.dashboardStatus.data = null;
       } finally {
         state.dashboardStatus.loading = false;
       }
@@ -7500,7 +7586,23 @@
     function renderCatalogosModal() {
       const etapasContainer = $("etapas-list");
       const tiposContainer = $("tipos-custo-list");
+      const createMsg = $("catalogo-create-msg");
+      const createBtn = $("catalogo-create-btn");
+      const createTipo = $("catalogo-create-tipo");
+      const createId = $("catalogo-create-id");
+      const createNome = $("catalogo-create-nome");
+      const createOrdem = $("catalogo-create-ordem");
       if (!etapasContainer || !tiposContainer) return;
+
+      const admin = isAdmin();
+      if (createMsg) {
+        createMsg.textContent = admin
+          ? "Se Ordem estiver vazia, usa o número do ID (se for numérico) ou o próximo disponível."
+          : "Somente administradores podem criar categorias.";
+      }
+      [createTipo, createId, createNome, createOrdem, createBtn].forEach(el => {
+        if (el) el.disabled = !admin;
+      });
 
       if (state.catalogosStatus.loading) {
         etapasContainer.innerHTML = '<div class="skeleton h-10 rounded"></div>'.repeat(4);
@@ -7514,10 +7616,13 @@
         return;
       }
 
-      if (state.etapas.length === 0) {
+      const etapasOrdenadas = sortCatalogoItems(state.etapas);
+      const tiposOrdenados = sortCatalogoItems(state.tiposCusto);
+
+      if (etapasOrdenadas.length === 0) {
         etapasContainer.innerHTML = '<p class="muted">Nenhuma etapa disponível</p>';
       } else {
-        etapasContainer.innerHTML = state.etapas.map(e => `
+        etapasContainer.innerHTML = etapasOrdenadas.map(e => `
           <div class="flex items-center justify-between p-3 border rounded">
             <div>
               <div class="font-bold">${escapeHtml(e.nome)}</div>
@@ -7528,10 +7633,10 @@
         `).join('');
       }
 
-      if (state.tiposCusto.length === 0) {
+      if (tiposOrdenados.length === 0) {
         tiposContainer.innerHTML = '<p class="muted">Nenhum tipo de custo disponível</p>';
       } else {
-        tiposContainer.innerHTML = state.tiposCusto.map(t => `
+        tiposContainer.innerHTML = tiposOrdenados.map(t => `
           <div class="flex items-center justify-between p-3 border rounded">
             <div>
               <div class="font-bold">${escapeHtml(t.nome)}</div>
@@ -7654,6 +7759,76 @@
       } catch (err) {
         console.error(err);
         showToast('Erro ao criar fornecedor', 'error');
+      }
+    }
+
+    async function createCatalogoItem() {
+      if (!isAdmin()) {
+        showToast('Somente administradores podem criar categorias.', 'warning');
+        return;
+      }
+
+      const tipo = $("catalogo-create-tipo")?.value || "etapa";
+      const nome = $("catalogo-create-nome")?.value.trim();
+      let id = $("catalogo-create-id")?.value.trim();
+      const ordemRaw = $("catalogo-create-ordem")?.value;
+
+      if (!nome) {
+        showToast('Informe o nome da categoria', 'warning');
+        return;
+      }
+
+      if (!id) {
+        id = slugifyCatalogoId(nome);
+      }
+
+      if (!id || id.includes('/')) {
+        showToast('ID inválido (evite barras e deixe algo único).', 'warning');
+        return;
+      }
+
+      const targetList = tipo === "etapa" ? state.etapas : state.tiposCusto;
+      if (targetList.some(i => i.id === id)) {
+        showToast('Já existe uma categoria com esse ID.', 'warning');
+        return;
+      }
+
+      let ordem = Number.isFinite(Number(ordemRaw)) ? Number(ordemRaw) : null;
+      if (!Number.isFinite(ordem)) {
+        const idNumeric = /^\d+$/.test(id) ? Number(id) : null;
+        ordem = Number.isFinite(idNumeric) ? idNumeric : getNextCatalogoOrder(targetList);
+      }
+
+      const payload = {
+        nome,
+        ordem,
+        ativo: true,
+        sistema: false,
+        createdAt: serverTimestamp(),
+        createdBy: state.user?.email || null
+      };
+
+      try {
+        const col = tipo === "etapa" ? refs("dummy").catalogoEtapasCol : refs("dummy").catalogoTiposCustoCol;
+        await setDoc(doc(col, id), payload, { merge: true });
+
+        const newItem = { id, ...payload };
+        if (tipo === "etapa") {
+          state.etapas = mergeCatalogoItems(state.etapas, [newItem]);
+        } else {
+          state.tiposCusto = mergeCatalogoItems(state.tiposCusto, [newItem]);
+        }
+
+        state.ready.catalogos = state.etapas.length > 0 && state.tiposCusto.length > 0;
+        $("catalogo-create-id").value = "";
+        $("catalogo-create-nome").value = "";
+        $("catalogo-create-ordem").value = "";
+        renderCatalogosModal();
+        rerender();
+        showToast('Categoria criada com sucesso!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao criar categoria', 'error');
       }
     }
 
