@@ -23,6 +23,18 @@ const UNIDADE_ID = "GERAL";
 // coleções que você quer copiar
 const collections = ["lancamentos", "acertos", "history"];
 
+function resolveCompetenciaDate(data) {
+  return (
+    data.dataCompetencia ||
+    data.dataPagamento ||
+    data.data ||
+    data.dataLancamento ||
+    data.lancamentoData ||
+    data.pagamentoData ||
+    null
+  );
+}
+
 async function copyCollection(colName) {
   const snap = await oldDb.collection(colName).get();
   console.log(`\n🔎 ${colName}: ${snap.size} docs`);
@@ -37,6 +49,20 @@ async function copyCollection(colName) {
     // carimbo para o novo sistema (se não quiser, apague essas 2 linhas)
     data.obraId = data.obraId ?? OBRA_ID;
     data.unidadeId = data.unidadeId ?? UNIDADE_ID;
+
+    if (colName === "lancamentos") {
+      // Todos os lançamentos do QD61 LT32 são pagos
+      data.statusPagamento = "pago";
+      data.status = "pago";
+      data.pago = true;
+
+      // Data de competência = data de lançamento ou pagamento do legado
+      const competencia = resolveCompetenciaDate(data);
+      if (competencia) {
+        data.dataCompetencia = competencia;
+        data.data = competencia;
+      }
+    }
 
     const targetRef = newDb.collection(colName).doc(docSnap.id);
     batch.set(targetRef, data, { merge: true });
