@@ -3,6 +3,9 @@
 .DS_Store
 .env
 
+# Temporary diffs
+temp_docs_app.diff
+
 # Firebase Service Account Keys (NUNCA COMMITAR!)
 serviceAccount-*.json
 serviceAccount.json
