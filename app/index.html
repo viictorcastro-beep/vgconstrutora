@@ -3765,9 +3765,8 @@
           const getSaldoCompleto = (p) => p?.posicaoLiquida ?? 0;
 
           const totalPago = getPago(posDe) + getPago(posPara);
-          const totalDevido = getDeveria(posDe) + getDeveria(posPara);
           const totalRecebido = getRecebido(posDe) + getRecebido(posPara);
-          const totalDireito = getDireito(posDe) + getDireito(posPara);
+          const totalLiquido = totalRecebido - totalPago;
 
           acertosConsolidados = [{
             pagador: transferencia.deNome || posDe?.nome || '—',
@@ -3777,18 +3776,15 @@
             socioBNome: posPara?.nome || transferencia.paraNome || '—',
             pagoA: getPago(posDe),
             pagoB: getPago(posPara),
-            devidoA: getDeveria(posDe),
-            devidoB: getDeveria(posPara),
             recebidoA: getRecebido(posDe),
             recebidoB: getRecebido(posPara),
-            direitoA: getDireito(posDe),
-            direitoB: getDireito(posPara),
+            liquidoA: getRecebido(posDe) - getPago(posDe),
+            liquidoB: getRecebido(posPara) - getPago(posPara),
             saldoCompletoA: getSaldoCompleto(posDe),
             saldoCompletoB: getSaldoCompleto(posPara),
             totalPago,
-            totalDevido,
             totalRecebido,
-            totalDireito
+            totalLiquido
           }];
         }
       } catch (err) {
@@ -3975,7 +3971,7 @@
         ${acertosConsolidados.length > 0 ? `
           <div class="card p-6 mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-400">
             <h3 class="font-black text-2xl mb-4 text-orange-900">💡 Acerto Sugerido Consolidado</h3>
-            <p class="text-sm text-gray-700 mb-4">Equalização por <strong>Pago vs Deveria</strong> e <strong>Recebido vs Direito</strong> (todas as obras)</p>
+            <p class="text-sm text-gray-700 mb-4">Equalização por <strong>Caixa Líquido</strong> (Recebido − Pago) em todas as obras</p>
             
             ${acertosConsolidados.map(acerto => `
               <div class="bg-white rounded-lg border-2 border-orange-500 p-6 mb-4">
@@ -3999,16 +3995,12 @@
                       <span class="font-bold text-red-600">R$ ${acerto.totalPago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
-                      <span class="text-gray-700">📋 Total Devido (Competência):</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.totalDevido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between">
                       <span class="text-gray-700">💵 Total Recebido (Caixa):</span>
                       <span class="font-bold text-green-600">R$ ${acerto.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
-                      <span class="text-gray-700">📋 Total Direito (Competência):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.totalDireito.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      <span class="text-gray-700">🧮 Total Caixa Líquido:</span>
+                      <span class="font-bold text-slate-700">R$ ${acerto.totalLiquido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                   </div>
                   
@@ -4020,17 +4012,13 @@
                         <span class="text-gray-600">💵 Recebeu (Caixa):</span>
                         <span class="font-bold text-green-600">R$ ${acerto.recebidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       </div>
-                      <div class="flex justify-between">
-                        <span class="text-gray-600">📋 Direito (Competência):</span>
-                        <span class="font-bold text-green-600">R$ ${acerto.direitoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                      </div>
                       <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
                         <span class="text-gray-600">💳 Pagou (Caixa):</span>
                         <span class="font-bold text-red-600">R$ ${acerto.pagoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-gray-600">📋 Deveria Pagar:</span>
-                        <span class="font-bold text-red-600">R$ ${acerto.devidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        <span class="text-gray-600">🧮 Caixa Líquido:</span>
+                        <span class="font-bold text-slate-700">R$ ${acerto.liquidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       </div>
                       <div class="flex justify-between border-t-2 ${acerto.saldoCompletoA >= 0 ? 'border-green-400' : 'border-orange-400'} pt-2 mt-2">
                         <span class="font-black">Saldo Completo (pagar/receber):</span>
@@ -4047,17 +4035,13 @@
                         <span class="text-gray-600">💵 Recebeu (Caixa):</span>
                         <span class="font-bold text-green-600">R$ ${acerto.recebidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       </div>
-                      <div class="flex justify-between">
-                        <span class="text-gray-600">📋 Direito (Competência):</span>
-                        <span class="font-bold text-green-600">R$ ${acerto.direitoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                      </div>
                       <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
                         <span class="text-gray-600">💳 Pagou (Caixa):</span>
                         <span class="font-bold text-red-600">R$ ${acerto.pagoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-gray-600">📋 Deveria Pagar:</span>
-                        <span class="font-bold text-red-600">R$ ${acerto.devidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        <span class="text-gray-600">🧮 Caixa Líquido:</span>
+                        <span class="font-bold text-slate-700">R$ ${acerto.liquidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       </div>
                       <div class="flex justify-between border-t-2 ${acerto.saldoCompletoB >= 0 ? 'border-green-400' : 'border-orange-400'} pt-2 mt-2">
                         <span class="font-black">Saldo Completo (pagar/receber):</span>
