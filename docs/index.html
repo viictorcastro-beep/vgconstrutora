@@ -3758,8 +3758,8 @@
           const posDe = posicoes[transferencia.de];
           const posPara = posicoes[transferencia.para];
 
-          const getPago = (p) => p?.detalheCaixaSemAcerto?.pagoFisico ?? p?.detalheCaixa?.pagoFisico ?? 0;
-          const getRecebido = (p) => p?.detalheCaixaSemAcerto?.recebidoFisico ?? p?.detalheCaixa?.recebidoFisico ?? 0;
+          const getPago = (p) => p?.detalheCaixa?.pagoFisico ?? 0;
+          const getRecebido = (p) => p?.detalheCaixa?.recebidoFisico ?? 0;
           const getDireito = (p) => p?.detalheDireito?.receitaPorAlocacao ?? 0;
           const getDeveria = (p) => p?.detalheDireito?.custoPorAlocacao ?? 0;
           const getSaldoCompleto = (p) => (getPago(p) - getDeveria(p)) - (getRecebido(p) - getDireito(p));
