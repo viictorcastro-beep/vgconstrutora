@@ -3397,7 +3397,8 @@
       if (modoA.transferencia) {
         const dePos = posicoes[modoA.transferencia.de];
         const paraPos = posicoes[modoA.transferencia.para];
-        const abatimento = (dePos?.acertosPago || 0) - (paraPos?.acertosRecebido || 0);
+        // Abatimento = pagamentos já feitos pelo devedor + contra-créditos recebidos
+        const abatimento = (dePos?.acertosPago || 0) + (dePos?.acertosRecebido || 0);
         const valorAjustado = Math.max(0, (modoA.transferencia.valor || 0) - abatimento);
         modoA.transferencia.valor = valorAjustado;
       }
@@ -3767,7 +3768,7 @@
 
           const dePos = posDe;
           const paraPos = posPara;
-          const abatimento = (dePos?.acertosPago || 0) - (paraPos?.acertosPago || 0);
+          const abatimento = (dePos?.acertosPago || 0) + (dePos?.acertosRecebido || 0);
           const valorBase = transferencia.valor || 0;
           const valorAjustado = Math.max(0, valorBase);
 
