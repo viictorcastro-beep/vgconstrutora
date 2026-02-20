@@ -2857,7 +2857,7 @@
 
     async function garantirAcertoPendenteQd61Lt32() {
       if (!isAdmin()) return;
-      if (localStorage.getItem('acerto_qd61_2044_pendente_v6') === '1') return;
+      if (localStorage.getItem('acerto_qd61_2044_pendente_v7') === '1') return;
 
       const obra = state.obras.find(o =>
         (o.nome && o.nome.toLowerCase().includes('qd61') && o.nome.toLowerCase().includes('lt32')) ||
@@ -2871,8 +2871,8 @@
       const socioVictor = sociosCfg.find(s => (s.nome || '').toLowerCase().includes('victor'));
       if (!socioGustavo || !socioVictor) return;
 
-      const de = socioVictor.firestoreId;
-      const para = socioGustavo.firestoreId;
+      const de = socioGustavo.firestoreId;
+      const para = socioVictor.firestoreId;
       const valor = 2044.33;
       const descricao = 'Acerto pendente QD61 LT32 (ajuste legado)';
       const data = new Date().toISOString().split('T')[0];
@@ -2902,9 +2902,18 @@
           createdBy: state.user?.email || 'system'
         });
         showToast('✅ Acerto pendente QD61 LT32 lançado (R$ 2.044,33)', 'success');
+      } else {
+        await updateDoc(doc(db, "obras", obra.id, "acertos", existenteId), {
+          de,
+          para,
+          considerarNaEqualizacao: true,
+          descricao,
+          updatedAt: serverTimestamp(),
+          updatedBy: state.user?.email || 'system'
+        });
       }
 
-      localStorage.setItem('acerto_qd61_2044_pendente_v6', '1');
+      localStorage.setItem('acerto_qd61_2044_pendente_v7', '1');
     }
 
     async function migrarEntradaTerrenoQd20Lt2() {
