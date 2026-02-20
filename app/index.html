@@ -1757,6 +1757,14 @@
       rerender();
 
       try {
+        if (!API_BASE) {
+          state.etapas = [...CATALOGO_ETAPAS_SEED];
+          state.tiposCusto = [...CATALOGO_TIPOS_CUSTO_SEED];
+          state.ready.catalogos = true;
+          state.catalogosStatus.lastLoadedAt = new Date().toISOString();
+          console.log("✅ Catálogos locais (Pages) carregados.");
+          return;
+        }
         console.log(`🔎 Buscando catálogos via API... base=${API_BASE || "(same-origin)"}`);
         const [etapas, tipos] = await Promise.all([
           fetchCatalogo("/api/catalogos/etapas"),
@@ -1771,7 +1779,14 @@
         console.log(`✅ Catálogos carregados: etapas=${state.etapas.length} tipos=${state.tiposCusto.length}`);
       } catch (err) {
         console.error("❌ Erro ao carregar catálogos:", err);
-        state.catalogosStatus.error = `Falha ao carregar catálogos (${err.message || "erro"})`;
+        if (!API_BASE) {
+          state.etapas = [...CATALOGO_ETAPAS_SEED];
+          state.tiposCusto = [...CATALOGO_TIPOS_CUSTO_SEED];
+          state.ready.catalogos = true;
+          state.catalogosStatus.error = null;
+        } else {
+          state.catalogosStatus.error = `Falha ao carregar catálogos (${err.message || "erro"})`;
+        }
       } finally {
         state.catalogosStatus.loading = false;
         renderCatalogosModal();
@@ -1806,11 +1821,22 @@
       state.dashboardStatus.error = null;
       state.dashboardStatus.lastKey = key;
       try {
+        if (!API_BASE) {
+          state.dashboardStatus.data = window.getDashboardCustos
+            ? window.getDashboardCustos(filtros)
+            : null;
+          return;
+        }
         state.dashboardStatus.data = await fetchDashboardCustos(filtros);
       } catch (err) {
         console.error("❌ Erro ao carregar dashboard via API:", err);
-        state.dashboardStatus.error = `Falha ao carregar dashboard (${err.message || "erro"})`;
-        state.dashboardStatus.data = null;
+        if (!API_BASE && window.getDashboardCustos) {
+          state.dashboardStatus.data = window.getDashboardCustos(filtros);
+          state.dashboardStatus.error = null;
+        } else {
+          state.dashboardStatus.error = `Falha ao carregar dashboard (${err.message || "erro"})`;
+          state.dashboardStatus.data = null;
+        }
       } finally {
         state.dashboardStatus.loading = false;
       }
