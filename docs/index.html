@@ -7292,21 +7292,156 @@
     
     // Funções auxiliares para CR
     window.baixarContaReceber = async function(crId) {
-      if (!confirm('Marcar esta Conta a Receber como recebida?\n\nIsso atualizará o status para "Recebido".')) {
-        return;
+      const cr = state.contasReceber.find(c => c.id === crId);
+      if (!cr) { showToast('CR não encontrada', 'error'); return; }
+
+      // Montar opções de unidade e sócios
+      const unidadeOpts = (state.unidades || []).map(u =>
+        `<option value="${u.id}">${escapeHtml(u.nome)}</option>`
+      ).join('');
+
+      const socioOpts = state.socios.map(s =>
+        `<option value="${s.id}">${escapeHtml(s.nome)}</option>`
+      ).join('');
+
+      // Criar modal de baixa inline
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+      overlay.id = 'baixa-cr-overlay';
+      overlay.innerHTML = `
+        <div class="card p-6 w-full max-w-lg mx-4">
+          <div class="font-black text-xl mb-2">✅ Receber Conta a Receber</div>
+          <div class="text-sm text-gray-600 mb-4">${escapeHtml(cr.descricao || '')} — <strong>R$ ${(cr.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></div>
+
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <div class="text-xs muted mb-1">Data do Recebimento *</div>
+              <input id="baixa-data" type="date" class="input" value="${new Date().toISOString().split('T')[0]}" required />
+            </div>
+            <div>
+              <div class="text-xs muted mb-1">Unidade</div>
+              <select id="baixa-unidade" class="select">
+                <option value="">GERAL</option>
+                ${unidadeOpts}
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 mb-4">
+            <div>
+              <div class="text-xs muted mb-1">Tipo</div>
+              <select id="baixa-tipo" class="select">
+                <option value="sinal">Sinal</option>
+                <option value="parcela">Parcela</option>
+                <option value="quitacao">Quitação</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+            <div>
+              <div class="text-xs muted mb-1">Forma Pagamento *</div>
+              <select id="baixa-forma" class="select">
+                <option value="pix">PIX</option>
+                <option value="transferencia">Transferência</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="cheque">Cheque</option>
+                <option value="financiamento">Financiamento</option>
+              </select>
+            </div>
+            <div>
+              <div class="text-xs muted mb-1">Recebido por *</div>
+              <select id="baixa-recebido-por" class="select">
+                ${socioOpts}
+                <option value="AMBOS">Ambos</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <div class="text-xs muted mb-1">Observações</div>
+            <input id="baixa-obs" type="text" class="input" value="Baixa automática CR: ${escapeHtml(cr.descricao || '')}" />
+          </div>
+
+          <div class="flex gap-3">
+            <button id="baixa-confirmar" class="btn btn-green flex-1">✅ Confirmar Recebimento</button>
+            <button id="baixa-cancelar" class="btn btn-soft">Cancelar</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      // Detectar recebidoPor a partir das alocações da CR
+      if (cr.alocacoes && cr.alocacoes.length === 1) {
+        const sel = overlay.querySelector('#baixa-recebido-por');
+        if (sel) sel.value = cr.alocacoes[0].socioId || '';
       }
-      
-      try {
-        await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId), {
-          status: 'recebido',
-          dataRecebimento: new Date().toISOString().split('T')[0]
-        });
-        
-        showToast('✅ Conta a Receber baixada!', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('❌ Erro ao baixar CR', 'error');
-      }
+
+      overlay.querySelector('#baixa-cancelar').onclick = () => overlay.remove();
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#baixa-confirmar').onclick = async () => {
+        const dataReceb = overlay.querySelector('#baixa-data').value;
+        const formaPag = overlay.querySelector('#baixa-forma').value;
+        let recebidoPor = overlay.querySelector('#baixa-recebido-por').value;
+        const unidadeId = overlay.querySelector('#baixa-unidade').value || (state.unidades[0]?.id || '');
+        const tipo = overlay.querySelector('#baixa-tipo').value;
+        const obs = overlay.querySelector('#baixa-obs').value.trim();
+
+        if (!dataReceb || !formaPag || !recebidoPor) {
+          showToast('Preencha data, forma e recebido por', 'warning');
+          return;
+        }
+
+        // Normalizar recebidoPor
+        if (recebidoPor !== 'AMBOS') {
+          recebidoPor = resolveSocioCanonicalId(recebidoPor) || recebidoPor;
+        }
+
+        const btnConfirm = overlay.querySelector('#baixa-confirmar');
+        btnConfirm.disabled = true;
+        btnConfirm.textContent = '⏳ Processando...';
+
+        try {
+          // 1. Criar recebimento
+          const recebRef = await addDoc(refs(OBRA_ID).recebimentosCol, {
+            data: dataReceb,
+            unidadeId,
+            tipo,
+            valor: cr.valor,
+            formaPagamento: formaPag,
+            recebidoPor,
+            observacoes: obs,
+            contaReceberId: crId,
+            createdAt: serverTimestamp(),
+            createdBy: state.user.email
+          });
+
+          // 2. Atualizar CR como recebida
+          await updateDoc(doc(db, "obras", OBRA_ID, "contasReceber", crId), {
+            status: 'recebido',
+            dataRecebimento: dataReceb,
+            recebimentoVinculadoId: recebRef.id
+          });
+
+          // 3. Gerar acerto automático se necessário
+          await gerarAcertoAutomatico(recebRef.id, {
+            data: dataReceb,
+            unidadeId,
+            tipo,
+            valor: cr.valor,
+            recebidoPor,
+            observacoes: obs
+          });
+
+          overlay.remove();
+          showToast(`✅ Recebimento de R$ ${cr.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})} registrado e CR baixada!`, 'success');
+        } catch (err) {
+          console.error(err);
+          btnConfirm.disabled = false;
+          btnConfirm.textContent = '✅ Confirmar Recebimento';
+          showToast('❌ Erro ao processar baixa', 'error');
+        }
+      };
     };
     
     window.editarContaReceber = async function(crId) {
