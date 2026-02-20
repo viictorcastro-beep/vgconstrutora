@@ -2857,7 +2857,6 @@
 
     async function garantirAcertoPendenteQd61Lt32() {
       if (!isAdmin()) return;
-      if (localStorage.getItem('acerto_qd61_2044_pendente_v7') === '1') return;
 
       const obra = state.obras.find(o =>
         (o.nome && o.nome.toLowerCase().includes('qd61') && o.nome.toLowerCase().includes('lt32')) ||
@@ -2912,8 +2911,6 @@
           updatedBy: state.user?.email || 'system'
         });
       }
-
-      localStorage.setItem('acerto_qd61_2044_pendente_v7', '1');
     }
 
     async function migrarEntradaTerrenoQd20Lt2() {
