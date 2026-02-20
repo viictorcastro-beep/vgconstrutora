@@ -2857,7 +2857,6 @@
 
     async function garantirAcertoPendenteQd61Lt32() {
       if (!isAdmin()) return;
-      if (localStorage.getItem('acerto_qd61_2044_pendente_v5') === '1') return;
 
       const obra = state.obras.find(o =>
         (o.nome && o.nome.toLowerCase().includes('qd61') && o.nome.toLowerCase().includes('lt32')) ||
@@ -2871,8 +2870,8 @@
       const socioVictor = sociosCfg.find(s => (s.nome || '').toLowerCase().includes('victor'));
       if (!socioGustavo || !socioVictor) return;
 
-      const de = socioGustavo.firestoreId;
-      const para = socioVictor.firestoreId;
+      const de = socioVictor.firestoreId;
+      const para = socioGustavo.firestoreId;
       const valor = 2044.33;
       const descricao = 'Acerto pendente QD61 LT32 (ajuste legado)';
       const data = new Date().toISOString().split('T')[0];
@@ -2912,8 +2911,6 @@
           updatedBy: state.user?.email || 'system'
         });
       }
-
-      localStorage.setItem('acerto_qd61_2044_pendente_v5', '1');
     }
 
     async function migrarEntradaTerrenoQd20Lt2() {
