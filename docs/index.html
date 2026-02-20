@@ -1756,8 +1756,6 @@
         }
         
         hydrateObrasSelect();
-        // Lançar acerto pendente QD61 LT32 (uma vez)
-        garantirAcertoPendenteQd61Lt32().catch(err => console.error('Erro ao lançar acerto pendente QD61 LT32:', err));
         migrarEntradaTerrenoQd20Lt2().catch(err => console.error('Erro ao migrar entrada do terreno QD20 LT2:', err));
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
@@ -2700,7 +2698,11 @@
         console.log(`     posicoes keys: [${Object.keys(posicoes).join(', ')}]`);
         const socioAFirestoreId = resolveSocioFirestoreId(obra.socioAId);
         const socioBFirestoreId = resolveSocioFirestoreId(obra.socioBId);
+        const fallbackSocios = (state.socios || []).map(s => s.id).filter(Boolean);
+        const socioAAllocId = socioAFirestoreId || fallbackSocios[0] || null;
+        const socioBAllocId = socioBFirestoreId || (fallbackSocios.find(id => id !== socioAAllocId) || null);
         console.log(`     socioAId (firestore): "${socioAFirestoreId}" | socioBId (firestore): "${socioBFirestoreId}"`);
+        console.log(`     socioA (alloc): "${socioAAllocId}" | socioB (alloc): "${socioBAllocId}"`);
         console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[socioAFirestoreId]}`);
         console.log(`     Obra tem socioBId em posicoes? ${!!posicoes[socioBFirestoreId]}`);
 
@@ -2743,36 +2745,36 @@
           console.log(`     💰 Investimentos: A R$ ${invA.toFixed(2)} | B R$ ${invB.toFixed(2)} | Total R$ ${invTotal.toFixed(2)}`);
           
           // 💵 CAIXA: Quem pagou fisicamente
-          if (invA > 0 && socioAFirestoreId && posicoes[socioAFirestoreId]) {
-            posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += invA;
-            posicoes[socioAFirestoreId].detalheCaixaSemAcerto.pagoFisico += invA;
-            addDetalheObra(socioAFirestoreId, 'pagoFisicoSemAcerto', invA);
-            addDetalheObra(socioAFirestoreId, 'pagoFisico', invA);
-            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}`);
+          if (invA > 0 && socioAAllocId && posicoes[socioAAllocId]) {
+            posicoes[socioAAllocId].detalheCaixa.pagoFisico += invA;
+            posicoes[socioAAllocId].detalheCaixaSemAcerto.pagoFisico += invA;
+            addDetalheObra(socioAAllocId, 'pagoFisicoSemAcerto', invA);
+            addDetalheObra(socioAAllocId, 'pagoFisico', invA);
+            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAAllocId].nome}`);
           }
           
-          if (invB > 0 && socioBFirestoreId && posicoes[socioBFirestoreId]) {
-            posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += invB;
-            posicoes[socioBFirestoreId].detalheCaixaSemAcerto.pagoFisico += invB;
-            addDetalheObra(socioBFirestoreId, 'pagoFisicoSemAcerto', invB);
-            addDetalheObra(socioBFirestoreId, 'pagoFisico', invB);
-            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}`);
+          if (invB > 0 && socioBAllocId && posicoes[socioBAllocId]) {
+            posicoes[socioBAllocId].detalheCaixa.pagoFisico += invB;
+            posicoes[socioBAllocId].detalheCaixaSemAcerto.pagoFisico += invB;
+            addDetalheObra(socioBAllocId, 'pagoFisicoSemAcerto', invB);
+            addDetalheObra(socioBAllocId, 'pagoFisico', invB);
+            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBAllocId].nome}`);
           }
           
           // 📋 COMPETÊNCIA: AMBOS deveriam pagar 50/50 do total (independente de quem investiu)
           if (invTotal > 0) {
             const metadeInv = invTotal / 2;
             
-            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
-              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', metadeInv);
-              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            if (socioAAllocId && posicoes[socioAAllocId]) {
+              posicoes[socioAAllocId].detalheDireito.custoPorAlocacao += metadeInv;
+              addDetalheObra(socioAAllocId, 'custoPorAlocacao', metadeInv);
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioAAllocId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
             
-            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
-              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
-              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', metadeInv);
-              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            if (socioBAllocId && posicoes[socioBAllocId]) {
+              posicoes[socioBAllocId].detalheDireito.custoPorAlocacao += metadeInv;
+              addDetalheObra(socioBAllocId, 'custoPorAlocacao', metadeInv);
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioBAllocId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
           }
 
@@ -2808,31 +2810,31 @@
               addDetalheObra(pagoPorFirestoreId, 'pagoFisico', valor);
             } else {
               // Fallback: dividir 50/50 se não souber quem pagou
-              if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-                posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += valorA;
-                posicoes[socioAFirestoreId].detalheCaixaSemAcerto.pagoFisico += valorA;
-                addDetalheObra(socioAFirestoreId, 'pagoFisicoSemAcerto', valorA);
-                addDetalheObra(socioAFirestoreId, 'pagoFisico', valorA);
+              if (socioAAllocId && posicoes[socioAAllocId]) {
+                posicoes[socioAAllocId].detalheCaixa.pagoFisico += valorA;
+                posicoes[socioAAllocId].detalheCaixaSemAcerto.pagoFisico += valorA;
+                addDetalheObra(socioAAllocId, 'pagoFisicoSemAcerto', valorA);
+                addDetalheObra(socioAAllocId, 'pagoFisico', valorA);
               }
-              if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
-                posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += valorB;
-                posicoes[socioBFirestoreId].detalheCaixaSemAcerto.pagoFisico += valorB;
-                addDetalheObra(socioBFirestoreId, 'pagoFisicoSemAcerto', valorB);
-                addDetalheObra(socioBFirestoreId, 'pagoFisico', valorB);
+              if (socioBAllocId && posicoes[socioBAllocId]) {
+                posicoes[socioBAllocId].detalheCaixa.pagoFisico += valorB;
+                posicoes[socioBAllocId].detalheCaixaSemAcerto.pagoFisico += valorB;
+                addDetalheObra(socioBAllocId, 'pagoFisicoSemAcerto', valorB);
+                addDetalheObra(socioBAllocId, 'pagoFisico', valorB);
               }
             }
             
             // 📋 COMPETÊNCIA: Custo alocado por percentual
-            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += valorA;
-              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', valorA);
+            if (socioAAllocId && posicoes[socioAAllocId]) {
+              posicoes[socioAAllocId].detalheDireito.custoPorAlocacao += valorA;
+              addDetalheObra(socioAAllocId, 'custoPorAlocacao', valorA);
             } else if (obra.socioAId) {
               console.warn(`     ⚠️ socioAId "${obra.socioAId}" não encontrado em posicoes!`);
             }
             
-            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
-              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += valorB;
-              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', valorB);
+            if (socioBAllocId && posicoes[socioBAllocId]) {
+              posicoes[socioBAllocId].detalheDireito.custoPorAlocacao += valorB;
+              addDetalheObra(socioBAllocId, 'custoPorAlocacao', valorB);
             } else if (obra.socioBId) {
               console.warn(`     ⚠️ socioBId "${obra.socioBId}" não encontrado em posicoes!`);
             }
@@ -2879,18 +2881,11 @@
               : Number(valorRaw || 0);
             if (!valor) return;
 
-            const isQd61Lt32 = (obra?.nome || '').toLowerCase().includes('qd61') && (obra?.nome || '').toLowerCase().includes('lt32')
-              || (obra?.id || '').toLowerCase().includes('qd61') && (obra?.id || '').toLowerCase().includes('lt32');
-            const matchPendenteQd61 = isQd61Lt32 && Math.abs(valor - 2044.33) < 0.02;
-            const shouldConsider = a.considerarNaEqualizacao === true || matchPendenteQd61;
+            const shouldConsider = a.considerarNaEqualizacao === true;
             if (!shouldConsider) return;
 
             const deId = resolveSocioFirestoreId(a.de) || resolveSocioFirestoreId(normalizarSocioValor(a.de, obra));
             const paraId = resolveSocioFirestoreId(a.para) || resolveSocioFirestoreId(normalizarSocioValor(a.para, obra));
-
-            if (isQd61Lt32) {
-              console.log(`     🧾 ACERTO QD61 considerado: R$ ${valor.toFixed(2)} | de: ${a.de} -> ${deId} | para: ${a.para} -> ${paraId} | flag: ${a.considerarNaEqualizacao}`);
-            }
 
             if (deId && posicoes[deId]) {
               posicoes[deId].detalheCaixa.pagoFisico += valor;
@@ -2928,10 +2923,10 @@
               } else {
                 // 50/50 default
                 const metade = valor / 2;
-                if (socioAFirestoreId && posicoes[socioAFirestoreId]) posicoes[socioAFirestoreId].contasReceber += metade;
-                if (socioAFirestoreId && posicoes[socioAFirestoreId]) addDetalheObra(socioAFirestoreId, 'contasReceber', metade);
-                if (socioBFirestoreId && posicoes[socioBFirestoreId]) posicoes[socioBFirestoreId].contasReceber += metade;
-                if (socioBFirestoreId && posicoes[socioBFirestoreId]) addDetalheObra(socioBFirestoreId, 'contasReceber', metade);
+                if (socioAAllocId && posicoes[socioAAllocId]) posicoes[socioAAllocId].contasReceber += metade;
+                if (socioAAllocId && posicoes[socioAAllocId]) addDetalheObra(socioAAllocId, 'contasReceber', metade);
+                if (socioBAllocId && posicoes[socioBAllocId]) posicoes[socioBAllocId].contasReceber += metade;
+                if (socioBAllocId && posicoes[socioBAllocId]) addDetalheObra(socioBAllocId, 'contasReceber', metade);
               }
             }
           });
@@ -2943,15 +2938,15 @@
             .reduce((sum, d) => sum + (d.custoPorAlocacao || 0), 0);
 
           if (totalPagoSemAcerto > 0.01 && Math.abs(totalCustoAlocado) < 0.01) {
-            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-              const metade = socioBFirestoreId ? totalPagoSemAcerto / 2 : totalPagoSemAcerto;
-              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metade;
-              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', metade);
+            if (socioAAllocId && posicoes[socioAAllocId]) {
+              const metade = socioBAllocId ? totalPagoSemAcerto / 2 : totalPagoSemAcerto;
+              posicoes[socioAAllocId].detalheDireito.custoPorAlocacao += metade;
+              addDetalheObra(socioAAllocId, 'custoPorAlocacao', metade);
             }
-            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+            if (socioBAllocId && posicoes[socioBAllocId]) {
               const metade = totalPagoSemAcerto / 2;
-              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metade;
-              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', metade);
+              posicoes[socioBAllocId].detalheDireito.custoPorAlocacao += metade;
+              addDetalheObra(socioBAllocId, 'custoPorAlocacao', metade);
             }
           }
 
@@ -3457,90 +3452,51 @@
         return;
       }
       
-      // Calcular acertos consolidados (baseado em SALDO REAL considerando INVESTIMENTOS + RECEBIMENTOS)
-      const acertosConsolidados = [];
-      if (state.socios.length >= 2) {
-        for (let i = 0; i < state.socios.length; i++) {
-          for (let j = i + 1; j < state.socios.length; j++) {
-            const socioA = state.socios[i];
-            const socioB = state.socios[j];
-            const dadosA = balancoPorSocio[socioA.id];
-            const dadosB = balancoPorSocio[socioB.id];
-            
-            // 🎯 NOVO CÁLCULO: Saldo Real = Recebido (Caixa) - Investido
-            const saldoRealA = dadosA.recebidoCaixa - dadosA.totalInvestido;
-            const saldoRealB = dadosB.recebidoCaixa - dadosB.totalInvestido;
-            
-            console.log(`\n🔍 DEBUG ACERTO CONSOLIDADO:`);
-            console.log(`  ${socioA.nome}:`);
-            console.log(`    - Total Investido: R$ ${dadosA.totalInvestido.toFixed(2)}`);
-            console.log(`    - Recebido Caixa: R$ ${dadosA.recebidoCaixa.toFixed(2)}`);
-            console.log(`    - Saldo Real: R$ ${saldoRealA.toFixed(2)}`);
-            console.log(`  ${socioB.nome}:`);
-            console.log(`    - Total Investido: R$ ${dadosB.totalInvestido.toFixed(2)}`);
-            console.log(`    - Recebido Caixa: R$ ${dadosB.recebidoCaixa.toFixed(2)}`);
-            console.log(`    - Saldo Real: R$ ${saldoRealB.toFixed(2)}`);
-            
-            // 🎯 Total Consolidado
-            const totalInvestido = dadosA.totalInvestido + dadosB.totalInvestido;
-            const totalRecebidoCaixa = dadosA.recebidoCaixa + dadosB.recebidoCaixa;
-            const saldoTotal = totalRecebidoCaixa - totalInvestido;
-            
-            console.log(`  Total Investido (ambos): R$ ${totalInvestido.toFixed(2)}`);
-            console.log(`  Total Recebido (ambos): R$ ${totalRecebidoCaixa.toFixed(2)}`);
-            console.log(`  Saldo Total: R$ ${saldoTotal.toFixed(2)}`);
-            
-            // 🎯 Saldo Ideal 50/50
-            const saldoIdeal = saldoTotal / 2;
-            console.log(`  Saldo Ideal 50/50 (cada): R$ ${saldoIdeal.toFixed(2)}`);
-            
-            // 🎯 Acerto necessário = Diferença entre Saldo Real e Saldo Ideal
-            const acertoA = saldoRealA - saldoIdeal;
-            const acertoB = saldoRealB - saldoIdeal;
-            
-            console.log(`  Acerto ${socioA.nome}: R$ ${acertoA.toFixed(2)}`);
-            console.log(`  Acerto ${socioB.nome}: R$ ${acertoB.toFixed(2)}`);
-            
-            let acertoValor = 0;
-            let pagador = '';
-            let recebedor = '';
-            
-            // Quem tem saldo real acima do ideal deve repassar
-            if (acertoA > 0.01) {
-              acertoValor = Math.abs(acertoA);
-              pagador = socioA.nome; // A tem saldo acima do ideal
-              recebedor = socioB.nome; // B tem saldo abaixo do ideal
-            } else if (acertoB > 0.01) {
-              acertoValor = Math.abs(acertoB);
-              pagador = socioB.nome; // B tem saldo acima do ideal
-              recebedor = socioA.nome; // A tem saldo abaixo do ideal
-            }
-            
-            if (acertoValor > 0.01) {
-              acertosConsolidados.push({
-                pagador,
-                recebedor,
-                valor: acertoValor,
-                // Dados detalhados para exibição
-                investidoA: dadosA.totalInvestido,
-                investidoB: dadosB.totalInvestido,
-                recebidoCaixaA: dadosA.recebidoCaixa,
-                recebidoCaixaB: dadosB.recebidoCaixa,
-                saldoRealA,
-                saldoRealB,
-                saldoIdeal,
-                direitoA: dadosA.direitoCompetencia,
-                direitoB: dadosB.direitoCompetencia,
-                acertoA,
-                acertoB,
-                socioANome: socioA.nome,
-                socioBNome: socioB.nome,
-                totalInvestido,
-                totalRecebidoCaixa
-              });
-            }
-          }
+      // Calcular acertos consolidados (netting: Pago vs Deveria / Recebido vs Direito)
+      let acertosConsolidados = [];
+      try {
+        const resultadoEqualizacao = await calcularEqualizacaoGlobal();
+        if (!resultadoEqualizacao?.erro && resultadoEqualizacao?.modoA?.transferencia) {
+          const { transferencia } = resultadoEqualizacao.modoA;
+          const posicoes = resultadoEqualizacao.posicoes || {};
+          const posDe = posicoes[transferencia.de];
+          const posPara = posicoes[transferencia.para];
+
+          const getPago = (p) => p?.detalheCaixaSemAcerto?.pagoFisico ?? p?.detalheCaixa?.pagoFisico ?? 0;
+          const getRecebido = (p) => p?.detalheCaixaSemAcerto?.recebidoFisico ?? p?.detalheCaixa?.recebidoFisico ?? 0;
+          const getDireito = (p) => p?.detalheDireito?.receitaPorAlocacao ?? 0;
+          const getDeveria = (p) => p?.detalheDireito?.custoPorAlocacao ?? 0;
+          const getSaldoCompleto = (p) => (getPago(p) - getDeveria(p)) - (getRecebido(p) - getDireito(p));
+
+          const totalPago = getPago(posDe) + getPago(posPara);
+          const totalDevido = getDeveria(posDe) + getDeveria(posPara);
+          const totalRecebido = getRecebido(posDe) + getRecebido(posPara);
+          const totalDireito = getDireito(posDe) + getDireito(posPara);
+
+          acertosConsolidados = [{
+            pagador: transferencia.deNome || posDe?.nome || '—',
+            recebedor: transferencia.paraNome || posPara?.nome || '—',
+            valor: transferencia.valor || 0,
+            socioANome: posDe?.nome || transferencia.deNome || '—',
+            socioBNome: posPara?.nome || transferencia.paraNome || '—',
+            pagoA: getPago(posDe),
+            pagoB: getPago(posPara),
+            devidoA: getDeveria(posDe),
+            devidoB: getDeveria(posPara),
+            recebidoA: getRecebido(posDe),
+            recebidoB: getRecebido(posPara),
+            direitoA: getDireito(posDe),
+            direitoB: getDireito(posPara),
+            saldoCompletoA: getSaldoCompleto(posDe),
+            saldoCompletoB: getSaldoCompleto(posPara),
+            totalPago,
+            totalDevido,
+            totalRecebido,
+            totalDireito
+          }];
         }
+      } catch (err) {
+        console.error('Erro ao calcular acerto consolidado:', err);
       }
 
       // Renderizar HTML
@@ -3723,7 +3679,7 @@
         ${acertosConsolidados.length > 0 ? `
           <div class="card p-6 mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-400">
             <h3 class="font-black text-2xl mb-4 text-orange-900">💡 Acerto Sugerido Consolidado</h3>
-            <p class="text-sm text-gray-700 mb-4">Equalização <strong>50/50</strong> considerando <strong>Investimentos + Recebimentos</strong> (todas as obras)</p>
+            <p class="text-sm text-gray-700 mb-4">Equalização por <strong>Pago vs Deveria</strong> e <strong>Recebido vs Direito</strong> (todas as obras)</p>
             
             ${acertosConsolidados.map(acerto => `
               <div class="bg-white rounded-lg border-2 border-orange-500 p-6 mb-4">
@@ -3743,93 +3699,89 @@
                   <div class="bg-blue-50 border border-blue-300 rounded p-3 mb-4">
                     <div class="font-bold text-blue-900 mb-2">🌍 Consolidado (Ambos Sócios):</div>
                     <div class="flex justify-between">
-                      <span class="text-gray-700">💳 Total Investido:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      <span class="text-gray-700">💳 Total Pago (Caixa):</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.totalPago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-700">📋 Total Devido (Competência):</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.totalDevido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-gray-700">💵 Total Recebido (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.totalRecebidoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-blue-400 pt-2 mt-2">
-                      <span class="font-bold text-blue-900">Saldo Total:</span>
-                      <span class="font-black text-lg ${(acerto.totalRecebidoCaixa - acerto.totalInvestido) >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${(acerto.totalRecebidoCaixa - acerto.totalInvestido).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
+                      <span class="font-bold text-green-600">R$ ${acerto.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
-                      <span class="text-sm text-blue-700">💰 Saldo Ideal 50/50 (cada):</span>
-                      <span class="font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      <span class="text-gray-700">📋 Total Direito (Competência):</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.totalDireito.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                   </div>
                   
-                  <!-- Sócio A -->
-                  <div class="bg-white border-2 ${acerto.saldoRealA > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
-                    <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💳 Investiu:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <!-- Sócio A -->
+                    <div class="bg-white border-2 ${acerto.saldoCompletoA >= 0 ? 'border-green-400' : 'border-orange-400'} rounded p-3">
+                      <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">💵 Recebeu (Caixa):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.recebidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Direito (Competência):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.direitoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
+                        <span class="text-gray-600">💳 Pagou (Caixa):</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.pagoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Deveria Pagar:</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.devidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t-2 ${acerto.saldoCompletoA >= 0 ? 'border-green-400' : 'border-orange-400'} pt-2 mt-2">
+                        <span class="font-black">Saldo Completo (pagar/receber):</span>
+                        <span class="font-black text-xl ${acerto.saldoCompletoA >= 0 ? 'text-green-600' : 'text-orange-600'}">
+                          ${acerto.saldoCompletoA >= 0 ? '+' : ''}R$ ${acerto.saldoCompletoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </span>
+                      </div>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
-                      <span class="font-black text-lg ${acerto.saldoRealA >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${acerto.saldoRealA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
-                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t-2 ${acerto.acertoA > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
-                      <span class="font-black">Diferença:</span>
-                      <span class="font-black text-xl ${acerto.acertoA > 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoA >= 0 ? '+' : ''}R$ ${acerto.acertoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <!-- Sócio B -->
-                  <div class="bg-white border-2 ${acerto.saldoRealB > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
-                    <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💳 Investiu:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
-                      <span class="font-black text-lg ${acerto.saldoRealB >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${acerto.saldoRealB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
-                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t-2 ${acerto.acertoB > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
-                      <span class="font-black">Diferença:</span>
-                      <span class="font-black text-xl ${acerto.acertoB > 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoB >= 0 ? '+' : ''}R$ ${acerto.acertoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
+                    
+                    <!-- Sócio B -->
+                    <div class="bg-white border-2 ${acerto.saldoCompletoB >= 0 ? 'border-green-400' : 'border-orange-400'} rounded p-3">
+                      <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">💵 Recebeu (Caixa):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.recebidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Direito (Competência):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.direitoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
+                        <span class="text-gray-600">💳 Pagou (Caixa):</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.pagoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Deveria Pagar:</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.devidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t-2 ${acerto.saldoCompletoB >= 0 ? 'border-green-400' : 'border-orange-400'} pt-2 mt-2">
+                        <span class="font-black">Saldo Completo (pagar/receber):</span>
+                        <span class="font-black text-xl ${acerto.saldoCompletoB >= 0 ? 'text-green-600' : 'text-orange-600'}">
+                          ${acerto.saldoCompletoB >= 0 ? '+' : ''}R$ ${acerto.saldoCompletoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   
                   <div class="bg-yellow-100 border border-yellow-400 rounded p-4 mt-3">
                     <div class="font-bold text-yellow-900 mb-2">💡 Conclusão:</div>
                     <div class="text-yellow-800">
-                      <strong>${acerto.pagador}</strong> tem um saldo real acima do ideal 50/50. 
+                      <strong>${acerto.pagador}</strong> tem um saldo completo acima do 50/50. 
                       Para equalizar perfeitamente a sociedade, deve transferir 
                       <strong class="text-xl text-orange-700">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
                       para <strong>${acerto.recebedor}</strong>.
                     </div>
                     <div class="text-xs text-yellow-700 mt-2">
-                      ✅ Após o acerto, ambos terão o mesmo saldo: R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      ✅ Acertos só entram quando marcados como "considerar na equalização".
                     </div>
                   </div>
                 </div>
@@ -4149,8 +4101,10 @@
                 <p class="text-gray-700">
                   Considerando <strong>caixa atual + valores a receber futuros</strong>, 
                   <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> está com mais recursos consolidados. 
-                  Para equalizar a posição estratégica, deve transferir 
-                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>.
+                  Para equalizar a posição estratégica, 
+                  <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> deve transferir 
+                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                  para <strong>${escapeHtml(modoB.transferencia.paraNome)}</strong>.
                 </p>
                 <p class="text-gray-600 mt-2 text-xs">
                   💡 Este valor é menor que o Modo A porque considera receitas futuras que vão equilibrar naturalmente.
@@ -7891,10 +7845,23 @@
     function computeEqualizacao() {
       // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
       const obra = state.obras.find(o => o.id === OBRA_ID);
+      const canonicalA = resolveSocioCanonicalId(obra?.socioAId) || "A";
+      const canonicalB = resolveSocioCanonicalId(obra?.socioBId) || "B";
       const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
       const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
       const investimentoA = obra?.investimentoA || 0;
       const investimentoB = obra?.investimentoB || 0;
+
+      const resolveCanonical = (valor) => {
+        if (!valor) return null;
+        const normalized = normalizarSocioValor(valor, obra);
+        if (String(normalized).toUpperCase() === "AMBOS") return "AMBOS";
+        const canonical = resolveSocioCanonicalId(normalized);
+        if (canonical) return canonical;
+        const v = String(normalized).toUpperCase();
+        if (v.length === 1 && v >= 'A' && v <= 'Z') return v;
+        return null;
+      };
 
       // 1. RECEBIMENTOS
       let recebeuFisicamenteA = 0; // Quanto A recebeu fisicamente
@@ -7903,14 +7870,14 @@
       let temDireitoB = 0; // Quanto B tem direito (baseado no proprietário)
 
       state.recebimentos.forEach(r => {
-        const recebidoPor = r.recebidoPor || "ambos";
+        const recebidoPor = resolveCanonical(r.recebidoPor) || "AMBOS";
         const unidade = state.unidades.find(u => u.id === r.unidadeId);
-        const proprietario = unidade?.proprietario || "ambos";
+        const proprietario = resolveCanonical(unidade?.proprietario) || "AMBOS";
 
         // Quem recebeu fisicamente
-        if (recebidoPor === "A") {
+        if (recebidoPor === canonicalA) {
           recebeuFisicamenteA += r.valor;
-        } else if (recebidoPor === "B") {
+        } else if (recebidoPor === canonicalB) {
           recebeuFisicamenteB += r.valor;
         } else {
           recebeuFisicamenteA += r.valor / 2;
@@ -7918,9 +7885,9 @@
         }
 
         // Quem tem direito (baseado no proprietário da unidade)
-        if (proprietario === "A") {
+        if (proprietario === canonicalA) {
           temDireitoA += r.valor;
-        } else if (proprietario === "B") {
+        } else if (proprietario === canonicalB) {
           temDireitoB += r.valor;
         } else {
           temDireitoA += r.valor / 2;
@@ -7940,19 +7907,27 @@
       let pagouB = 0;
 
       state.lancamentos.forEach(l => {
-        if (l.pagador === "A") {
+        const pagadorCanon = resolveCanonical(l.pagador || l.pagadorId);
+        if (pagadorCanon === canonicalA) {
           pagouA += l.valor;
-        } else {
+        } else if (pagadorCanon === canonicalB) {
           pagouB += l.valor;
+        } else {
+          pagouA += l.valor / 2;
+          pagouB += l.valor / 2;
         }
       });
 
       state.rateios.forEach(r => {
         const totalRateio = r.distribuicao?.reduce((sum, d) => sum + d.valor, 0) || 0;
-        if (r.pagador === "A") {
+        const pagadorCanon = resolveCanonical(r.pagador || r.pagadorId);
+        if (pagadorCanon === canonicalA) {
           pagouA += totalRateio;
-        } else {
+        } else if (pagadorCanon === canonicalB) {
           pagouB += totalRateio;
+        } else {
+          pagouA += totalRateio / 2;
+          pagouB += totalRateio / 2;
         }
       });
 
@@ -7986,11 +7961,13 @@
       let saldoFinalB = saldoBrutoB;
 
       state.acertos.forEach(a => {
-        if (a.de === "A" && a.para === "B") {
+        const deCanon = resolveCanonical(a.de);
+        const paraCanon = resolveCanonical(a.para);
+        if (deCanon === canonicalA && paraCanon === canonicalB) {
           // A transferiu dinheiro para B
           saldoFinalA -= a.valor;  // A diminui saldo (deu dinheiro)
           saldoFinalB += a.valor;  // B aumenta saldo (recebeu dinheiro)
-        } else if (a.de === "B" && a.para === "A") {
+        } else if (deCanon === canonicalB && paraCanon === canonicalA) {
           // B transferiu dinheiro para A
           saldoFinalB -= a.valor;
           saldoFinalA += a.valor;

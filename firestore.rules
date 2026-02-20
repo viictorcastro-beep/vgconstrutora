@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'viictor.castro@gmail.com';
+    }
+
+    match /catalogo_etapas/{etapaId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /catalogo_tipos_custo/{tipoId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /obras/{obraId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+
+      match /unidades/{unidadeId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /lancamentos/{lancId} {
+        allow read: if isSignedIn();
+        allow create, update: if isSignedIn()
+          && request.resource.data.obraId == obraId
+          && request.resource.data.etapaId is string
+          && request.resource.data.tipoCustoId is string
+          && get(/databases/$(database)/documents/catalogo_etapas/$(request.resource.data.etapaId)).data.ativo == true
+          && get(/databases/$(database)/documents/catalogo_tipos_custo/$(request.resource.data.tipoCustoId)).data.ativo == true
+          && (
+            !('unidadeId' in request.resource.data) || request.resource.data.unidadeId == null ||
+            exists(/databases/$(database)/documents/obras/$(obraId)/unidades/$(request.resource.data.unidadeId))
+          )
+          && request.resource.data.escopo in ['GERAL','UNIDADE'];
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}

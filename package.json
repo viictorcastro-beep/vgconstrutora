@@ -4,12 +4,19 @@
   "description": "Migração de dados Firebase qd61lt32 → qd20-lt2-a-b",
   "type": "module",
   "scripts": {
-    "migrate": "node scripts/migrate-qd61-to-new.mjs"
+    "migrate": "node scripts/migrate-qd61-to-new.mjs",
+    "migrate:custos": "node scripts/migrate-custos-categoria.mjs",
+    "test:custos": "node scripts/test-custos.mjs",
+    "test:catalogos": "node scripts/test-catalogos.mjs",
+    "start": "node server.mjs",
+    "seed:catalogos": "node scripts/seed-catalogos.mjs"
   },
   "keywords": ["firebase", "migration"],
   "author": "VG Construtora",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "firebase-admin": "^12.0.0"
   }
 }

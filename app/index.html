@@ -167,7 +167,7 @@
         <button id="menu-socios" class="btn btn-soft text-sm" onclick="window.gerenciarSocios()" title="Gerenciar Sócios (Admin)">👔 Sócios</button>
         <button id="menu-unidades" class="btn btn-soft text-sm">Unidades</button>
         <button id="menu-fornecedores" class="btn btn-soft text-sm">Fornecedores</button>
-        <button id="menu-categorias" class="btn btn-soft text-sm">Categorias</button>
+        <button id="menu-categorias" class="btn btn-soft text-sm">Catálogos</button>
         <button id="theme-toggle" class="btn btn-soft text-sm" title="Alternar tema">🌙</button>
         <button id="export-excel-btn" class="btn btn-green text-sm" title="Exportar Excel">📊 Excel</button>
         <div id="user-email" class="text-sm muted"></div>
@@ -249,200 +249,224 @@
 
       <!-- DASHBOARD VIEW -->
       <div id="view-DASHBOARD" class="view-content">
-        
-        <!-- Filtros Avançados -->
         <div class="card p-4 mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div class="md:col-span-2">
+              <div class="text-xs muted mb-1">Obra *</div>
+              <select id="dash-obra" class="select text-sm"></select>
+            </div>
+            <div>
+              <div class="text-xs muted mb-1">Unidade</div>
+              <select id="dash-unidade" class="select text-sm">
+                <option value="all">Todas</option>
+              </select>
+            </div>
             <div>
               <div class="text-xs muted mb-1">Período</div>
-              <select id="filter-periodo" class="select text-sm" onchange="rerender()">
-                <option value="TODOS">Todos</option>
-                <option value="MES_ATUAL">Mês Atual</option>
-                <option value="MES_ANTERIOR">Mês Anterior</option>
-                <option value="TRIMESTRE">Último Trimestre</option>
-                <option value="ANO">Ano Atual</option>
+              <select id="dash-periodo" class="select text-sm">
+                <option value="TUDO">Tudo</option>
+                <option value="ULTIMOS_30">Últimos 30 dias</option>
+                <option value="ULTIMOS_90">Últimos 90 dias</option>
+                <option value="ULTIMOS_180">Últimos 180 dias</option>
+                <option value="INTERVALO">Intervalo</option>
               </select>
             </div>
             <div>
-              <div class="text-xs muted mb-1">Status</div>
-              <select id="filter-status" class="select text-sm" onchange="rerender()">
-                <option value="TODOS">Todos</option>
-                <option value="pendente">⏳ Pendente</option>
-                <option value="pago">✅ Pago</option>
-                <option value="atrasado">🚨 Atrasado</option>
+              <div class="text-xs muted mb-1">Modo de data</div>
+              <select id="dash-modo-data" class="select text-sm">
+                <option value="competencia">Competência</option>
+                <option value="pagamento">Pagamento (caixa)</option>
               </select>
             </div>
             <div>
-              <div class="text-xs muted mb-1">Categoria</div>
-              <select id="filter-categoria" class="select text-sm" onchange="rerender()">
-                <option value="TODAS">Todas</option>
+              <div class="text-xs muted mb-1">Ordenação</div>
+              <select id="dash-ordem" class="select text-sm">
+                <option value="total_desc">Total (desc)</option>
+                <option value="etapa_asc">Etapa (A → Z)</option>
               </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Fornecedor</div>
-              <select id="filter-fornecedor" class="select text-sm" onchange="rerender()">
-                <option value="TODOS">Todos</option>
-              </select>
-            </div>
-            <div>
-              <div class="text-xs muted mb-1">Buscar</div>
-              <input id="filter-text" type="text" class="input text-sm" placeholder="Descrição..." oninput="rerender()" />
             </div>
           </div>
-          <button id="filters-clear" class="btn btn-soft text-sm mt-3">Limpar Filtros</button>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+            <div>
+              <div class="text-xs muted mb-1">Data início</div>
+              <input id="dash-dtini" type="date" class="input text-sm" />
+            </div>
+            <div>
+              <div class="text-xs muted mb-1">Data fim</div>
+              <input id="dash-dtfim" type="date" class="input text-sm" />
+            </div>
+            <div class="md:col-span-2 flex items-end gap-2">
+              <button id="dash-limpar" class="btn btn-soft text-sm">Limpar filtros</button>
+              <button id="dash-retry" class="btn btn-dark text-sm">Atualizar</button>
+            </div>
+          </div>
+          <div id="dash-periodo-hint" class="text-xs text-amber-600 mt-2 hidden">
+            Intervalo ativo: selecione Data início e Data fim.
+          </div>
         </div>
 
-        <!-- KPIs -->
-        <div id="kpis-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6"></div>
-        
-        <!-- Análise Financeira Detalhada por Sócio e Unidade -->
-        <div id="analise-detalhada"></div>
-        
-        <!-- Métricas de Rentabilidade -->
-        <div id="roi-section" class="mb-6"></div>
-        
-        <!-- Gráficos Interativos -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">📈 Evolução de Custos</div>
-            <div class="chart-container">
-              <canvas id="chart-custos-tempo"></canvas>
-            </div>
+        <div id="dashboard-custos-loading" class="card p-6 mb-6 hidden">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="h-24 rounded-lg skeleton"></div>
+            <div class="h-24 rounded-lg skeleton"></div>
+            <div class="h-24 rounded-lg skeleton"></div>
+            <div class="h-24 rounded-lg skeleton"></div>
           </div>
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">🥧 Distribuição por Categoria</div>
-            <div class="chart-container">
-              <canvas id="chart-categorias-pie"></canvas>
-            </div>
-          </div>
-        </div>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">💰 Fluxo de Caixa Projetado</div>
-            <div class="chart-container">
-              <canvas id="chart-fluxo-caixa"></canvas>
-            </div>
-          </div>
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">📊 ROI Comparativo</div>
-            <div class="chart-container">
-              <canvas id="chart-roi-bar"></canvas>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Custo por m² -->
-        <div id="custo-m2-section"></div>
-        
-        <!-- Analytics -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">🏆 Top 5 Categorias</div>
-            <div id="top-categorias"></div>
-          </div>
-          <div class="card p-6">
-            <div class="font-black text-lg mb-4">🛒 Top 5 Fornecedores</div>
-            <div id="top-fornecedores"></div>
-          </div>
-        </div>
-        
-        <!-- Lucro Previsto -->
-        <div class="card p-6 mt-6">
-          <div class="font-black text-lg mb-4">💎 Lucro Previsto por Sócio</div>
-          <div id="lucro-section"></div>
+          <div class="h-64 rounded-lg skeleton mt-6"></div>
         </div>
 
-        <!-- Equalização -->
-        <div class="card p-6 mt-6">
-          <div class="font-black text-lg mb-4">⚖️ Equalização entre Sócios</div>
-          <div id="equalizacao-section"></div>
+        <div id="dashboard-custos-error" class="card p-6 mb-6 hidden">
+          <div class="text-center">
+            <div class="text-2xl mb-2">⚠️</div>
+            <div class="font-bold">Erro ao carregar dashboard</div>
+            <div class="text-sm muted mt-2">Tente atualizar os filtros ou recarregar os dados.</div>
+          </div>
         </div>
 
-        <!-- Export -->
-        <div class="mt-6 text-center">
-          <button id="export-pdf-btn" class="btn btn-danger">📄 Exportar Dashboard PDF</button>
+        <div id="dashboard-custos-empty" class="card p-6 mb-6 hidden">
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            <div class="font-bold">Sem lançamentos nesse filtro</div>
+            <div class="text-sm">Crie um custo com etapa e tipo para começar.</div>
+            <button id="dash-criar-lancamento" class="btn btn-green mt-4">+ Criar lançamento</button>
+          </div>
+        </div>
+
+        <div id="dashboard-custos-content" class="space-y-6 hidden">
+          <div id="dashboard-kpis" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+
+          <div class="card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div class="font-black text-lg">📋 Custo por Etapa</div>
+              <div class="text-sm muted">Material vs Mão de Obra vs Outros</div>
+            </div>
+            <div id="dashboard-tabela" class="overflow-x-auto"></div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="card p-6">
+              <div class="font-black text-lg mb-4">📊 Etapas (barras empilhadas)</div>
+              <div class="chart-container">
+                <canvas id="chart-custos-etapa"></canvas>
+              </div>
+            </div>
+            <div class="card p-6">
+              <div class="font-black text-lg mb-4">🥧 Total geral</div>
+              <div class="chart-container">
+                <canvas id="chart-custos-pie"></canvas>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- LANÇAMENTOS VIEW -->
       <div id="view-LANCAMENTOS" class="view-content hidden">
         <div class="card p-6 mb-6">
-          <div class="font-black text-lg mb-4">💰 Novo Lançamento</div>
+          <div class="font-black text-lg mb-4">💰 Novo Lançamento (Custo)</div>
           <form id="lanc-form">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Data *</div>
-                <input id="lanc-data" type="date" class="input" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Data Vencimento</div>
-                <input id="lanc-vencimento" type="date" class="input" />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Data Competência</div>
-                <input id="lanc-competencia" type="date" class="input" />
-              </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <fieldset class="border border-slate-200 rounded-xl p-4">
+                <legend class="px-2 text-sm font-bold text-slate-700">Escopo</legend>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-xs muted mb-1">Obra *</div>
+                    <select id="lanc-obra" class="select" required></select>
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Unidade</div>
+                    <select id="lanc-unidade" class="select">
+                      <option value="">Todas / Não definida</option>
+                    </select>
+                    <div id="lanc-unidade-warning" class="text-xs text-amber-600 mt-1 hidden">Recomendado escolher unidade quando há mais de 1 ativa.</div>
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset class="border border-slate-200 rounded-xl p-4">
+                <legend class="px-2 text-sm font-bold text-slate-700">Classificação</legend>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-xs muted mb-1">Etapa *</div>
+                    <select id="lanc-etapa" class="select" required>
+                      <option value="">Selecione...</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Tipo de custo *</div>
+                    <select id="lanc-tipo-custo" class="select" required>
+                      <option value="">Selecione...</option>
+                    </select>
+                  </div>
+                </div>
+                <div id="catalogos-error" class="text-xs text-red-600 mt-2 hidden">
+                  Catálogos indisponíveis. <button type="button" id="catalogos-retry" class="underline">Tentar novamente</button>
+                </div>
+              </fieldset>
+
+              <fieldset class="border border-slate-200 rounded-xl p-4">
+                <legend class="px-2 text-sm font-bold text-slate-700">Financeiro</legend>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-xs muted mb-1">Valor * (R$)</div>
+                    <input id="lanc-valor" type="number" step="0.01" class="input" placeholder="1000.00" required />
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Status de pagamento</div>
+                    <select id="lanc-status" class="select">
+                      <option value="pago">✅ Pago</option>
+                      <option value="pendente">⏳ Pendente</option>
+                      <option value="atrasado">🚨 Atrasado</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <div class="text-xs muted mb-1">Pagador (Sócio) *</div>
+                    <select id="lanc-pagador" class="select" data-socio-select required></select>
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Fornecedor *</div>
+                    <select id="lanc-fornecedor" class="select" required>
+                      <option value="">Selecione...</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <div class="text-xs muted mb-1">Data Competência *</div>
+                    <input id="lanc-competencia" type="date" class="input" required />
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Data Pagamento</div>
+                    <input id="lanc-pagamento" type="date" class="input" />
+                  </div>
+                  <div>
+                    <div class="text-xs muted mb-1">Data Vencimento</div>
+                    <input id="lanc-vencimento" type="date" class="input" />
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset class="border border-slate-200 rounded-xl p-4">
+                <legend class="px-2 text-sm font-bold text-slate-700">Detalhes</legend>
+                <div class="mb-4">
+                  <div class="text-xs muted mb-1">Descrição *</div>
+                  <input id="lanc-descricao" type="text" class="input" placeholder="Ex: Material elétrico..." required />
+                </div>
+                <div>
+                  <div class="text-xs muted mb-1">Link Comprovante (Google Drive) *</div>
+                  <input id="lanc-comprovante" type="url" class="input" placeholder="https://drive.google.com/file/d/..." required />
+                  <div class="text-[11px] text-gray-500 mt-1">Obrigatório para comprovação futura.</div>
+                </div>
+              </fieldset>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Unidade *</div>
-                <select id="lanc-unidade" class="select" required>
-                  <option value="">Selecione...</option>
-                </select>
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Categoria *</div>
-                <select id="lanc-categoria" class="select" required>
-                  <option value="">Selecione...</option>
-                </select>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Fornecedor *</div>
-                <select id="lanc-fornecedor" class="select" required>
-                  <option value="">Selecione...</option>
-                </select>
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Pagador (Sócio) *</div>
-                <select id="lanc-pagador" class="select" data-socio-select required>
-                  <!-- Populado dinamicamente -->
-                </select>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <div class="text-xs muted mb-1">Valor * (R$)</div>
-                <input id="lanc-valor" type="number" step="0.01" class="input" placeholder="1000.00" required />
-              </div>
-              <div>
-                <div class="text-xs muted mb-1">Status de Pagamento</div>
-                <select id="lanc-status" class="select" disabled>
-                  <option value="pago" selected>✅ Pago</option>
-                </select>
-                <div class="text-[11px] text-gray-500 mt-1">Lançamentos só são criados quando há pagamento.</div>
-              </div>
-            </div>
-            
-            <div class="mb-4">
-              <div class="text-xs muted mb-1">Descrição *</div>
-              <input id="lanc-descricao" type="text" class="input" placeholder="Ex: Material elétrico..." required />
-            </div>
-            
-            <div class="mb-4">
-              <div class="text-xs muted mb-1">Link Comprovante (Google Drive) *</div>
-              <input id="lanc-comprovante" type="url" class="input" placeholder="https://drive.google.com/file/d/..." required />
-              <div class="text-[11px] text-gray-500 mt-1">Obrigatório para comprovação futura.</div>
-            </div>
-            
-            <div class="flex gap-3">
+
+            <div class="flex flex-wrap gap-3 mt-4">
               <button type="submit" class="btn btn-green">💾 Salvar Lançamento</button>
               <button type="button" id="lanc-quick" class="btn btn-soft">⚡ Atalho: Transitório</button>
+              <button type="button" id="lanc-ver-dashboard" class="btn btn-indigo hidden">📊 Ver no dashboard</button>
             </div>
           </form>
         </div>
@@ -1044,33 +1068,26 @@
   </div>
 
   <div id="modal-categorias" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
-    <div class="card p-6 w-full max-w-3xl">
+    <div class="card p-6 w-full max-w-5xl">
       <div class="flex items-center justify-between mb-4">
-        <div class="font-black text-xl">📂 Categorias</div>
+        <div class="font-black text-xl">📚 Catálogos Oficiais (Etapas & Tipos de Custo)</div>
         <button data-close="modal-categorias" class="btn btn-soft">Fechar</button>
       </div>
 
-      <div class="grid grid-cols-12 gap-3 mb-4">
-        <div class="col-span-5">
-          <div class="text-xs muted mb-1">Nome</div>
-          <input id="cat-nome" class="input" placeholder="Ex: Material Elétrico" />
-        </div>
-        <div class="col-span-3">
-          <div class="text-xs muted mb-1">Grupo</div>
-          <input id="cat-grupo" class="input" placeholder="Ex: Materiais" />
-        </div>
-        <div class="col-span-2">
-          <div class="text-xs muted mb-1">Cor</div>
-          <input id="cat-cor" type="color" class="input" value="#3b82f6" />
-        </div>
-        <div class="col-span-2 flex items-end">
-          <button id="cat-create" class="btn btn-dark w-full">+</button>
-        </div>
+      <div class="alert alert-warning mb-4">
+        <div class="font-bold text-yellow-800">Somente leitura</div>
+        <div class="text-sm text-yellow-700">Os catálogos são padronizados e protegidos contra edições manuais.</div>
       </div>
 
-      <div>
-        <div class="font-bold mb-2">Lista de Categorias:</div>
-        <div id="categorias-list" class="space-y-2"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <div class="font-bold mb-2">🏗️ Etapas</div>
+          <div id="etapas-list" class="space-y-2"></div>
+        </div>
+        <div>
+          <div class="font-bold mb-2">💰 Tipos de Custo</div>
+          <div id="tipos-custo-list" class="space-y-2"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1079,7 +1096,7 @@
     // Firebase imports
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js");
     const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js");
-    const { getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js");
+    const { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js");
 
     // Firebase config
     const firebaseConfig = {
@@ -1174,7 +1191,7 @@
       
       // Recriar gráficos com tema novo
       if (VIEW === "DASHBOARD") {
-        renderCharts();
+        renderDashboard();
       }
     }
 
@@ -1189,13 +1206,15 @@
       
       // Lançamentos
       const lancData = state.lancamentos.map(l => ({
-        'Data': l.data,
+        'Data Competência': l.dataCompetencia || l.data || '',
+        'Data Pagamento': l.dataPagamento || '',
         'Descrição': l.descricao,
-        'Categoria': state.categorias.find(c => c.id === l.categoriaId)?.nome || '',
+        'Etapa': state.etapas.find(e => e.id === (l.etapaId || 'administracao_financeiro'))?.nome || '',
+        'Tipo de Custo': state.tiposCusto.find(t => t.id === (l.tipoCustoId || 'outros'))?.nome || '',
         'Fornecedor': state.fornecedores.find(f => f.id === l.fornecedorId)?.nome || '',
         'Unidade': state.unidades.find(u => u.id === l.unidadeId)?.nome || '',
         'Valor': l.valor,
-        'Status': l.status || 'pendente'
+        'Status': l.statusPagamento || l.status || 'pendente'
       }));
       const wsLanc = XLSX.utils.json_to_sheet(lancData);
       XLSX.utils.book_append_sheet(wb, wsLanc, 'Lançamentos');
@@ -1264,6 +1283,8 @@
       socios: [],  // Lista de sócios personalizados
       unidades: [],
       categorias: [],
+      etapas: [],
+      tiposCusto: [],
       fornecedores: [],
       deducoes: [],
       lancamentos: [],
@@ -1273,10 +1294,57 @@
       contasReceber: [],  // Nova: Contas a Receber (vendas confirmadas não recebidas)
       config: {
         socios: []  // Inicializar como array vazio
+      },
+      ready: {
+        catalogos: false,
+        obra: false
+      },
+      catalogosStatus: {
+        loading: false,
+        error: null,
+        lastLoadedAt: null
+      },
+      dashboardStatus: {
+        loading: false,
+        error: null,
+        lastKey: null,
+        data: null
       }
     };
 
+    const CATALOGO_ETAPAS_SEED = [
+      { id: "terreno_regularizacao", nome: "Terreno & Regularização", ordem: 1, ativo: true, sistema: true },
+      { id: "projetos_aprovacoes", nome: "Projetos & Aprovações", ordem: 2, ativo: true, sistema: true },
+      { id: "preparacao_implantacao", nome: "Preparação/Implantação", ordem: 3, ativo: true, sistema: true },
+      { id: "fundacao", nome: "Fundação", ordem: 4, ativo: true, sistema: true },
+      { id: "estrutura", nome: "Estrutura", ordem: 5, ativo: true, sistema: true },
+      { id: "alvenaria_vedacoes", nome: "Alvenaria/Vedações", ordem: 6, ativo: true, sistema: true },
+      { id: "cobertura", nome: "Cobertura", ordem: 7, ativo: true, sistema: true },
+      { id: "esquadrias_vidros", nome: "Esquadrias/Vidros", ordem: 8, ativo: true, sistema: true },
+      { id: "eletrica_telecom", nome: "Elétrica/Telecom", ordem: 9, ativo: true, sistema: true },
+      { id: "hidraulica_sanitaria", nome: "Hidráulica/Sanitária", ordem: 10, ativo: true, sistema: true },
+      { id: "revestimentos", nome: "Revestimentos", ordem: 11, ativo: true, sistema: true },
+      { id: "gesso_forros", nome: "Gesso/Forros", ordem: 12, ativo: true, sistema: true },
+      { id: "pintura", nome: "Pintura", ordem: 13, ativo: true, sistema: true },
+      { id: "marcenaria", nome: "Marcenaria/Planejados", ordem: 14, ativo: true, sistema: true },
+      { id: "externo_paisagismo", nome: "Externo/Paisagismo", ordem: 15, ativo: true, sistema: true },
+      { id: "pos_obra", nome: "Pós-obra/Assistência", ordem: 16, ativo: true, sistema: true },
+      { id: "administracao_financeiro", nome: "Administração/Financeiro", ordem: 17, ativo: true, sistema: true },
+      { id: "comercializacao_venda", nome: "Comercialização/Venda", ordem: 18, ativo: true, sistema: true }
+    ];
+
+    const CATALOGO_TIPOS_CUSTO_SEED = [
+      { id: "material", nome: "Material", ordem: 1, ativo: true, sistema: true },
+      { id: "mao_obra", nome: "Mão de Obra", ordem: 2, ativo: true, sistema: true },
+      { id: "frete_entrega", nome: "Frete/Entrega", ordem: 3, ativo: true, sistema: true },
+      { id: "locacao_equipamento", nome: "Locação/Equipamento", ordem: 4, ativo: true, sistema: true },
+      { id: "taxas_licencas", nome: "Taxas/Licenças", ordem: 5, ativo: true, sistema: true },
+      { id: "consumiveis", nome: "Consumíveis", ordem: 6, ativo: true, sistema: true },
+      { id: "outros", nome: "Outros", ordem: 7, ativo: true, sistema: true }
+    ];
+
     const listeners = [];
+    const obraListeners = [];
 
     // SISTEMA DE PERMISSÕES
     const ROLES = {
@@ -1327,6 +1395,8 @@
         obrasCol: collection(db, "obras"),
         sociosCol: collection(db, "socios"),  // Coleção global de sócios
         obraDoc: doc(db, "obras", obraId),
+        catalogoEtapasCol: collection(db, "catalogo_etapas"),
+        catalogoTiposCustoCol: collection(db, "catalogo_tipos_custo"),
         unidadesCol: collection(db, "obras", obraId, "unidades"),
         categoriasCol: collection(db, "obras", obraId, "categorias"),
         fornecedoresCol: collection(db, "obras", obraId, "fornecedores"),
@@ -1360,6 +1430,7 @@
         $("login-screen").classList.add("hidden");
         $("app").classList.remove("hidden");
         
+        loadCatalogosFromApi();
         subscribeSocios();
         subscribeObrasList();
         setupEventListeners();
@@ -1375,10 +1446,19 @@
         showToast(`Bem-vindo, ${user.email}!`, 'success');
       } else {
         state.user = null;
+        state.etapas = [];
+        state.tiposCusto = [];
+        state.ready.catalogos = false;
+        state.ready.obra = false;
+        state.catalogosStatus.loading = false;
+        state.catalogosStatus.error = null;
+        state.catalogosStatus.lastLoadedAt = null;
         $("login-screen").classList.remove("hidden");
         $("app").classList.add("hidden");
         listeners.forEach(unsub => unsub());
         listeners.length = 0;
+        obraListeners.forEach(unsub => unsub());
+        obraListeners.length = 0;
       }
     });
 
@@ -1420,27 +1500,49 @@
         };
       });
 
-      // Filters
-      $("filters-clear").onclick = () => {
-        $("filter-text").value = "";
-        $("filter-categoria").value = "TODAS";
-        $("filter-fornecedor").value = "TODOS";
-        $("filter-periodo").value = "TODOS";
-        $("filter-status").value = "TODOS";
-        filterText = "";
-        filterCategoria = "TODAS";
-        filterFornecedor = "TODOS";
-        filterPeriodo = "TODOS";
-        filterStatus = "TODOS";
-        rerender();
+      // Dashboard filtros
+      const dashObra = $("dash-obra");
+      if (dashObra) dashObra.onchange = () => {
+        const value = dashObra.value;
+        if (value && value !== OBRA_ID) {
+          $("obra-select").value = value;
+          switchObra();
+        }
+        renderDashboard();
       };
+      const dashUnidade = $("dash-unidade");
+      if (dashUnidade) dashUnidade.onchange = renderDashboard;
+      const dashPeriodo = $("dash-periodo");
+      if (dashPeriodo) dashPeriodo.onchange = renderDashboard;
+      const dashModoData = $("dash-modo-data");
+      if (dashModoData) dashModoData.onchange = renderDashboard;
+      const dashOrdem = $("dash-ordem");
+      if (dashOrdem) dashOrdem.onchange = renderDashboard;
+      const dashDtIni = $("dash-dtini");
+      if (dashDtIni) dashDtIni.onchange = renderDashboard;
+      const dashDtFim = $("dash-dtfim");
+      if (dashDtFim) dashDtFim.onchange = renderDashboard;
+      const dashLimpar = $("dash-limpar");
+      if (dashLimpar) dashLimpar.onclick = () => {
+        if (dashUnidade) dashUnidade.value = "all";
+        if (dashPeriodo) dashPeriodo.value = "TUDO";
+        if (dashModoData) dashModoData.value = "competencia";
+        if (dashOrdem) dashOrdem.value = "total_desc";
+        if (dashDtIni) dashDtIni.value = "";
+        if (dashDtFim) dashDtFim.value = "";
+        renderDashboard();
+      };
+      const dashRetry = $("dash-retry");
+      if (dashRetry) dashRetry.onclick = renderDashboard;
+      const dashCriarLanc = $("dash-criar-lancamento");
+      if (dashCriarLanc) dashCriarLanc.onclick = () => window.navigateTo("LANCAMENTOS");
 
       // CRUD buttons
       $("obra-create").onclick = () => openModal("modal-obra");
       document.getElementById("obra-form").onsubmit = createObra;
       $("unid-create").onclick = createUnidade;
       $("forn-create").onclick = createFornecedor;
-      $("cat-create").onclick = createCategoria;
+      // Catálogos oficiais são read-only no UI
       $("ded-create").onclick = createDeducao;
 
       // Deduções: controlar estado da base quando tipo mudar
@@ -1454,7 +1556,24 @@
       $("lanc-quick").onclick = () => {
         const trans = state.unidades.find(u => (u.nome||"").toLowerCase().includes("transit"));
         if (trans) $("lanc-unidade").value = trans.id;
+        updateLancamentoUnidadeWarning();
       };
+      const lancObra = $("lanc-obra");
+      if (lancObra) lancObra.onchange = () => {
+        const value = lancObra.value;
+        if (value && value !== OBRA_ID) {
+          $("obra-select").value = value;
+          switchObra();
+        }
+        $("lanc-unidade").value = "";
+        updateLancamentoUnidadeWarning();
+      };
+      const lancUnidade = $("lanc-unidade");
+      if (lancUnidade) lancUnidade.onchange = updateLancamentoUnidadeWarning;
+      const lancVerDash = $("lanc-ver-dashboard");
+      if (lancVerDash) lancVerDash.onclick = () => window.navigateTo("DASHBOARD");
+      const catRetry = $("catalogos-retry");
+      if (catRetry) catRetry.onclick = loadCatalogosFromApi;
 
       $("rat-add-dest").onclick = rateioAddDest;
       $("rat-save").onclick = addRateio;
@@ -1524,7 +1643,8 @@
         }
       };
 
-      $("export-pdf-btn").onclick = exportPDF;
+      const exportPdfBtn = $("export-pdf-btn");
+      if (exportPdfBtn) exportPdfBtn.onclick = exportPDF;
 
       // Theme toggle
       $("theme-toggle").onclick = toggleTheme;
@@ -1601,6 +1721,101 @@
     }
 
     // SUBSCRIPTIONS
+    const API_BASE = (() => {
+      if (window.API_BASE) return window.API_BASE;
+      const stored = localStorage.getItem("API_BASE");
+      if (stored) return stored;
+      if (window.location.protocol === "file:") return "http://localhost:3001";
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") return "http://localhost:3001";
+      return "";
+    })();
+
+    async function fetchCatalogo(endpoint) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const url = `${API_BASE}${endpoint}`;
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (!data || !Array.isArray(data.items)) {
+          throw new Error("Resposta inválida da API");
+        }
+        return data.items;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    async function loadCatalogosFromApi() {
+      state.catalogosStatus.loading = true;
+      state.catalogosStatus.error = null;
+      state.ready.catalogos = false;
+      renderCatalogosModal();
+      rerender();
+
+      try {
+        console.log(`🔎 Buscando catálogos via API... base=${API_BASE || "(same-origin)"}`);
+        const [etapas, tipos] = await Promise.all([
+          fetchCatalogo("/api/catalogos/etapas"),
+          fetchCatalogo("/api/catalogos/tipos-custo")
+        ]);
+
+        state.etapas = etapas.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+        state.tiposCusto = tipos.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+        state.ready.catalogos = state.etapas.length > 0 && state.tiposCusto.length > 0;
+        state.catalogosStatus.lastLoadedAt = new Date().toISOString();
+
+        console.log(`✅ Catálogos carregados: etapas=${state.etapas.length} tipos=${state.tiposCusto.length}`);
+      } catch (err) {
+        console.error("❌ Erro ao carregar catálogos:", err);
+        state.catalogosStatus.error = `Falha ao carregar catálogos (${err.message || "erro"})`;
+      } finally {
+        state.catalogosStatus.loading = false;
+        renderCatalogosModal();
+        rerender();
+      }
+    }
+
+    function buildDashboardQuery(filtros) {
+      const params = new URLSearchParams();
+      if (filtros.obraId) params.set("obraId", filtros.obraId);
+      if (filtros.unidadeId) params.set("unidadeId", filtros.unidadeId);
+      if (filtros.modoData) params.set("modoData", filtros.modoData);
+      if (filtros.dtIni) params.set("dtIni", filtros.dtIni);
+      if (filtros.dtFim) params.set("dtFim", filtros.dtFim);
+      return params.toString();
+    }
+
+    async function fetchDashboardCustos(filtros) {
+      const query = buildDashboardQuery(filtros);
+      const url = `${API_BASE}/api/dashboard/custos?${query}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    async function loadDashboardCustos(filtros) {
+      const key = JSON.stringify(filtros || {});
+      if (state.dashboardStatus.loading && state.dashboardStatus.lastKey === key) return;
+      state.dashboardStatus.loading = true;
+      state.dashboardStatus.error = null;
+      state.dashboardStatus.lastKey = key;
+      try {
+        state.dashboardStatus.data = await fetchDashboardCustos(filtros);
+      } catch (err) {
+        console.error("❌ Erro ao carregar dashboard via API:", err);
+        state.dashboardStatus.error = `Falha ao carregar dashboard (${err.message || "erro"})`;
+        state.dashboardStatus.data = null;
+      } finally {
+        state.dashboardStatus.loading = false;
+      }
+    }
+
     function subscribeSocios() {
       const r = refs("dummy").sociosCol;
       listeners.push(onSnapshot(r, (snap) => {
@@ -1756,8 +1971,6 @@
         }
         
         hydrateObrasSelect();
-        // Lançar acerto pendente QD61 LT32 (uma vez)
-        garantirAcertoPendenteQd61Lt32().catch(err => console.error('Erro ao lançar acerto pendente QD61 LT32:', err));
         migrarEntradaTerrenoQd20Lt2().catch(err => console.error('Erro ao migrar entrada do terreno QD20 LT2:', err));
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
@@ -1784,10 +1997,12 @@
 
     function subscribeObra() {
       if (!OBRA_ID) return;
+
+      state.ready.obra = false;
       
-      // Clear previous listeners (except obras list listener at index 0)
-      while (listeners.length > 1) {
-        const unsub = listeners.pop();
+      // Clear previous obra listeners
+      while (obraListeners.length > 0) {
+        const unsub = obraListeners.pop();
         unsub();
       }
 
@@ -1804,53 +2019,54 @@
         }, 100);
       };
 
-      listeners.push(onSnapshot(r.unidadesCol, (snap) => {
+      obraListeners.push(onSnapshot(r.unidadesCol, (snap) => {
         state.unidades = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.categoriasCol, (snap) => {
+      obraListeners.push(onSnapshot(r.categoriasCol, (snap) => {
         state.categorias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.fornecedoresCol, (snap) => {
+      obraListeners.push(onSnapshot(r.fornecedoresCol, (snap) => {
         state.fornecedores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.deducoesCol, (snap) => {
+      obraListeners.push(onSnapshot(r.deducoesCol, (snap) => {
         state.deducoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.lancamentosCol, (snap) => {
+      obraListeners.push(onSnapshot(r.lancamentosCol, (snap) => {
         state.lancamentos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.ready.obra = true;
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.rateiosCol, (snap) => {
+      obraListeners.push(onSnapshot(r.rateiosCol, (snap) => {
         state.rateios = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.recebimentosCol, (snap) => {
+      obraListeners.push(onSnapshot(r.recebimentosCol, (snap) => {
         state.recebimentos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.acertosCol, (snap) => {
+      obraListeners.push(onSnapshot(r.acertosCol, (snap) => {
         state.acertos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
       // 📊 Contas a Receber subscriber
-      listeners.push(onSnapshot(r.contasReceberCol, (snap) => {
+      obraListeners.push(onSnapshot(r.contasReceberCol, (snap) => {
         state.contasReceber = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
-      listeners.push(onSnapshot(r.configDoc, (snap) => {
+      obraListeners.push(onSnapshot(r.configDoc, (snap) => {
         state.config = snap.exists() ? snap.data() : {};
         scheduleRerender();
       }));
@@ -1864,6 +2080,7 @@
     window.switchObra = function() {
       OBRA_ID = $("obra-select").value;
       if (OBRA_ID) {
+        state.ready.obra = false;
         // Verificar acesso
         if (!hasAccessToObra(OBRA_ID)) {
           showToast('❌ Você não tem acesso a esta obra', 'error');
@@ -1948,7 +2165,7 @@
       renderObrasModal();
       renderUnidadesModal();
       renderFornecedoresModal();
-      renderCategoriasModal();
+      renderCatalogosModal();
     }
 
     window.goToObraDashboard = function(obraId) {
@@ -2700,7 +2917,11 @@
         console.log(`     posicoes keys: [${Object.keys(posicoes).join(', ')}]`);
         const socioAFirestoreId = resolveSocioFirestoreId(obra.socioAId);
         const socioBFirestoreId = resolveSocioFirestoreId(obra.socioBId);
+        const fallbackSocios = (state.socios || []).map(s => s.id).filter(Boolean);
+        const socioAAllocId = socioAFirestoreId || fallbackSocios[0] || null;
+        const socioBAllocId = socioBFirestoreId || (fallbackSocios.find(id => id !== socioAAllocId) || null);
         console.log(`     socioAId (firestore): "${socioAFirestoreId}" | socioBId (firestore): "${socioBFirestoreId}"`);
+        console.log(`     socioA (alloc): "${socioAAllocId}" | socioB (alloc): "${socioBAllocId}"`);
         console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[socioAFirestoreId]}`);
         console.log(`     Obra tem socioBId em posicoes? ${!!posicoes[socioBFirestoreId]}`);
 
@@ -2743,36 +2964,36 @@
           console.log(`     💰 Investimentos: A R$ ${invA.toFixed(2)} | B R$ ${invB.toFixed(2)} | Total R$ ${invTotal.toFixed(2)}`);
           
           // 💵 CAIXA: Quem pagou fisicamente
-          if (invA > 0 && socioAFirestoreId && posicoes[socioAFirestoreId]) {
-            posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += invA;
-            posicoes[socioAFirestoreId].detalheCaixaSemAcerto.pagoFisico += invA;
-            addDetalheObra(socioAFirestoreId, 'pagoFisicoSemAcerto', invA);
-            addDetalheObra(socioAFirestoreId, 'pagoFisico', invA);
-            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}`);
+          if (invA > 0 && socioAAllocId && posicoes[socioAAllocId]) {
+            posicoes[socioAAllocId].detalheCaixa.pagoFisico += invA;
+            posicoes[socioAAllocId].detalheCaixaSemAcerto.pagoFisico += invA;
+            addDetalheObra(socioAAllocId, 'pagoFisicoSemAcerto', invA);
+            addDetalheObra(socioAAllocId, 'pagoFisico', invA);
+            console.log(`       ✅ Investimento A (caixa) adicionado ao sócio ${posicoes[socioAAllocId].nome}`);
           }
           
-          if (invB > 0 && socioBFirestoreId && posicoes[socioBFirestoreId]) {
-            posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += invB;
-            posicoes[socioBFirestoreId].detalheCaixaSemAcerto.pagoFisico += invB;
-            addDetalheObra(socioBFirestoreId, 'pagoFisicoSemAcerto', invB);
-            addDetalheObra(socioBFirestoreId, 'pagoFisico', invB);
-            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}`);
+          if (invB > 0 && socioBAllocId && posicoes[socioBAllocId]) {
+            posicoes[socioBAllocId].detalheCaixa.pagoFisico += invB;
+            posicoes[socioBAllocId].detalheCaixaSemAcerto.pagoFisico += invB;
+            addDetalheObra(socioBAllocId, 'pagoFisicoSemAcerto', invB);
+            addDetalheObra(socioBAllocId, 'pagoFisico', invB);
+            console.log(`       ✅ Investimento B (caixa) adicionado ao sócio ${posicoes[socioBAllocId].nome}`);
           }
           
           // 📋 COMPETÊNCIA: AMBOS deveriam pagar 50/50 do total (independente de quem investiu)
           if (invTotal > 0) {
             const metadeInv = invTotal / 2;
             
-            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
-              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', metadeInv);
-              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioAFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            if (socioAAllocId && posicoes[socioAAllocId]) {
+              posicoes[socioAAllocId].detalheDireito.custoPorAlocacao += metadeInv;
+              addDetalheObra(socioAAllocId, 'custoPorAlocacao', metadeInv);
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioAAllocId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
             
-            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
-              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metadeInv;
-              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', metadeInv);
-              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioBFirestoreId].nome}: R$ ${metadeInv.toFixed(2)}`);
+            if (socioBAllocId && posicoes[socioBAllocId]) {
+              posicoes[socioBAllocId].detalheDireito.custoPorAlocacao += metadeInv;
+              addDetalheObra(socioBAllocId, 'custoPorAlocacao', metadeInv);
+              console.log(`       ✅ Custo competência (50%) adicionado ao sócio ${posicoes[socioBAllocId].nome}: R$ ${metadeInv.toFixed(2)}`);
             }
           }
 
@@ -2808,31 +3029,31 @@
               addDetalheObra(pagoPorFirestoreId, 'pagoFisico', valor);
             } else {
               // Fallback: dividir 50/50 se não souber quem pagou
-              if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-                posicoes[socioAFirestoreId].detalheCaixa.pagoFisico += valorA;
-                posicoes[socioAFirestoreId].detalheCaixaSemAcerto.pagoFisico += valorA;
-                addDetalheObra(socioAFirestoreId, 'pagoFisicoSemAcerto', valorA);
-                addDetalheObra(socioAFirestoreId, 'pagoFisico', valorA);
+              if (socioAAllocId && posicoes[socioAAllocId]) {
+                posicoes[socioAAllocId].detalheCaixa.pagoFisico += valorA;
+                posicoes[socioAAllocId].detalheCaixaSemAcerto.pagoFisico += valorA;
+                addDetalheObra(socioAAllocId, 'pagoFisicoSemAcerto', valorA);
+                addDetalheObra(socioAAllocId, 'pagoFisico', valorA);
               }
-              if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
-                posicoes[socioBFirestoreId].detalheCaixa.pagoFisico += valorB;
-                posicoes[socioBFirestoreId].detalheCaixaSemAcerto.pagoFisico += valorB;
-                addDetalheObra(socioBFirestoreId, 'pagoFisicoSemAcerto', valorB);
-                addDetalheObra(socioBFirestoreId, 'pagoFisico', valorB);
+              if (socioBAllocId && posicoes[socioBAllocId]) {
+                posicoes[socioBAllocId].detalheCaixa.pagoFisico += valorB;
+                posicoes[socioBAllocId].detalheCaixaSemAcerto.pagoFisico += valorB;
+                addDetalheObra(socioBAllocId, 'pagoFisicoSemAcerto', valorB);
+                addDetalheObra(socioBAllocId, 'pagoFisico', valorB);
               }
             }
             
             // 📋 COMPETÊNCIA: Custo alocado por percentual
-            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += valorA;
-              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', valorA);
+            if (socioAAllocId && posicoes[socioAAllocId]) {
+              posicoes[socioAAllocId].detalheDireito.custoPorAlocacao += valorA;
+              addDetalheObra(socioAAllocId, 'custoPorAlocacao', valorA);
             } else if (obra.socioAId) {
               console.warn(`     ⚠️ socioAId "${obra.socioAId}" não encontrado em posicoes!`);
             }
             
-            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
-              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += valorB;
-              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', valorB);
+            if (socioBAllocId && posicoes[socioBAllocId]) {
+              posicoes[socioBAllocId].detalheDireito.custoPorAlocacao += valorB;
+              addDetalheObra(socioBAllocId, 'custoPorAlocacao', valorB);
             } else if (obra.socioBId) {
               console.warn(`     ⚠️ socioBId "${obra.socioBId}" não encontrado em posicoes!`);
             }
@@ -2879,18 +3100,11 @@
               : Number(valorRaw || 0);
             if (!valor) return;
 
-            const isQd61Lt32 = (obra?.nome || '').toLowerCase().includes('qd61') && (obra?.nome || '').toLowerCase().includes('lt32')
-              || (obra?.id || '').toLowerCase().includes('qd61') && (obra?.id || '').toLowerCase().includes('lt32');
-            const matchPendenteQd61 = isQd61Lt32 && Math.abs(valor - 2044.33) < 0.02;
-            const shouldConsider = a.considerarNaEqualizacao === true || matchPendenteQd61;
+            const shouldConsider = a.considerarNaEqualizacao === true;
             if (!shouldConsider) return;
 
             const deId = resolveSocioFirestoreId(a.de) || resolveSocioFirestoreId(normalizarSocioValor(a.de, obra));
             const paraId = resolveSocioFirestoreId(a.para) || resolveSocioFirestoreId(normalizarSocioValor(a.para, obra));
-
-            if (isQd61Lt32) {
-              console.log(`     🧾 ACERTO QD61 considerado: R$ ${valor.toFixed(2)} | de: ${a.de} -> ${deId} | para: ${a.para} -> ${paraId} | flag: ${a.considerarNaEqualizacao}`);
-            }
 
             if (deId && posicoes[deId]) {
               posicoes[deId].detalheCaixa.pagoFisico += valor;
@@ -2928,10 +3142,10 @@
               } else {
                 // 50/50 default
                 const metade = valor / 2;
-                if (socioAFirestoreId && posicoes[socioAFirestoreId]) posicoes[socioAFirestoreId].contasReceber += metade;
-                if (socioAFirestoreId && posicoes[socioAFirestoreId]) addDetalheObra(socioAFirestoreId, 'contasReceber', metade);
-                if (socioBFirestoreId && posicoes[socioBFirestoreId]) posicoes[socioBFirestoreId].contasReceber += metade;
-                if (socioBFirestoreId && posicoes[socioBFirestoreId]) addDetalheObra(socioBFirestoreId, 'contasReceber', metade);
+                if (socioAAllocId && posicoes[socioAAllocId]) posicoes[socioAAllocId].contasReceber += metade;
+                if (socioAAllocId && posicoes[socioAAllocId]) addDetalheObra(socioAAllocId, 'contasReceber', metade);
+                if (socioBAllocId && posicoes[socioBAllocId]) posicoes[socioBAllocId].contasReceber += metade;
+                if (socioBAllocId && posicoes[socioBAllocId]) addDetalheObra(socioBAllocId, 'contasReceber', metade);
               }
             }
           });
@@ -2943,15 +3157,15 @@
             .reduce((sum, d) => sum + (d.custoPorAlocacao || 0), 0);
 
           if (totalPagoSemAcerto > 0.01 && Math.abs(totalCustoAlocado) < 0.01) {
-            if (socioAFirestoreId && posicoes[socioAFirestoreId]) {
-              const metade = socioBFirestoreId ? totalPagoSemAcerto / 2 : totalPagoSemAcerto;
-              posicoes[socioAFirestoreId].detalheDireito.custoPorAlocacao += metade;
-              addDetalheObra(socioAFirestoreId, 'custoPorAlocacao', metade);
+            if (socioAAllocId && posicoes[socioAAllocId]) {
+              const metade = socioBAllocId ? totalPagoSemAcerto / 2 : totalPagoSemAcerto;
+              posicoes[socioAAllocId].detalheDireito.custoPorAlocacao += metade;
+              addDetalheObra(socioAAllocId, 'custoPorAlocacao', metade);
             }
-            if (socioBFirestoreId && posicoes[socioBFirestoreId]) {
+            if (socioBAllocId && posicoes[socioBAllocId]) {
               const metade = totalPagoSemAcerto / 2;
-              posicoes[socioBFirestoreId].detalheDireito.custoPorAlocacao += metade;
-              addDetalheObra(socioBFirestoreId, 'custoPorAlocacao', metade);
+              posicoes[socioBAllocId].detalheDireito.custoPorAlocacao += metade;
+              addDetalheObra(socioBAllocId, 'custoPorAlocacao', metade);
             }
           }
 
@@ -3457,90 +3671,51 @@
         return;
       }
       
-      // Calcular acertos consolidados (baseado em SALDO REAL considerando INVESTIMENTOS + RECEBIMENTOS)
-      const acertosConsolidados = [];
-      if (state.socios.length >= 2) {
-        for (let i = 0; i < state.socios.length; i++) {
-          for (let j = i + 1; j < state.socios.length; j++) {
-            const socioA = state.socios[i];
-            const socioB = state.socios[j];
-            const dadosA = balancoPorSocio[socioA.id];
-            const dadosB = balancoPorSocio[socioB.id];
-            
-            // 🎯 NOVO CÁLCULO: Saldo Real = Recebido (Caixa) - Investido
-            const saldoRealA = dadosA.recebidoCaixa - dadosA.totalInvestido;
-            const saldoRealB = dadosB.recebidoCaixa - dadosB.totalInvestido;
-            
-            console.log(`\n🔍 DEBUG ACERTO CONSOLIDADO:`);
-            console.log(`  ${socioA.nome}:`);
-            console.log(`    - Total Investido: R$ ${dadosA.totalInvestido.toFixed(2)}`);
-            console.log(`    - Recebido Caixa: R$ ${dadosA.recebidoCaixa.toFixed(2)}`);
-            console.log(`    - Saldo Real: R$ ${saldoRealA.toFixed(2)}`);
-            console.log(`  ${socioB.nome}:`);
-            console.log(`    - Total Investido: R$ ${dadosB.totalInvestido.toFixed(2)}`);
-            console.log(`    - Recebido Caixa: R$ ${dadosB.recebidoCaixa.toFixed(2)}`);
-            console.log(`    - Saldo Real: R$ ${saldoRealB.toFixed(2)}`);
-            
-            // 🎯 Total Consolidado
-            const totalInvestido = dadosA.totalInvestido + dadosB.totalInvestido;
-            const totalRecebidoCaixa = dadosA.recebidoCaixa + dadosB.recebidoCaixa;
-            const saldoTotal = totalRecebidoCaixa - totalInvestido;
-            
-            console.log(`  Total Investido (ambos): R$ ${totalInvestido.toFixed(2)}`);
-            console.log(`  Total Recebido (ambos): R$ ${totalRecebidoCaixa.toFixed(2)}`);
-            console.log(`  Saldo Total: R$ ${saldoTotal.toFixed(2)}`);
-            
-            // 🎯 Saldo Ideal 50/50
-            const saldoIdeal = saldoTotal / 2;
-            console.log(`  Saldo Ideal 50/50 (cada): R$ ${saldoIdeal.toFixed(2)}`);
-            
-            // 🎯 Acerto necessário = Diferença entre Saldo Real e Saldo Ideal
-            const acertoA = saldoRealA - saldoIdeal;
-            const acertoB = saldoRealB - saldoIdeal;
-            
-            console.log(`  Acerto ${socioA.nome}: R$ ${acertoA.toFixed(2)}`);
-            console.log(`  Acerto ${socioB.nome}: R$ ${acertoB.toFixed(2)}`);
-            
-            let acertoValor = 0;
-            let pagador = '';
-            let recebedor = '';
-            
-            // Quem tem saldo real acima do ideal deve repassar
-            if (acertoA > 0.01) {
-              acertoValor = Math.abs(acertoA);
-              pagador = socioA.nome; // A tem saldo acima do ideal
-              recebedor = socioB.nome; // B tem saldo abaixo do ideal
-            } else if (acertoB > 0.01) {
-              acertoValor = Math.abs(acertoB);
-              pagador = socioB.nome; // B tem saldo acima do ideal
-              recebedor = socioA.nome; // A tem saldo abaixo do ideal
-            }
-            
-            if (acertoValor > 0.01) {
-              acertosConsolidados.push({
-                pagador,
-                recebedor,
-                valor: acertoValor,
-                // Dados detalhados para exibição
-                investidoA: dadosA.totalInvestido,
-                investidoB: dadosB.totalInvestido,
-                recebidoCaixaA: dadosA.recebidoCaixa,
-                recebidoCaixaB: dadosB.recebidoCaixa,
-                saldoRealA,
-                saldoRealB,
-                saldoIdeal,
-                direitoA: dadosA.direitoCompetencia,
-                direitoB: dadosB.direitoCompetencia,
-                acertoA,
-                acertoB,
-                socioANome: socioA.nome,
-                socioBNome: socioB.nome,
-                totalInvestido,
-                totalRecebidoCaixa
-              });
-            }
-          }
+      // Calcular acertos consolidados (netting: Pago vs Deveria / Recebido vs Direito)
+      let acertosConsolidados = [];
+      try {
+        const resultadoEqualizacao = await calcularEqualizacaoGlobal();
+        if (!resultadoEqualizacao?.erro && resultadoEqualizacao?.modoA?.transferencia) {
+          const { transferencia } = resultadoEqualizacao.modoA;
+          const posicoes = resultadoEqualizacao.posicoes || {};
+          const posDe = posicoes[transferencia.de];
+          const posPara = posicoes[transferencia.para];
+
+          const getPago = (p) => p?.detalheCaixaSemAcerto?.pagoFisico ?? p?.detalheCaixa?.pagoFisico ?? 0;
+          const getRecebido = (p) => p?.detalheCaixaSemAcerto?.recebidoFisico ?? p?.detalheCaixa?.recebidoFisico ?? 0;
+          const getDireito = (p) => p?.detalheDireito?.receitaPorAlocacao ?? 0;
+          const getDeveria = (p) => p?.detalheDireito?.custoPorAlocacao ?? 0;
+          const getSaldoCompleto = (p) => (getPago(p) - getDeveria(p)) - (getRecebido(p) - getDireito(p));
+
+          const totalPago = getPago(posDe) + getPago(posPara);
+          const totalDevido = getDeveria(posDe) + getDeveria(posPara);
+          const totalRecebido = getRecebido(posDe) + getRecebido(posPara);
+          const totalDireito = getDireito(posDe) + getDireito(posPara);
+
+          acertosConsolidados = [{
+            pagador: transferencia.deNome || posDe?.nome || '—',
+            recebedor: transferencia.paraNome || posPara?.nome || '—',
+            valor: transferencia.valor || 0,
+            socioANome: posDe?.nome || transferencia.deNome || '—',
+            socioBNome: posPara?.nome || transferencia.paraNome || '—',
+            pagoA: getPago(posDe),
+            pagoB: getPago(posPara),
+            devidoA: getDeveria(posDe),
+            devidoB: getDeveria(posPara),
+            recebidoA: getRecebido(posDe),
+            recebidoB: getRecebido(posPara),
+            direitoA: getDireito(posDe),
+            direitoB: getDireito(posPara),
+            saldoCompletoA: getSaldoCompleto(posDe),
+            saldoCompletoB: getSaldoCompleto(posPara),
+            totalPago,
+            totalDevido,
+            totalRecebido,
+            totalDireito
+          }];
         }
+      } catch (err) {
+        console.error('Erro ao calcular acerto consolidado:', err);
       }
 
       // Renderizar HTML
@@ -3723,7 +3898,7 @@
         ${acertosConsolidados.length > 0 ? `
           <div class="card p-6 mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-400">
             <h3 class="font-black text-2xl mb-4 text-orange-900">💡 Acerto Sugerido Consolidado</h3>
-            <p class="text-sm text-gray-700 mb-4">Equalização <strong>50/50</strong> considerando <strong>Investimentos + Recebimentos</strong> (todas as obras)</p>
+            <p class="text-sm text-gray-700 mb-4">Equalização por <strong>Pago vs Deveria</strong> e <strong>Recebido vs Direito</strong> (todas as obras)</p>
             
             ${acertosConsolidados.map(acerto => `
               <div class="bg-white rounded-lg border-2 border-orange-500 p-6 mb-4">
@@ -3743,93 +3918,89 @@
                   <div class="bg-blue-50 border border-blue-300 rounded p-3 mb-4">
                     <div class="font-bold text-blue-900 mb-2">🌍 Consolidado (Ambos Sócios):</div>
                     <div class="flex justify-between">
-                      <span class="text-gray-700">💳 Total Investido:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      <span class="text-gray-700">💳 Total Pago (Caixa):</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.totalPago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-700">📋 Total Devido (Competência):</span>
+                      <span class="font-bold text-red-600">R$ ${acerto.totalDevido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-gray-700">💵 Total Recebido (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.totalRecebidoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-blue-400 pt-2 mt-2">
-                      <span class="font-bold text-blue-900">Saldo Total:</span>
-                      <span class="font-black text-lg ${(acerto.totalRecebidoCaixa - acerto.totalInvestido) >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${(acerto.totalRecebidoCaixa - acerto.totalInvestido).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
+                      <span class="font-bold text-green-600">R$ ${acerto.totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                     <div class="flex justify-between">
-                      <span class="text-sm text-blue-700">💰 Saldo Ideal 50/50 (cada):</span>
-                      <span class="font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      <span class="text-gray-700">📋 Total Direito (Competência):</span>
+                      <span class="font-bold text-green-600">R$ ${acerto.totalDireito.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                     </div>
                   </div>
                   
-                  <!-- Sócio A -->
-                  <div class="bg-white border-2 ${acerto.saldoRealA > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
-                    <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💳 Investiu:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.investidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <!-- Sócio A -->
+                    <div class="bg-white border-2 ${acerto.saldoCompletoA >= 0 ? 'border-green-400' : 'border-orange-400'} rounded p-3">
+                      <div class="font-bold text-gray-800 mb-2">${acerto.socioANome}</div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">💵 Recebeu (Caixa):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.recebidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Direito (Competência):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.direitoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
+                        <span class="text-gray-600">💳 Pagou (Caixa):</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.pagoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Deveria Pagar:</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.devidoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t-2 ${acerto.saldoCompletoA >= 0 ? 'border-green-400' : 'border-orange-400'} pt-2 mt-2">
+                        <span class="font-black">Saldo Completo (pagar/receber):</span>
+                        <span class="font-black text-xl ${acerto.saldoCompletoA >= 0 ? 'text-green-600' : 'text-orange-600'}">
+                          ${acerto.saldoCompletoA >= 0 ? '+' : ''}R$ ${acerto.saldoCompletoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </span>
+                      </div>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
-                      <span class="font-black text-lg ${acerto.saldoRealA >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${acerto.saldoRealA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
-                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t-2 ${acerto.acertoA > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
-                      <span class="font-black">Diferença:</span>
-                      <span class="font-black text-xl ${acerto.acertoA > 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoA >= 0 ? '+' : ''}R$ ${acerto.acertoA.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <!-- Sócio B -->
-                  <div class="bg-white border-2 ${acerto.saldoRealB > acerto.saldoIdeal ? 'border-orange-400' : 'border-green-400'} rounded p-3">
-                    <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💳 Investiu:</span>
-                      <span class="font-bold text-red-600">R$ ${acerto.investidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">💵 Recebeu (Caixa):</span>
-                      <span class="font-bold text-green-600">R$ ${acerto.recebidoCaixaB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span class="font-bold">Saldo Real (Recebido - Investido):</span>
-                      <span class="font-black text-lg ${acerto.saldoRealB >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        R$ ${acerto.saldoRealB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-sm text-blue-700">Saldo Ideal (50/50):</span>
-                      <span class="text-sm font-bold text-blue-700">R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    <div class="flex justify-between border-t-2 ${acerto.acertoB > 0 ? 'border-orange-400' : 'border-green-400'} pt-2 mt-2">
-                      <span class="font-black">Diferença:</span>
-                      <span class="font-black text-xl ${acerto.acertoB > 0 ? 'text-orange-600' : 'text-green-600'}">
-                        ${acerto.acertoB >= 0 ? '+' : ''}R$ ${acerto.acertoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
+                    
+                    <!-- Sócio B -->
+                    <div class="bg-white border-2 ${acerto.saldoCompletoB >= 0 ? 'border-green-400' : 'border-orange-400'} rounded p-3">
+                      <div class="font-bold text-gray-800 mb-2">${acerto.socioBNome}</div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">💵 Recebeu (Caixa):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.recebidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Direito (Competência):</span>
+                        <span class="font-bold text-green-600">R$ ${acerto.direitoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
+                        <span class="text-gray-600">💳 Pagou (Caixa):</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.pagoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">📋 Deveria Pagar:</span>
+                        <span class="font-bold text-red-600">R$ ${acerto.devidoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                      <div class="flex justify-between border-t-2 ${acerto.saldoCompletoB >= 0 ? 'border-green-400' : 'border-orange-400'} pt-2 mt-2">
+                        <span class="font-black">Saldo Completo (pagar/receber):</span>
+                        <span class="font-black text-xl ${acerto.saldoCompletoB >= 0 ? 'text-green-600' : 'text-orange-600'}">
+                          ${acerto.saldoCompletoB >= 0 ? '+' : ''}R$ ${acerto.saldoCompletoB.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   
                   <div class="bg-yellow-100 border border-yellow-400 rounded p-4 mt-3">
                     <div class="font-bold text-yellow-900 mb-2">💡 Conclusão:</div>
                     <div class="text-yellow-800">
-                      <strong>${acerto.pagador}</strong> tem um saldo real acima do ideal 50/50. 
+                      <strong>${acerto.pagador}</strong> tem um saldo completo acima do 50/50. 
                       Para equalizar perfeitamente a sociedade, deve transferir 
                       <strong class="text-xl text-orange-700">R$ ${acerto.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
                       para <strong>${acerto.recebedor}</strong>.
                     </div>
                     <div class="text-xs text-yellow-700 mt-2">
-                      ✅ Após o acerto, ambos terão o mesmo saldo: R$ ${acerto.saldoIdeal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      ✅ Acertos só entram quando marcados como "considerar na equalização".
                     </div>
                   </div>
                 </div>
@@ -4149,8 +4320,10 @@
                 <p class="text-gray-700">
                   Considerando <strong>caixa atual + valores a receber futuros</strong>, 
                   <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> está com mais recursos consolidados. 
-                  Para equalizar a posição estratégica, deve transferir 
-                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>.
+                  Para equalizar a posição estratégica, 
+                  <strong>${escapeHtml(modoB.transferencia.deNome)}</strong> deve transferir 
+                  <strong class="text-blue-600">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
+                  para <strong>${escapeHtml(modoB.transferencia.paraNome)}</strong>.
                 </p>
                 <p class="text-gray-600 mt-2 text-xs">
                   💡 Este valor é menor que o Modo A porque considera receitas futuras que vão equilibrar naturalmente.
@@ -4733,81 +4906,399 @@
       }
     };
 
-    // DASHBOARD
-    function renderDashboard() {
-      garantirSociosMapeados(); // Garantir antes de renderizar
-      
-      renderAlertasVencimento();
-      
-      const lancs = getLancamentosFiltrados();
-      const rats = getRateiosFiltrados();
-      
-      const custoTotal = computeCustoTotal(lancs, rats);
-      const lucroData = computeLucro(lancs, rats);
-      const equalizacao = computeEqualizacao();
-      
-      // Calcular recebimentos
-      const totalRecebido = state.recebimentos.reduce((sum, r) => sum + (r.valor || 0), 0);
-      const aReceber = lucroData.vgvTotal - totalRecebido;
-      const fluxoCaixa = totalRecebido - custoTotal;
+    // DASHBOARD (Custos)
+    function parseDateInput(value) {
+      return value ? new Date(`${value}T00:00:00`) : null;
+    }
 
-      // KPIs
-      const kpisHTML = `
-        <div class="card p-6">
-          <div class="text-xs muted mb-2">💰 CUSTO TOTAL</div>
-          <div class="text-3xl font-black">R$ ${custoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-        </div>
-        <div class="card p-6">
-          <div class="text-xs muted mb-2">💎 VGV PREVISTO</div>
-          <div class="text-3xl font-black">R$ ${lucroData.vgvTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-        </div>
-        <div class="card p-6">
-          <div class="text-xs muted mb-2">💵 RECEBIDO</div>
-          <div class="text-3xl font-black ok">R$ ${totalRecebido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-          <div class="text-xs muted mt-2">A receber: R$ ${aReceber.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-        </div>
-        <div class="card p-6">
-          <div class="text-xs muted mb-2">🏦 FLUXO DE CAIXA</div>
-          <div class="text-3xl font-black ${fluxoCaixa >= 0 ? 'ok' : 'danger'}">R$ ${fluxoCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-          <div class="text-xs muted mt-2">${fluxoCaixa >= 0 ? 'Positivo' : 'Negativo'}</div>
-        </div>
-        <div class="card p-6">
-          <div class="text-xs muted mb-2">📊 LUCRO BRUTO</div>
-          <div class="text-3xl font-black ${lucroData.lucroBruto >= 0 ? 'ok' : 'danger'}">R$ ${lucroData.lucroBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-        </div>
-        <div class="card p-6">
-          <div class="text-xs muted mb-2">💵 LUCRO LÍQUIDO</div>
-          <div class="text-3xl font-black ${lucroData.lucroLiquido >= 0 ? 'ok' : 'danger'}">R$ ${lucroData.lucroLiquido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-        </div>
-      `;
-      $("kpis-grid").innerHTML = kpisHTML;
+    function getDashboardFilters() {
+      return {
+        obraId: $("dash-obra")?.value || OBRA_ID,
+        unidadeId: $("dash-unidade")?.value || "all",
+        periodo: $("dash-periodo")?.value || "TUDO",
+        dtIni: $("dash-dtini")?.value || "",
+        dtFim: $("dash-dtfim")?.value || "",
+        modoData: $("dash-modo-data")?.value || "competencia",
+        ordenacao: $("dash-ordem")?.value || "total_desc"
+      };
+    }
 
-      // Nova seção: Análise Detalhada por Unidade e Sócio
-      renderAnaliseDetalhada(lancs, rats);
+    function getDataLancamento(l, modoData) {
+      if (modoData === "pagamento") {
+        return l.dataPagamento || null;
+      }
+      return l.dataCompetencia || l.data || null;
+    }
 
-      // Métricas de Rentabilidade
-      renderROISection(custoTotal, lucroData, totalRecebido);
+    function getCustosFiltradosByFiltros(filtros) {
+      let lancs = [...state.lancamentos];
 
-      // Gráficos Interativos
-      renderCharts();
+      if (filtros.modoData === "pagamento") {
+        lancs = lancs.filter(l => !!l.dataPagamento);
+      }
 
-      // Custo por m²
-      renderCustoM2(lancs, rats);
+      if (filtros.unidadeId !== "all") {
+        lancs = lancs.filter(l => l.unidadeId === filtros.unidadeId);
+      }
 
-      // Top categorias
-      renderTopCategorias(lancs, rats);
+      const hoje = new Date();
+      let dtIni = null;
+      let dtFim = null;
 
-      // Top fornecedores
-      renderTopFornecedores(lancs, rats);
+      if (filtros.periodo === "ULTIMOS_30") dtIni = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+      if (filtros.periodo === "ULTIMOS_90") dtIni = new Date(hoje.getTime() - 90 * 24 * 60 * 60 * 1000);
+      if (filtros.periodo === "ULTIMOS_180") dtIni = new Date(hoje.getTime() - 180 * 24 * 60 * 60 * 1000);
+      if (filtros.periodo === "INTERVALO") {
+        dtIni = parseDateInput(filtros.dtIni);
+        dtFim = parseDateInput(filtros.dtFim);
+      }
 
-      // Lucro por sócio
-      renderLucroSection(lucroData);
+      if (dtIni || dtFim) {
+        lancs = lancs.filter(l => {
+          const data = getDataLancamento(l, filtros.modoData);
+          if (!data) return false;
+          const dataObj = new Date(data);
+          if (dtIni && dataObj < dtIni) return false;
+          if (dtFim && dataObj > dtFim) return false;
+          return true;
+        });
+      }
 
-      // Equalização
-      renderEqualizacaoSection();
+      return lancs;
+    }
 
-      // Hydrate filter selects
-      hydrateFilterSelects();
+    function getCustosFiltrados() {
+      return getCustosFiltradosByFiltros(getDashboardFilters());
+    }
+
+    function buildDashboardCustos(lancs) {
+      const etapasCatalogo = state.etapas.length ? state.etapas : CATALOGO_ETAPAS_SEED;
+      const tiposCatalogo = state.tiposCusto.length ? state.tiposCusto : CATALOGO_TIPOS_CUSTO_SEED;
+
+      const tiposIds = tiposCatalogo.map(t => t.id);
+      const etapasMap = {};
+      const totaisPorTipo = {};
+      tiposIds.forEach(id => { totaisPorTipo[id] = 0; });
+
+      etapasCatalogo.forEach(e => {
+        etapasMap[e.id] = {
+          etapaId: e.id,
+          etapaNome: e.nome,
+          total: 0,
+          porTipo: { ...totaisPorTipo },
+          material: 0,
+          mao_obra: 0,
+          outros: 0
+        };
+      });
+
+      const fallbackEtapaId = "administracao_financeiro";
+      const fallbackTipoId = "outros";
+
+      lancs.forEach(l => {
+        const etapaId = etapasMap[l.etapaId] ? l.etapaId : fallbackEtapaId;
+        const tipoId = tiposIds.includes(l.tipoCustoId) ? l.tipoCustoId : fallbackTipoId;
+        const valor = l.valor || 0;
+
+        if (!etapasMap[etapaId]) {
+          etapasMap[etapaId] = {
+            etapaId,
+            etapaNome: etapaId,
+            total: 0,
+            porTipo: { ...totaisPorTipo },
+            material: 0,
+            mao_obra: 0,
+            outros: 0
+          };
+        }
+
+        etapasMap[etapaId].total += valor;
+        etapasMap[etapaId].porTipo[tipoId] = (etapasMap[etapaId].porTipo[tipoId] || 0) + valor;
+
+        totaisPorTipo[tipoId] = (totaisPorTipo[tipoId] || 0) + valor;
+      });
+
+      const porEtapa = Object.values(etapasMap).filter(e => e.total > 0);
+
+      porEtapa.forEach(e => {
+        e.material = e.porTipo.material || 0;
+        e.mao_obra = e.porTipo.mao_obra || 0;
+        e.outros = e.total - e.material - e.mao_obra;
+      });
+
+      const geral = lancs.reduce((sum, l) => sum + (l.valor || 0), 0);
+      const material = totaisPorTipo.material || 0;
+      const mao_obra = totaisPorTipo.mao_obra || 0;
+      const outros = geral - material - mao_obra;
+
+      return {
+        totais: {
+          geral,
+          porTipo: totaisPorTipo,
+          material,
+          mao_obra,
+          outros
+        },
+        porEtapa
+      };
+    }
+
+    function buildDashboardResponse(filtros, lancs) {
+      const dados = buildDashboardCustos(lancs);
+      return {
+        filtros: {
+          obraId: filtros.obraId,
+          unidadeId: filtros.unidadeId || "all",
+          dtIni: filtros.dtIni || null,
+          dtFim: filtros.dtFim || null,
+          modoData: filtros.modoData || "competencia"
+        },
+        totais: {
+          geral: dados.totais.geral,
+          porTipo: dados.totais.porTipo,
+          material: dados.totais.material,
+          mao_obra: dados.totais.mao_obra,
+          outros: dados.totais.outros
+        },
+        porEtapa: dados.porEtapa.map(e => ({
+          etapaId: e.etapaId,
+          etapaNome: e.etapaNome,
+          total: e.total,
+          porTipo: e.porTipo,
+          material: e.material,
+          mao_obra: e.mao_obra,
+          outros: e.outros
+        }))
+      };
+    }
+
+    window.getDashboardCustos = function(params = {}) {
+      const filtros = { ...getDashboardFilters(), ...params };
+      const lancs = getCustosFiltradosByFiltros(filtros);
+      return buildDashboardResponse(filtros, lancs);
+    };
+
+    function renderDashboardCharts(dados) {
+      if (typeof Chart === 'undefined') return;
+
+      Object.values(chartInstances).forEach(chart => chart?.destroy());
+      chartInstances = {};
+
+      const theme = document.body.getAttribute('data-theme') || 'light';
+      const isDark = theme === 'dark';
+      const textColor = isDark ? '#f1f5f9' : '#0f172a';
+      const gridColor = isDark ? '#475569' : '#e2e8f0';
+
+      const labels = dados.porEtapa.map(e => e.etapaNome);
+      const material = dados.porEtapa.map(e => e.material);
+      const maoObra = dados.porEtapa.map(e => e.mao_obra);
+      const outros = dados.porEtapa.map(e => e.outros);
+
+      const barCanvas = document.getElementById('chart-custos-etapa');
+      if (barCanvas) {
+        chartInstances.custosEtapa = new Chart(barCanvas, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Material', data: material, backgroundColor: 'rgba(59, 130, 246, 0.8)' },
+              { label: 'Mão de Obra', data: maoObra, backgroundColor: 'rgba(16, 185, 129, 0.8)' },
+              { label: 'Outros', data: outros, backgroundColor: 'rgba(245, 158, 11, 0.8)' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: textColor } }
+            },
+            scales: {
+              x: { stacked: true, ticks: { color: textColor }, grid: { color: gridColor } },
+              y: { stacked: true, ticks: { color: textColor }, grid: { color: gridColor } }
+            }
+          }
+        });
+      }
+
+      const pieCanvas = document.getElementById('chart-custos-pie');
+      if (pieCanvas) {
+        chartInstances.custosPie = new Chart(pieCanvas, {
+          type: 'doughnut',
+          data: {
+            labels: ['Material', 'Mão de Obra', 'Outros'],
+            datasets: [{
+              data: [dados.totais.material, dados.totais.mao_obra, dados.totais.outros],
+              backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
+              borderWidth: 2,
+              borderColor: '#ffffff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'right', labels: { color: textColor } }
+            }
+          }
+        });
+      }
+    }
+
+    async function renderDashboard() {
+      if (!state.user) return;
+
+      const filtros = getDashboardFilters();
+      const loadingEl = $("dashboard-custos-loading");
+      const emptyEl = $("dashboard-custos-empty");
+      const errorEl = $("dashboard-custos-error");
+      const contentEl = $("dashboard-custos-content");
+      const hintEl = $("dash-periodo-hint");
+
+      if (!OBRA_ID) {
+        loadingEl?.classList.add("hidden");
+        contentEl?.classList.add("hidden");
+        emptyEl?.classList.add("hidden");
+        errorEl?.classList.remove("hidden");
+        return;
+      }
+
+      if (hintEl) {
+        if (filtros.periodo === "INTERVALO") hintEl.classList.remove("hidden");
+        else hintEl.classList.add("hidden");
+      }
+
+      const obraSel = $("dash-obra");
+      if (obraSel) {
+        obraSel.innerHTML = state.obras.map(o => `<option value="${o.id}">${escapeHtml(o.nome || o.id)}</option>`).join('');
+        if (OBRA_ID) obraSel.value = OBRA_ID;
+      }
+
+      const unidSel = $("dash-unidade");
+      if (unidSel) {
+        unidSel.innerHTML = '<option value="all">Todas</option>' +
+          state.unidades.map(u => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`).join('');
+        unidSel.value = filtros.unidadeId;
+      }
+
+      if (!state.ready.catalogos || !state.ready.obra) {
+        loadingEl?.classList.remove("hidden");
+        emptyEl?.classList.add("hidden");
+        errorEl?.classList.add("hidden");
+        contentEl?.classList.add("hidden");
+        return;
+      }
+
+      try {
+        await loadDashboardCustos(filtros);
+
+        if (state.dashboardStatus.loading) {
+          loadingEl?.classList.remove("hidden");
+          emptyEl?.classList.add("hidden");
+          errorEl?.classList.add("hidden");
+          contentEl?.classList.add("hidden");
+          return;
+        }
+
+        if (state.dashboardStatus.error) {
+          loadingEl?.classList.add("hidden");
+          emptyEl?.classList.add("hidden");
+          contentEl?.classList.add("hidden");
+          errorEl?.classList.remove("hidden");
+          return;
+        }
+
+        const response = state.dashboardStatus.data;
+        const dados = response ? {
+          totais: response.totais || { geral: 0, material: 0, mao_obra: 0, outros: 0 },
+          porEtapa: response.porEtapa || []
+        } : null;
+
+        if (!dados || dados.porEtapa.length === 0) {
+          Object.values(chartInstances).forEach(chart => chart?.destroy());
+          chartInstances = {};
+          loadingEl?.classList.add("hidden");
+          errorEl?.classList.add("hidden");
+          contentEl?.classList.add("hidden");
+          emptyEl?.classList.remove("hidden");
+          return;
+        }
+
+        const ordenacao = filtros.ordenacao;
+        if (ordenacao === "etapa_asc") {
+          dados.porEtapa.sort((a, b) => a.etapaNome.localeCompare(b.etapaNome));
+        } else {
+          dados.porEtapa.sort((a, b) => b.total - a.total);
+        }
+
+        const kpisHTML = `
+          <div class="card p-5">
+            <div class="text-xs muted mb-2">💰 Total Geral</div>
+            <div class="text-2xl font-black">R$ ${dados.totais.geral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+          <div class="card p-5">
+            <div class="text-xs muted mb-2">📦 Material</div>
+            <div class="text-2xl font-black">R$ ${dados.totais.material.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+          <div class="card p-5">
+            <div class="text-xs muted mb-2">👷 Mão de Obra</div>
+            <div class="text-2xl font-black">R$ ${dados.totais.mao_obra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+          <div class="card p-5">
+            <div class="text-xs muted mb-2">📌 Outros</div>
+            <div class="text-2xl font-black">R$ ${dados.totais.outros.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+          </div>
+        `;
+        $("dashboard-kpis").innerHTML = kpisHTML;
+
+        const tabelaHTML = `
+          <table class="table w-full">
+            <thead>
+              <tr>
+                <th class="text-left">Etapa</th>
+                <th class="text-left">Total</th>
+                <th class="text-left">Material</th>
+                <th class="text-left">Mão de Obra</th>
+                <th class="text-left">Outros</th>
+                <th class="text-left">%Material</th>
+                <th class="text-left">%MO</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dados.porEtapa.map(e => {
+                const percMat = e.total ? ((e.material / e.total) * 100) : 0;
+                const percMo = e.total ? ((e.mao_obra / e.total) * 100) : 0;
+                return `
+                  <tr>
+                    <td>${escapeHtml(e.etapaNome)}</td>
+                    <td class="font-bold">R$ ${e.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>R$ ${e.material.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>R$ ${e.mao_obra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>R$ ${e.outros.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>${percMat.toFixed(1)}%</td>
+                    <td>${percMo.toFixed(1)}%</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+        $("dashboard-tabela").innerHTML = tabelaHTML;
+
+        renderDashboardCharts(dados);
+
+        loadingEl?.classList.add("hidden");
+        emptyEl?.classList.add("hidden");
+        errorEl?.classList.add("hidden");
+        contentEl?.classList.remove("hidden");
+      } catch (err) {
+        console.error("❌ Erro dashboard custos:", err);
+        Object.values(chartInstances).forEach(chart => chart?.destroy());
+        chartInstances = {};
+        loadingEl?.classList.add("hidden");
+        emptyEl?.classList.add("hidden");
+        contentEl?.classList.add("hidden");
+        errorEl?.classList.remove("hidden");
+      }
     }
 
     function renderAlertasVencimento() {
@@ -6244,20 +6735,62 @@
       fornSel.value = filterFornecedor;
     }
 
+    function updateLancamentoUnidadeWarning() {
+      const warning = $("lanc-unidade-warning");
+      if (!warning) return;
+      const unidadeId = $("lanc-unidade")?.value;
+      const precisaUnidade = (state.unidades || []).length >= 2;
+      if (precisaUnidade && !unidadeId) {
+        warning.classList.remove("hidden");
+      } else {
+        warning.classList.add("hidden");
+      }
+    }
+
     // LANCAMENTOS VIEW
     function renderLancamentosView() {
       // Hydrate selects
+      const obraSel = $("lanc-obra");
+      if (obraSel) {
+        obraSel.innerHTML = state.obras.map(o => `<option value="${o.id}">${escapeHtml(o.nome || o.id)}</option>`).join('');
+        if (OBRA_ID) obraSel.value = OBRA_ID;
+      }
+
       const unidSel = $("lanc-unidade");
-      unidSel.innerHTML = '<option value="">Selecione...</option>' +
+      unidSel.innerHTML = '<option value="">Todas / Não definida</option>' +
         state.unidades.map(u => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`).join('');
 
-      const catSel = $("lanc-categoria");
-      catSel.innerHTML = '<option value="">Selecione...</option>' +
-        state.categorias.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+      const etapaSel = $("lanc-etapa");
+      const tipoSel = $("lanc-tipo-custo");
+      const catalogReady = state.ready.catalogos && state.etapas.length > 0 && state.tiposCusto.length > 0;
+      if (state.catalogosStatus.error) {
+        etapaSel.innerHTML = '<option value="">Erro ao carregar</option>';
+        tipoSel.innerHTML = '<option value="">Erro ao carregar</option>';
+        etapaSel.disabled = true;
+        tipoSel.disabled = true;
+        $("catalogos-error")?.classList.remove("hidden");
+      } else if (!catalogReady) {
+        etapaSel.innerHTML = '<option value="">Carregando...</option>';
+        tipoSel.innerHTML = '<option value="">Carregando...</option>';
+        etapaSel.disabled = true;
+        tipoSel.disabled = true;
+        $("catalogos-error")?.classList.add("hidden");
+      } else {
+        etapaSel.disabled = false;
+        tipoSel.disabled = false;
+        etapaSel.innerHTML = '<option value="">Selecione...</option>' +
+          state.etapas.filter(e => e.ativo !== false).map(e => `<option value="${e.id}">${escapeHtml(e.nome)}</option>`).join('');
+        tipoSel.innerHTML = '<option value="">Selecione...</option>' +
+          state.tiposCusto.filter(t => t.ativo !== false).map(t => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
+        $("catalogos-error")?.classList.add("hidden");
+      }
 
       const fornSel = $("lanc-fornecedor");
       fornSel.innerHTML = '<option value="">Selecione...</option>' +
         state.fornecedores.map(f => `<option value="${f.id}">${escapeHtml(f.nome)}</option>`).join('');
+
+      updateLancamentoUnidadeWarning();
+      $("lanc-ver-dashboard")?.classList.add("hidden");
 
       // Render list
       renderLancamentosList();
@@ -6274,10 +6807,11 @@
         <table class="table w-full">
           <thead>
             <tr>
-              <th class="text-left">Data</th>
+              <th class="text-left">Competência</th>
               <th class="text-left">Status</th>
               <th class="text-left">Unidade</th>
-              <th class="text-left">Categoria</th>
+              <th class="text-left">Etapa</th>
+              <th class="text-left">Tipo</th>
               <th class="text-left">Fornecedor</th>
               <th class="text-left">Descrição</th>
               <th class="text-left">Valor</th>
@@ -6288,23 +6822,27 @@
           <tbody>
             ${state.lancamentos.map(l => {
               const unid = state.unidades.find(u => u.id === l.unidadeId);
-              const cat = state.categorias.find(c => c.id === l.categoriaId);
+              const etapa = state.etapas.find(e => e.id === (l.etapaId || "administracao_financeiro"));
+              const tipo = state.tiposCusto.find(t => t.id === (l.tipoCustoId || "outros"));
               const forn = state.fornecedores.find(f => f.id === l.fornecedorId);
-              const statusClass = (l.status || "pendente") === "pago" ? "badge-pago" : (l.status === "atrasado" ? "badge-atrasado" : "badge-pendente");
-              const statusIcon = (l.status || "pendente") === "pago" ? "✅" : (l.status === "atrasado" ? "🚨" : "⏳");
+              const statusAtual = l.statusPagamento || l.status || "pendente";
+              const statusClass = statusAtual === "pago" ? "badge-pago" : (statusAtual === "atrasado" ? "badge-atrasado" : "badge-pendente");
+              const statusIcon = statusAtual === "pago" ? "✅" : (statusAtual === "atrasado" ? "🚨" : "⏳");
+              const dataBase = l.dataCompetencia || l.data;
               
               return `
                 <tr>
-                  <td>${new Date(l.data).toLocaleDateString('pt-BR')}</td>
-                  <td><span class="badge ${statusClass}">${statusIcon} ${(l.status || "pendente").toUpperCase()}</span></td>
+                  <td>${dataBase ? new Date(dataBase).toLocaleDateString('pt-BR') : '-'}</td>
+                  <td><span class="badge ${statusClass}">${statusIcon} ${statusAtual.toUpperCase()}</span></td>
                   <td>${escapeHtml(unid?.nome || '-')}</td>
-                  <td>${escapeHtml(cat?.nome || '-')}</td>
+                  <td>${escapeHtml(etapa?.nome || '-') }</td>
+                  <td>${escapeHtml(tipo?.nome || '-') }</td>
                   <td>${escapeHtml(forn?.nome || '-')}</td>
                   <td>${escapeHtml(l.descricao)}</td>
                   <td class="font-bold">R$ ${l.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td>${l.dataVencimento ? new Date(l.dataVencimento).toLocaleDateString('pt-BR') : '-'}</td>
                   <td>
-                    ${l.comprovante ? `<a href="${l.comprovante}" target="_blank" class="text-blue-600 hover:underline mr-2">📎</a>` : ''}
+                    ${(l.comprovante || l.anexoUrl) ? `<a href="${l.comprovante || l.anexoUrl}" target="_blank" class="text-blue-600 hover:underline mr-2">📎</a>` : ''}
                     <button onclick="window.mudarStatusLancamento('${l.id}')" class="text-green-600 hover:underline mr-2" title="Mudar status">💳</button>
                     <button onclick="window.deleteLancamento('${l.id}')" class="text-red-600 hover:underline" title="Deletar">🗑️</button>
                   </td>
@@ -6848,36 +7386,26 @@
 
     function renderObrasModal() {
       const container = $("obras-list");
-      console.log("🔍 renderObrasModal chamado. Total de obras:", state.obras.length);
-      console.log("📦 Container encontrado:", container);
-      
-      if (!container) {
-        console.error("❌ Container obras-list NÃO ENCONTRADO!");
-        return;
-      }
-      
+      if (!container) return;
       if (state.obras.length === 0) {
         container.innerHTML = '<p class="muted">Nenhuma obra cadastrada</p>';
         return;
       }
 
-      const html = state.obras.map(o => {
-        console.log("  - Renderizando obra:", o.nome, "ID:", o.id);
-        const nomeSeguro = o.nome ? o.nome.replace(/[<>"']/g, '') : 'Sem nome';
-        return `
-          <div class="flex justify-between items-center p-3 border rounded bg-gray-50 mb-2">
-            <span class="font-bold text-gray-800">${nomeSeguro}</span>
-            <div class="flex gap-2">
-              <button onclick="window.editarObra('${o.id}')" class="btn btn-soft text-sm">✏️</button>
-              <button onclick="window.deleteObra('${o.id}')" class="btn btn-danger text-sm">🗑️</button>
-            </div>
+      const html = state.obras.map(o => `
+        <div class="flex items-center justify-between p-3 border rounded">
+          <div>
+            <div class="font-bold">${escapeHtml(o.nome || o.id)}</div>
+            <div class="text-xs muted">${escapeHtml(o.endereco || '')}</div>
           </div>
-        `;
-      }).join('');
+          <div class="flex gap-2">
+            <button onclick="window.editarObra('${o.id}')" class="btn btn-soft text-sm">✏️</button>
+            <button onclick="window.deleteObra('${o.id}')" class="btn btn-danger text-sm">🗑️</button>
+          </div>
+        </div>
+      `).join('');
 
-      console.log("📝 HTML gerado (primeiros 200 chars):", html.substring(0, 200));
       container.innerHTML = html;
-      console.log("✅ obras-list.innerHTML definido. Novo conteúdo:", container.innerHTML.substring(0, 200));
     }
 
     function renderUnidadesModal() {
@@ -6943,27 +7471,50 @@
       container.innerHTML = html;
     }
 
-    function renderCategoriasModal() {
-      const container = $("categorias-list");
-      if (state.categorias.length === 0) {
-        container.innerHTML = '<p class="muted">Nenhuma categoria cadastrada</p>';
+    function renderCatalogosModal() {
+      const etapasContainer = $("etapas-list");
+      const tiposContainer = $("tipos-custo-list");
+      if (!etapasContainer || !tiposContainer) return;
+
+      if (state.catalogosStatus.loading) {
+        etapasContainer.innerHTML = '<div class="skeleton h-10 rounded"></div>'.repeat(4);
+        tiposContainer.innerHTML = '<div class="skeleton h-10 rounded"></div>'.repeat(4);
         return;
       }
 
-      const html = state.categorias.map(c => `
-        <div class="flex justify-between items-center p-3 border rounded">
-          <div class="flex items-center gap-2">
-            <div style="width: 16px; height: 16px; border-radius: 4px; background: ${c.cor || '#ccc'};"></div>
-            <div>
-              <div class="font-bold">${escapeHtml(c.nome)}</div>
-              ${c.grupo ? `<div class="text-xs muted">Grupo: ${escapeHtml(c.grupo)}</div>` : ''}
-            </div>
-          </div>
-          <button onclick="window.deleteCategoria('${c.id}')" class="text-red-600 hover:underline text-sm">🗑️</button>
-        </div>
-      `).join('');
+      if (state.catalogosStatus.error) {
+        etapasContainer.innerHTML = `<p class="text-red-600">${escapeHtml(state.catalogosStatus.error)}</p>`;
+        tiposContainer.innerHTML = `<p class="text-red-600">${escapeHtml(state.catalogosStatus.error)}</p>`;
+        return;
+      }
 
-      container.innerHTML = html;
+      if (state.etapas.length === 0) {
+        etapasContainer.innerHTML = '<p class="muted">Nenhuma etapa disponível</p>';
+      } else {
+        etapasContainer.innerHTML = state.etapas.map(e => `
+          <div class="flex items-center justify-between p-3 border rounded">
+            <div>
+              <div class="font-bold">${escapeHtml(e.nome)}</div>
+              <div class="text-xs muted">ID: ${escapeHtml(e.id)} • Ordem: ${e.ordem ?? '-'}</div>
+            </div>
+            <span class="chip">${e.ativo === false ? 'Inativo' : 'Ativo'}</span>
+          </div>
+        `).join('');
+      }
+
+      if (state.tiposCusto.length === 0) {
+        tiposContainer.innerHTML = '<p class="muted">Nenhum tipo de custo disponível</p>';
+      } else {
+        tiposContainer.innerHTML = state.tiposCusto.map(t => `
+          <div class="flex items-center justify-between p-3 border rounded">
+            <div>
+              <div class="font-bold">${escapeHtml(t.nome)}</div>
+              <div class="text-xs muted">ID: ${escapeHtml(t.id)} • Ordem: ${t.ordem ?? '-'}</div>
+            </div>
+            <span class="chip">${t.ativo === false ? 'Inativo' : 'Ativo'}</span>
+          </div>
+        `).join('');
+      }
     }
 
     // CRUD FUNCTIONS
@@ -7081,30 +7632,7 @@
     }
 
     async function createCategoria() {
-      const nome = $("cat-nome").value.trim();
-      const grupo = $("cat-grupo").value.trim();
-      const cor = $("cat-cor").value;
-
-      if (!nome) {
-        showToast('Digite o nome da categoria', 'warning');
-        return;
-      }
-
-      try {
-        await addDoc(refs(OBRA_ID).categoriasCol, {
-          nome,
-          grupo: grupo || null,
-          cor: cor || "#3b82f6",
-          createdAt: serverTimestamp(),
-          createdBy: state.user.email
-        });
-        $("cat-nome").value = "";
-        $("cat-grupo").value = "";
-        showToast('Categoria criada com sucesso!', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('Erro ao criar categoria', 'error');
-      }
+      showToast('Catálogos oficiais são padronizados e não podem ser editados aqui.', 'warning');
     }
 
     async function createDeducao() {
@@ -7164,19 +7692,22 @@
     async function addLancamento(e) {
       e.preventDefault();
 
-      const data = $("lanc-data").value;
-      const vencimento = $("lanc-vencimento").value || null;
-      const competencia = $("lanc-competencia").value || data;
-      const unidadeId = $("lanc-unidade").value;
-      const categoriaId = $("lanc-categoria").value;
+      const obraId = $("lanc-obra").value || OBRA_ID;
+      const unidadeIdRaw = $("lanc-unidade").value;
+      const unidadeId = unidadeIdRaw || null;
+      const etapaId = $("lanc-etapa").value;
+      const tipoCustoId = $("lanc-tipo-custo").value;
       const fornecedorId = $("lanc-fornecedor").value;
       const pagador = $("lanc-pagador").value;
       const valor = parseFloat($("lanc-valor").value);
-      const status = "pago";
+      const statusPagamento = $("lanc-status").value || "pendente";
       const descricao = $("lanc-descricao").value.trim();
       const comprovante = $("lanc-comprovante").value.trim();
+      const competencia = $("lanc-competencia").value;
+      const dataPagamento = $("lanc-pagamento").value || null;
+      const vencimento = $("lanc-vencimento").value || null;
 
-      if (!data || !unidadeId || !categoriaId || !fornecedorId || !valor || !descricao) {
+      if (!obraId || !competencia || !etapaId || !tipoCustoId || !fornecedorId || !pagador || !valor || !descricao) {
         showToast('Preencha todos os campos obrigatórios', 'error');
         return;
       }
@@ -7191,11 +7722,33 @@
         return;
       }
 
+      if (state.unidades.length >= 2 && !unidadeId) {
+        if (!confirm('Salvar lançamento como GERAL (sem unidade)?')) {
+          return;
+        }
+      }
+
+      if (unidadeId && !state.unidades.find(u => u.id === unidadeId)) {
+        showToast('Unidade inválida para esta obra', 'error');
+        return;
+      }
+
+      const etapaValida = state.etapas.find(e => e.id === etapaId && e.ativo !== false);
+      const tipoValido = state.tiposCusto.find(t => t.id === tipoCustoId && t.ativo !== false);
+      if (!etapaValida) {
+        showToast('Etapa inválida ou inativa', 'error');
+        return;
+      }
+      if (!tipoValido) {
+        showToast('Tipo de custo inválido ou inativo', 'error');
+        return;
+      }
+
       // Validação de duplicatas
       const possiveisDuplicatas = state.lancamentos.filter(l =>
         l.fornecedorId === fornecedorId &&
         Math.abs(l.valor - valor) < 0.01 &&
-        Math.abs(new Date(l.data) - new Date(data)) < 7 * 24 * 60 * 60 * 1000
+        Math.abs(new Date(l.dataCompetencia || l.data) - new Date(competencia)) < 7 * 24 * 60 * 60 * 1000
       );
 
       if (possiveisDuplicatas.length > 0) {
@@ -7206,19 +7759,26 @@
       }
 
       try {
-        await addDoc(refs(OBRA_ID).lancamentosCol, {
-          data,
-          dataVencimento: vencimento,
+        await addDoc(refs(obraId).lancamentosCol, {
+          obraId,
+          unidadeId: unidadeId || null,
+          escopo: unidadeId ? "UNIDADE" : "GERAL",
+          etapaId,
+          tipoCustoId,
+          valor,
           dataCompetencia: competencia,
-          unidadeId,
-          categoriaId,
+          dataPagamento,
+          dataVencimento: vencimento,
           fornecedorId,
           pagador,
-          valor,
-          status,
-          pago: true,
+          pagadorId: pagador,
+          statusPagamento,
+          status: statusPagamento,
+          pago: statusPagamento === "pago",
           descricao,
           comprovante,
+          anexoUrl: comprovante,
+          data: competencia,
           createdAt: serverTimestamp(),
           createdBy: state.user.email,
           historico: [{
@@ -7228,6 +7788,9 @@
           }]
         });
         $("lanc-form").reset();
+        updateLancamentoUnidadeWarning();
+        const verDashBtn = $("lanc-ver-dashboard");
+        if (verDashBtn) verDashBtn.classList.remove("hidden");
         showToast('Lançamento criado com sucesso!', 'success');
       } catch (err) {
         console.error(err);
@@ -7697,14 +8260,7 @@
     };
 
     window.deleteCategoria = async (id) => {
-      if (!confirm('Deletar categoria?')) return;
-      try {
-        await deleteDoc(doc(db, "obras", OBRA_ID, "categorias", id));
-        showToast('Categoria deletada', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('Erro ao deletar categoria', 'error');
-      }
+      showToast('Catálogos oficiais não podem ser deletados. Apenas desativação via seed/admin.', 'warning');
     };
 
     window.deleteDeducao = async (id) => {
@@ -7767,7 +8323,7 @@
       const lancamento = state.lancamentos.find(l => l.id === id);
       if (!lancamento) return;
 
-      const statusAtual = lancamento.status || "pendente";
+      const statusAtual = lancamento.statusPagamento || lancamento.status || "pendente";
       const proximoStatus = {
         "pendente": "pago",
         "pago": "pendente",
@@ -7777,8 +8333,14 @@
       const novoStatus = proximoStatus[statusAtual];
 
       try {
+        const dataPagamentoAtual = novoStatus === "pago"
+          ? (lancamento.dataPagamento || new Date().toISOString().slice(0, 10))
+          : (novoStatus === "pendente" ? null : lancamento.dataPagamento || null);
         await updateDoc(doc(db, "obras", OBRA_ID, "lancamentos", id), {
           status: novoStatus,
+          statusPagamento: novoStatus,
+          pago: novoStatus === "pago",
+          dataPagamento: dataPagamentoAtual,
           historico: [...(lancamento.historico || []), {
             acao: 'status_changed',
             de: statusAtual,
@@ -7891,10 +8453,23 @@
     function computeEqualizacao() {
       // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
       const obra = state.obras.find(o => o.id === OBRA_ID);
+      const canonicalA = resolveSocioCanonicalId(obra?.socioAId) || "A";
+      const canonicalB = resolveSocioCanonicalId(obra?.socioBId) || "B";
       const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
       const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
       const investimentoA = obra?.investimentoA || 0;
       const investimentoB = obra?.investimentoB || 0;
+
+      const resolveCanonical = (valor) => {
+        if (!valor) return null;
+        const normalized = normalizarSocioValor(valor, obra);
+        if (String(normalized).toUpperCase() === "AMBOS") return "AMBOS";
+        const canonical = resolveSocioCanonicalId(normalized);
+        if (canonical) return canonical;
+        const v = String(normalized).toUpperCase();
+        if (v.length === 1 && v >= 'A' && v <= 'Z') return v;
+        return null;
+      };
 
       // 1. RECEBIMENTOS
       let recebeuFisicamenteA = 0; // Quanto A recebeu fisicamente
@@ -7903,14 +8478,14 @@
       let temDireitoB = 0; // Quanto B tem direito (baseado no proprietário)
 
       state.recebimentos.forEach(r => {
-        const recebidoPor = r.recebidoPor || "ambos";
+        const recebidoPor = resolveCanonical(r.recebidoPor) || "AMBOS";
         const unidade = state.unidades.find(u => u.id === r.unidadeId);
-        const proprietario = unidade?.proprietario || "ambos";
+        const proprietario = resolveCanonical(unidade?.proprietario) || "AMBOS";
 
         // Quem recebeu fisicamente
-        if (recebidoPor === "A") {
+        if (recebidoPor === canonicalA) {
           recebeuFisicamenteA += r.valor;
-        } else if (recebidoPor === "B") {
+        } else if (recebidoPor === canonicalB) {
           recebeuFisicamenteB += r.valor;
         } else {
           recebeuFisicamenteA += r.valor / 2;
@@ -7918,9 +8493,9 @@
         }
 
         // Quem tem direito (baseado no proprietário da unidade)
-        if (proprietario === "A") {
+        if (proprietario === canonicalA) {
           temDireitoA += r.valor;
-        } else if (proprietario === "B") {
+        } else if (proprietario === canonicalB) {
           temDireitoB += r.valor;
         } else {
           temDireitoA += r.valor / 2;
@@ -7940,19 +8515,27 @@
       let pagouB = 0;
 
       state.lancamentos.forEach(l => {
-        if (l.pagador === "A") {
+        const pagadorCanon = resolveCanonical(l.pagador || l.pagadorId);
+        if (pagadorCanon === canonicalA) {
           pagouA += l.valor;
-        } else {
+        } else if (pagadorCanon === canonicalB) {
           pagouB += l.valor;
+        } else {
+          pagouA += l.valor / 2;
+          pagouB += l.valor / 2;
         }
       });
 
       state.rateios.forEach(r => {
         const totalRateio = r.distribuicao?.reduce((sum, d) => sum + d.valor, 0) || 0;
-        if (r.pagador === "A") {
+        const pagadorCanon = resolveCanonical(r.pagador || r.pagadorId);
+        if (pagadorCanon === canonicalA) {
           pagouA += totalRateio;
-        } else {
+        } else if (pagadorCanon === canonicalB) {
           pagouB += totalRateio;
+        } else {
+          pagouA += totalRateio / 2;
+          pagouB += totalRateio / 2;
         }
       });
 
@@ -7986,11 +8569,13 @@
       let saldoFinalB = saldoBrutoB;
 
       state.acertos.forEach(a => {
-        if (a.de === "A" && a.para === "B") {
+        const deCanon = resolveCanonical(a.de);
+        const paraCanon = resolveCanonical(a.para);
+        if (deCanon === canonicalA && paraCanon === canonicalB) {
           // A transferiu dinheiro para B
           saldoFinalA -= a.valor;  // A diminui saldo (deu dinheiro)
           saldoFinalB += a.valor;  // B aumenta saldo (recebeu dinheiro)
-        } else if (a.de === "B" && a.para === "A") {
+        } else if (deCanon === canonicalB && paraCanon === canonicalA) {
           // B transferiu dinheiro para A
           saldoFinalB -= a.valor;
           saldoFinalA += a.valor;
