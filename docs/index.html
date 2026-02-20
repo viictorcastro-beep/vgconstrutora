@@ -1075,8 +1075,12 @@
   <div id="modal-fornecedores" class="modal fixed inset-0 hidden items-center justify-center p-4 z-50">
     <div class="card p-6 w-full max-w-3xl">
       <div class="flex items-center justify-between mb-4">
-        <div class="font-black text-xl">🛒 Fornecedores</div>
+        <div class="font-black text-xl">🛒 Fornecedores (Cadastro Universal)</div>
         <button data-close="modal-fornecedores" class="btn btn-soft">Fechar</button>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800 mb-3">
+        💡 <strong>Cadastro universal:</strong> fornecedores ficam disponíveis em todas as obras automaticamente.
       </div>
 
       <div class="grid grid-cols-12 gap-3 mb-4">
@@ -1500,12 +1504,13 @@
       return {
         obrasCol: collection(db, "obras"),
         sociosCol: collection(db, "socios"),  // Coleção global de sócios
+        fornecedoresCol: collection(db, "fornecedores"),  // Coleção global de fornecedores
         obraDoc: doc(db, "obras", obraId),
         catalogoEtapasCol: collection(db, "catalogo_etapas"),
         catalogoTiposCustoCol: collection(db, "catalogo_tipos_custo"),
         unidadesCol: collection(db, "obras", obraId, "unidades"),
         categoriasCol: collection(db, "obras", obraId, "categorias"),
-        fornecedoresCol: collection(db, "obras", obraId, "fornecedores"),
+        fornecedoresLegadoCol: collection(db, "obras", obraId, "fornecedores"),  // Legado — só p/ migração
         deducoesCol: collection(db, "obras", obraId, "deducoes"),
         lancamentosCol: collection(db, "obras", obraId, "lancamentos"),
         rateiosCol: collection(db, "obras", obraId, "rateios"),
@@ -1538,6 +1543,7 @@
         
         loadCatalogosFromApi();
         subscribeSocios();
+        subscribeFornecedores();
         subscribeObrasList();
         setupEventListeners();
         
@@ -2017,6 +2023,17 @@
       }));
     }
 
+    function subscribeFornecedores() {
+      const r = refs("dummy").fornecedoresCol;
+      listeners.push(onSnapshot(r, (snap) => {
+        state.fornecedores = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+        console.log("🛒 Fornecedores globais carregados:", state.fornecedores.length);
+        renderFornecedoresModal();
+      }, (err) => {
+        console.error("❌ Erro ao carregar fornecedores:", err);
+      }));
+    }
+
     // Helper para obter label do proprietário (compatível com formato antigo e novo)
     function getProprietarioLabel(proprietarioId) {
       if (!proprietarioId || proprietarioId === 'ambos') return '👥 Ambos (Legacy)';
@@ -2186,11 +2203,6 @@
 
       obraListeners.push(onSnapshot(r.categoriasCol, (snap) => {
         state.categorias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
-
-      obraListeners.push(onSnapshot(r.fornecedoresCol, (snap) => {
-        state.fornecedores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRerender();
       }));
 
@@ -7488,15 +7500,18 @@
 
       try {
         const todos = [];
+        // Fornecedores globais — já em state.fornecedores
+        const fornecedoresMap = new Map(state.fornecedores.map(f => [f.id, f]));
         for (const obra of state.obras) {
-          // Carregar lançamentos + categorias legadas + fornecedores
-          const [lancSnap, catSnap, fornSnap] = await Promise.all([
+          // Carregar lançamentos + categorias legadas + fornecedores legados (por obra)
+          const [lancSnap, catSnap, fornLegadoSnap] = await Promise.all([
             getDocs(collection(db, "obras", obra.id, "lancamentos")),
             getDocs(collection(db, "obras", obra.id, "categorias")),
             getDocs(collection(db, "obras", obra.id, "fornecedores"))
           ]);
           const categorias = new Map(catSnap.docs.map(d => [d.id, d.data()]));
-          const fornecedores = new Map(fornSnap.docs.map(d => [d.id, d.data()]));
+          // Mesclar fornecedores legados (por obra) com globais
+          const fornecedoresLegado = new Map(fornLegadoSnap.docs.map(d => [d.id, d.data()]));
 
           lancSnap.forEach(docSnap => {
             const raw = docSnap.data();
@@ -7504,7 +7519,7 @@
 
             // Enriquecer com nomes legados
             l._catNome = categorias.get(l.categoriaId)?.nome || '';
-            l._fornNome = fornecedores.get(l.fornecedorId)?.nome || '';
+            l._fornNome = fornecedoresMap.get(l.fornecedorId)?.nome || fornecedoresLegado.get(l.fornecedorId)?.nome || '';
 
             // Montar texto completo para inferência
             l._textoAnalise = [
@@ -8152,7 +8167,7 @@
       }
 
       try {
-        await addDoc(refs(OBRA_ID).fornecedoresCol, {
+        await addDoc(refs("dummy").fornecedoresCol, {
           nome,
           contato: contato || null,
           documento: doc || null,
@@ -9019,7 +9034,7 @@
     window.deleteFornecedor = async (id) => {
       if (!confirm('Deletar fornecedor?')) return;
       try {
-        await deleteDoc(doc(db, "obras", OBRA_ID, "fornecedores", id));
+        await deleteDoc(doc(db, "fornecedores", id));
         showToast('Fornecedor deletado', 'success');
       } catch (err) {
         console.error(err);
@@ -9029,6 +9044,93 @@
 
     window.deleteCategoria = async (id) => {
       showToast('Catálogos oficiais não podem ser deletados. Apenas desativação via seed/admin.', 'warning');
+    };
+
+    // ─── MIGRAÇÃO IN-APP: Fornecedores per-obra → Global ────
+    window._migrarFornecedoresGlobal = async () => {
+      if (!confirm('Migrar todos os fornecedores de todas as obras para coleção global?\nIsso vai deduplicar por nome e atualizar os lançamentos.')) return;
+      console.log('🚀 Iniciando migração de fornecedores...');
+
+      const porNome = new Map();
+      let totalLegado = 0;
+
+      for (const obra of state.obras) {
+        const fornSnap = await getDocs(collection(db, "obras", obra.id, "fornecedores"));
+        console.log(`  📦 ${obra.id}: ${fornSnap.size} fornecedores`);
+        totalLegado += fornSnap.size;
+
+        fornSnap.forEach(fornDoc => {
+          const data = fornDoc.data();
+          const nomeKey = (data.nome || '').trim().toLowerCase();
+          if (!nomeKey) return;
+          if (!porNome.has(nomeKey)) {
+            porNome.set(nomeKey, { nome: data.nome.trim(), contato: data.contato || null, documento: data.documento || null, origens: [] });
+          }
+          const entry = porNome.get(nomeKey);
+          entry.origens.push({ obraId: obra.id, oldId: fornDoc.id });
+          if (!entry.contato && data.contato) entry.contato = data.contato;
+          if (!entry.documento && data.documento) entry.documento = data.documento;
+        });
+      }
+
+      console.log(`📊 ${totalLegado} legados → ${porNome.size} únicos`);
+
+      // Verificar existentes na global
+      const existSnap = await getDocs(collection(db, "fornecedores"));
+      const existPorNome = new Map();
+      existSnap.forEach(d => existPorNome.set((d.data().nome || '').trim().toLowerCase(), d.id));
+
+      const idMap = new Map();
+      let criados = 0, jaExistiam = 0;
+
+      for (const [nomeKey, entry] of porNome.entries()) {
+        let globalId;
+        if (existPorNome.has(nomeKey)) {
+          globalId = existPorNome.get(nomeKey);
+          jaExistiam++;
+        } else {
+          const newRef = await addDoc(collection(db, "fornecedores"), {
+            nome: entry.nome, contato: entry.contato, documento: entry.documento,
+            createdAt: serverTimestamp(), createdBy: state.user?.email || 'migration',
+            _migratedFrom: entry.origens.map(o => `${o.obraId}/${o.oldId}`)
+          });
+          globalId = newRef.id;
+          criados++;
+          console.log(`  ✅ "${entry.nome}" → ${globalId}`);
+        }
+        for (const o of entry.origens) idMap.set(`${o.obraId}::${o.oldId}`, globalId);
+      }
+
+      console.log(`📦 ${criados} criados | ${jaExistiam} já existiam`);
+
+      // Atualizar fornecedorId em lançamentos e rateios
+      let lancUpd = 0, ratUpd = 0;
+      for (const obra of state.obras) {
+        const lancSnap = await getDocs(collection(db, "obras", obra.id, "lancamentos"));
+        for (const lancDoc of lancSnap.docs) {
+          const oldId = lancDoc.data().fornecedorId;
+          if (!oldId) continue;
+          const newId = idMap.get(`${obra.id}::${oldId}`);
+          if (newId && newId !== oldId) {
+            await updateDoc(lancDoc.ref, { fornecedorId: newId, _fornecedorIdLegado: oldId });
+            lancUpd++;
+          }
+        }
+        const ratSnap = await getDocs(collection(db, "obras", obra.id, "rateios"));
+        for (const ratDoc of ratSnap.docs) {
+          const oldId = ratDoc.data().fornecedorId;
+          if (!oldId) continue;
+          const newId = idMap.get(`${obra.id}::${oldId}`);
+          if (newId && newId !== oldId) {
+            await updateDoc(ratDoc.ref, { fornecedorId: newId, _fornecedorIdLegado: oldId });
+            ratUpd++;
+          }
+        }
+      }
+
+      console.log(`🔄 ${lancUpd} lançamentos | ${ratUpd} rateios atualizados`);
+      showToast(`✅ Migração concluída! ${criados} fornecedores criados, ${lancUpd + ratUpd} documentos atualizados`, 'success');
+      return { criados, jaExistiam, lancUpd, ratUpd };
     };
 
     window.deleteDeducao = async (id) => {
