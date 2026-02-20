@@ -3397,7 +3397,7 @@
       if (modoA.transferencia) {
         const dePos = posicoes[modoA.transferencia.de];
         const paraPos = posicoes[modoA.transferencia.para];
-        const abatimento = (dePos?.acertosPago || 0) - (paraPos?.acertosPago || 0);
+        const abatimento = (dePos?.acertosPago || 0) - (paraPos?.acertosRecebido || 0);
         const valorAjustado = Math.max(0, (modoA.transferencia.valor || 0) - abatimento);
         modoA.transferencia.valor = valorAjustado;
       }
