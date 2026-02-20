@@ -24,3 +24,9 @@ API de catálogos:
 - Healthcheck: `GET /api/health/catalogos`
 
 Regras sugeridas do Firestore em `firestore.rules`.
+
+## GitHub Pages (UI oficial)
+
+- Produção é main:/docs.
+- Arquivo oficial: docs/index.html.
+- Como validar: abrir o site, Ctrl+U e buscar por BUILD.
