@@ -3288,12 +3288,16 @@
             }
           }
 
+          const totalNetObra = Object.values(detalhesObra)
+            .reduce((sum, d) => sum + ((d.recebidoFisico || 0) - (d.pagoFisico || 0)), 0);
+          const sociosObra = Object.keys(detalhesObra).length || 1;
+          const mediaNetObra = totalNetObra / sociosObra;
+
           Object.entries(detalhesObra).forEach(([socioId, d]) => {
             const excessoRecebe = d.recebidoFisicoSemAcerto - d.receitaPorAlocacao;
             const excessoPaga = d.pagoFisicoSemAcerto - d.custoPorAlocacao;
-            const basePosicaoLiquida = excessoPaga - excessoRecebe;
-            const acertoSaldo = (d.acertosPago || 0) - (d.acertosRecebido || 0);
-            const posicaoLiquida = basePosicaoLiquida - acertoSaldo;
+            const netObra = (d.recebidoFisico || 0) - (d.pagoFisico || 0);
+            const posicaoLiquida = mediaNetObra - netObra;
             if (posicoes[socioId]) {
               posicoes[socioId].detalhesObras.push({
                 obraId,
@@ -3319,23 +3323,25 @@
 
       // Calcular totais consolidados
       console.log('\n📊 [EQ GLOBAL] Totais consolidados:');
-      Object.values(posicoes).forEach(pos => {
+      const posicoesArray = Object.values(posicoes);
+      const totalNetGlobal = posicoesArray.reduce(
+        (sum, pos) => sum + ((pos.detalheCaixa.recebidoFisico || 0) - (pos.detalheCaixa.pagoFisico || 0)),
+        0
+      );
+      const mediaNetGlobal = posicoesArray.length ? totalNetGlobal / posicoesArray.length : 0;
+
+      posicoesArray.forEach(pos => {
         pos.caixaFisico = pos.detalheCaixa.recebidoFisico - pos.detalheCaixa.pagoFisico;
         pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
-        const excessoRecebe = pos.detalheCaixaSemAcerto.recebidoFisico - pos.detalheDireito.receitaPorAlocacao;
-        const excessoPaga = pos.detalheCaixaSemAcerto.pagoFisico - pos.detalheDireito.custoPorAlocacao;
-        const basePosicaoLiquida = excessoPaga - excessoRecebe;
-        const acertoSaldo = (pos.acertosPago || 0) - (pos.acertosRecebido || 0);
-        pos.posicaoLiquida = basePosicaoLiquida - acertoSaldo;
+        const netGlobal = (pos.detalheCaixa.recebidoFisico || 0) - (pos.detalheCaixa.pagoFisico || 0);
+        pos.posicaoLiquida = mediaNetGlobal - netGlobal;
         pos.totalConsolidado = pos.posicaoLiquida + pos.contasReceber;
-        
+
         console.log(`  ${pos.nome}:`);
         console.log(`    - Recebido (Caixa): R$ ${pos.detalheCaixa.recebidoFisico.toFixed(2)}`);
         console.log(`    - Pago (Caixa): R$ ${pos.detalheCaixa.pagoFisico.toFixed(2)}`);
         console.log(`    - Saldo Caixa: R$ ${pos.caixaFisico.toFixed(2)}`);
-        console.log(`    - Receita Direito: R$ ${pos.detalheDireito.receitaPorAlocacao.toFixed(2)}`);
-        console.log(`    - Custo Direito: R$ ${pos.detalheDireito.custoPorAlocacao.toFixed(2)}`);
-        console.log(`    - Saldo Direito: R$ ${pos.direitoPorCompetencia.toFixed(2)}`);
+        console.log(`    - Caixa Líquido: R$ ${netGlobal.toFixed(2)}`);
         console.log(`    - Posição Líquida: R$ ${pos.posicaoLiquida.toFixed(2)}`);
         console.log(`    - Contas a Receber: R$ ${pos.contasReceber.toFixed(2)}`);
         console.log(`    - Total Consolidado: R$ ${pos.totalConsolidado.toFixed(2)}`);
