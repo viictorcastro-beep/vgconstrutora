@@ -63,10 +63,21 @@
     
     .empty-state { text-align:center; padding:60px 20px; color:#94a3b8; }
     .empty-state svg { width:80px; height:80px; margin:0 auto 20px; opacity:0.3; }
+    .legacy-notice { background: #fbbf24; color: #1f2937; padding: 12px 16px; text-align: center; font-weight: 800; }
+    .legacy-notice a { color: #0f172a; text-decoration: underline; }
   </style>
 </head>
 
 <body class="text-slate-800">
+  <div class="legacy-notice">
+    LEGACY - NÃO USAR. A UI oficial está em <a href="/vgconstrutora/">/vgconstrutora/</a>.
+    (Local: docs/index.html)
+  </div>
+  <script>
+    if (window.location.hostname.endsWith("github.io")) {
+      window.location.replace("/vgconstrutora/");
+    }
+  </script>
 
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
