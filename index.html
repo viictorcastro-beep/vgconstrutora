@@ -920,7 +920,7 @@
       <!-- Adicionar Usuário -->
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
         <div class="font-bold text-blue-900 mb-3">➕ Adicionar Usuário</div>
-        <form id="form-add-usuario" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <form id="form-add-usuario" class="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div class="md:col-span-2">
             <div class="text-xs muted mb-1">Email do Usuário</div>
             <input id="add-usuario-email" type="email" class="input" placeholder="socio@exemplo.com" required />
@@ -930,6 +930,13 @@
             <select id="add-usuario-socio" class="input" data-socio-select required>
               <option value="">Selecione...</option>
               <!-- Populado dinamicamente com sócios cadastrados -->
+            </select>
+          </div>
+          <div>
+            <div class="text-xs muted mb-1">Perfil</div>
+            <select id="add-usuario-role" class="input">
+              <option value="socio">Sócio</option>
+              <option value="viewer">Visualizador</option>
             </select>
           </div>
           <div>
@@ -1281,7 +1288,8 @@
     // SISTEMA DE PERMISSÕES
     const ROLES = {
       ADMIN: 'admin',
-      SOCIO: 'socio'
+      SOCIO: 'socio',
+      VIEWER: 'viewer'
     };
 
     const ADMIN_EMAIL = 'viictor.castro@gmail.com';
@@ -4693,6 +4701,7 @@
 
       const email = $("add-usuario-email").value.trim().toLowerCase();
       const socioId = $("add-usuario-socio").value;
+      const role = $("add-usuario-role").value;
 
       if (!email || !socioId) {
         showToast('Preencha todos os campos', 'warning');
@@ -4715,7 +4724,7 @@
         usuarios.push({
           email: email,
           socioId: socioId,
-          role: ROLES.SOCIO,
+          role: role,
           addedAt: new Date().toISOString(),
           addedBy: state.user.email
         });
