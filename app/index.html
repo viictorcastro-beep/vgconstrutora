@@ -464,8 +464,9 @@
             </div>
 
             <div class="flex flex-wrap gap-3 mt-4">
-              <button type="submit" class="btn btn-green">💾 Salvar Lançamento</button>
+              <button type="submit" id="lanc-submit" class="btn btn-green">💾 Salvar Lançamento</button>
               <button type="button" id="lanc-quick" class="btn btn-soft">⚡ Atalho: Transitório</button>
+              <button type="button" id="lanc-cancel-edit" class="btn btn-soft hidden">✖ Cancelar edição</button>
               <button type="button" id="lanc-ver-dashboard" class="btn btn-indigo hidden">📊 Ver no dashboard</button>
             </div>
           </form>
@@ -1301,6 +1302,7 @@
     let OBRA_ID = null;
     let filterText = "";
     let filterCategoria = "TODAS";
+    let LANCAMENTO_EDIT_ID = null;
     let filterFornecedor = "TODOS";
     let filterPeriodo = "TODOS";
     let filterStatus = "TODOS";
@@ -6925,6 +6927,7 @@
               <th class="text-left">Unidade</th>
               <th class="text-left">Etapa</th>
               <th class="text-left">Tipo</th>
+              <th class="text-left">Pagador</th>
               <th class="text-left">Fornecedor</th>
               <th class="text-left">Descrição</th>
               <th class="text-left">Valor</th>
@@ -6942,6 +6945,12 @@
               const statusClass = statusAtual === "pago" ? "badge-pago" : (statusAtual === "atrasado" ? "badge-atrasado" : "badge-pendente");
               const statusIcon = statusAtual === "pago" ? "✅" : (statusAtual === "atrasado" ? "🚨" : "⏳");
               const dataBase = l.dataCompetencia || l.data;
+              const obra = state.obras.find(o => o.id === (l.obraId || OBRA_ID)) || null;
+              const pagadorRaw = l.pagador ?? l.pagoPor ?? l.pagoPorId ?? l.quemPagou ?? l.socioPagou ?? l.pagadorId ?? null;
+              const pagoPorCanonical = pagadorRaw === "AMBOS" ? "AMBOS" : resolvePagoPor(l, obra);
+              const pagadorLabel = pagoPorCanonical === "AMBOS"
+                ? "Ambos (50/50)"
+                : socioNomePorQualquerId(pagoPorCanonical || pagadorRaw) || "-";
               
               return `
                 <tr>
@@ -6950,12 +6959,14 @@
                   <td>${escapeHtml(unid?.nome || '-')}</td>
                   <td>${escapeHtml(etapa?.nome || '-') }</td>
                   <td>${escapeHtml(tipo?.nome || '-') }</td>
+                  <td>${escapeHtml(pagadorLabel)}</td>
                   <td>${escapeHtml(forn?.nome || '-')}</td>
                   <td>${escapeHtml(l.descricao)}</td>
                   <td class="font-bold">R$ ${l.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td>${l.dataVencimento ? new Date(l.dataVencimento).toLocaleDateString('pt-BR') : '-'}</td>
                   <td>
                     ${(l.comprovante || l.anexoUrl) ? `<a href="${l.comprovante || l.anexoUrl}" target="_blank" class="text-blue-600 hover:underline mr-2">📎</a>` : ''}
+                    <button onclick="window.editLancamento('${l.id}')" class="text-blue-600 hover:underline mr-2" title="Editar">✏️</button>
                     <button onclick="window.mudarStatusLancamento('${l.id}')" class="text-green-600 hover:underline mr-2" title="Mudar status">💳</button>
                     <button onclick="window.deleteLancamento('${l.id}')" class="text-red-600 hover:underline" title="Deletar">🗑️</button>
                   </td>
@@ -7961,43 +7972,93 @@
       }
 
       try {
-        await addDoc(refs(obraId).lancamentosCol, {
-          obraId,
-          unidadeId: unidadeId || null,
-          escopo: unidadeId ? "UNIDADE" : "GERAL",
-          etapaId,
-          tipoCustoId,
-          valor,
-          dataCompetencia: competencia,
-          dataPagamento,
-          dataVencimento: vencimento,
-          fornecedorId,
-          pagador,
-          pagadorId: pagador,
-          statusPagamento,
-          status: statusPagamento,
-          pago: statusPagamento === "pago",
-          descricao,
-          comprovante,
-          anexoUrl: comprovante,
-          data: competencia,
-          createdAt: serverTimestamp(),
-          createdBy: state.user.email,
-          historico: [{
-            acao: 'created',
-            usuario: state.user.email,
-            data: new Date().toISOString()
-          }]
-        });
-        $("lanc-form").reset();
-        updateLancamentoUnidadeWarning();
-        const verDashBtn = $("lanc-ver-dashboard");
-        if (verDashBtn) verDashBtn.classList.remove("hidden");
-        showToast('Lançamento criado com sucesso!', 'success');
+        if (LANCAMENTO_EDIT_ID) {
+          const existing = state.lancamentos.find(l => l.id === LANCAMENTO_EDIT_ID);
+          if (!existing) {
+            showToast('Lançamento não encontrado para edição', 'error');
+            return;
+          }
+
+          const historico = [
+            ...(existing.historico || []),
+            { acao: 'updated', usuario: state.user.email, data: new Date().toISOString() }
+          ];
+
+          await updateDoc(doc(db, "obras", existing.obraId || obraId, "lancamentos", LANCAMENTO_EDIT_ID), {
+            obraId: existing.obraId || obraId,
+            unidadeId: unidadeId || null,
+            escopo: unidadeId ? "UNIDADE" : "GERAL",
+            etapaId,
+            tipoCustoId,
+            valor,
+            dataCompetencia: competencia,
+            dataPagamento,
+            dataVencimento: vencimento,
+            fornecedorId,
+            pagador,
+            pagadorId: pagador,
+            statusPagamento,
+            status: statusPagamento,
+            pago: statusPagamento === "pago",
+            descricao,
+            comprovante,
+            anexoUrl: comprovante,
+            data: competencia,
+            updatedAt: serverTimestamp(),
+            updatedBy: state.user.email,
+            historico
+          });
+
+          resetLancamentoForm();
+          showToast('Lançamento atualizado com sucesso!', 'success');
+        } else {
+          await addDoc(refs(obraId).lancamentosCol, {
+            obraId,
+            unidadeId: unidadeId || null,
+            escopo: unidadeId ? "UNIDADE" : "GERAL",
+            etapaId,
+            tipoCustoId,
+            valor,
+            dataCompetencia: competencia,
+            dataPagamento,
+            dataVencimento: vencimento,
+            fornecedorId,
+            pagador,
+            pagadorId: pagador,
+            statusPagamento,
+            status: statusPagamento,
+            pago: statusPagamento === "pago",
+            descricao,
+            comprovante,
+            anexoUrl: comprovante,
+            data: competencia,
+            createdAt: serverTimestamp(),
+            createdBy: state.user.email,
+            historico: [{
+              acao: 'created',
+              usuario: state.user.email,
+              data: new Date().toISOString()
+            }]
+          });
+
+          resetLancamentoForm();
+          const verDashBtn = $("lanc-ver-dashboard");
+          if (verDashBtn) verDashBtn.classList.remove("hidden");
+          showToast('Lançamento criado com sucesso!', 'success');
+        }
       } catch (err) {
         console.error(err);
-        showToast('Erro ao criar lançamento', 'error');
+        showToast('Erro ao salvar lançamento', 'error');
       }
+    }
+
+    function resetLancamentoForm() {
+      $("lanc-form").reset();
+      updateLancamentoUnidadeWarning();
+      LANCAMENTO_EDIT_ID = null;
+      const submitBtn = $("lanc-submit");
+      if (submitBtn) submitBtn.textContent = "💾 Salvar Lançamento";
+      $("lanc-cancel-edit")?.classList.add("hidden");
     }
 
     async function ratearIgualmente() {
@@ -8348,6 +8409,54 @@
         showToast('Erro ao deletar unidade', 'error');
       }
     };
+
+    window.editLancamento = async (id) => {
+      const lanc = state.lancamentos.find(l => l.id === id);
+      if (!lanc) return;
+
+      if (lanc.obraId && lanc.obraId !== OBRA_ID) {
+        const obra = state.obras.find(o => o.id === lanc.obraId);
+        if (obra) {
+          OBRA_ID = obra.id;
+          localStorage.setItem("obraId", OBRA_ID);
+          const selectObras = $("obra-select");
+          if (selectObras) selectObras.value = OBRA_ID;
+          subscribeObra();
+        }
+      }
+
+      // Preencher formulário com dados atuais
+      $("lanc-obra").value = lanc.obraId || OBRA_ID;
+      $("lanc-unidade").value = lanc.unidadeId || "";
+      $("lanc-etapa").value = lanc.etapaId || "";
+      $("lanc-tipo-custo").value = lanc.tipoCustoId || "";
+      $("lanc-fornecedor").value = lanc.fornecedorId || "";
+      const pagadorRaw = lanc.pagador ?? lanc.pagoPor ?? lanc.pagoPorId ?? lanc.quemPagou ?? lanc.socioPagou ?? lanc.pagadorId ?? "";
+      $("lanc-pagador").value = String(pagadorRaw).toUpperCase() === "AMBOS"
+        ? "AMBOS"
+        : (resolvePagoPor(lanc, state.obras.find(o => o.id === (lanc.obraId || OBRA_ID))) || pagadorRaw || "");
+      $("lanc-valor").value = lanc.valor ?? "";
+      $("lanc-status").value = lanc.statusPagamento || lanc.status || "pendente";
+      $("lanc-descricao").value = lanc.descricao || "";
+      $("lanc-comprovante").value = lanc.comprovante || lanc.anexoUrl || "";
+      $("lanc-competencia").value = lanc.dataCompetencia || lanc.data || "";
+      $("lanc-pagamento").value = lanc.dataPagamento || "";
+      $("lanc-vencimento").value = lanc.dataVencimento || "";
+
+      updateLancamentoUnidadeWarning();
+
+      LANCAMENTO_EDIT_ID = id;
+      const submitBtn = $("lanc-submit");
+      if (submitBtn) submitBtn.textContent = "💾 Salvar Alterações";
+      $("lanc-cancel-edit")?.classList.remove("hidden");
+
+      $("lanc-descricao").scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $("lanc-descricao").focus();
+    };
+
+    $("lanc-cancel-edit")?.addEventListener("click", () => {
+      resetLancamentoForm();
+    });
 
     window.editUnidade = async (id) => {
       const unidade = state.unidades.find(u => u.id === id);
