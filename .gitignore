@@ -2,9 +2,14 @@
 .firebase/
 .DS_Store
 .env
+.venv/
 
-# Temporary diffs
+# Temporary files
 temp_docs_app.diff
+temp_*.html
+temp_*.js
+fix_*.js
+*.backup
 
 # Firebase Service Account Keys (NUNCA COMMITAR!)
 serviceAccount-*.json

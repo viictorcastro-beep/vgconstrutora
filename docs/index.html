@@ -1,4 +1,4 @@
-<!-- BUILD: b4b6e32 -->
+<!-- BUILD: auto | 2026-02-20 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1140,7 +1140,7 @@
 
     // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
     console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
-    console.log("%c🔨 BUILD: 2026-02-19 00:00 | b4b6e32", "color: #22c55e; font-weight: bold; font-size: 16px;");
+    console.log("%c🔨 BUILD: 2026-02-20 | enterprise-audit", "color: #22c55e; font-weight: bold; font-size: 16px;");
     console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
     console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
     console.log("%c✓ FIXED: acertos automáticos com netting", "color: #10b981;");
@@ -5216,56 +5216,85 @@
           dados.porEtapa.sort((a, b) => b.total - a.total);
         }
 
+        const percMaterial = dados.totais.geral > 0 ? ((dados.totais.material / dados.totais.geral) * 100).toFixed(1) : '0.0';
+        const percMO = dados.totais.geral > 0 ? ((dados.totais.mao_obra / dados.totais.geral) * 100).toFixed(1) : '0.0';
+        const percOutros = dados.totais.geral > 0 ? ((dados.totais.outros / dados.totais.geral) * 100).toFixed(1) : '0.0';
+        const qtdEtapas = dados.porEtapa.length;
         const kpisHTML = `
-          <div class="card p-5">
+          <div class="card p-5 border-l-4" style="border-color:#0f172a">
             <div class="text-xs muted mb-2">💰 Total Geral</div>
             <div class="text-2xl font-black">R$ ${dados.totais.geral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            <div class="text-xs muted mt-1">${qtdEtapas} etapas com custo</div>
           </div>
-          <div class="card p-5">
+          <div class="card p-5 border-l-4" style="border-color:#3b82f6">
             <div class="text-xs muted mb-2">📦 Material</div>
             <div class="text-2xl font-black">R$ ${dados.totais.material.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            <div class="text-xs font-bold mt-1" style="color:#3b82f6">${percMaterial}% do total</div>
           </div>
-          <div class="card p-5">
+          <div class="card p-5 border-l-4" style="border-color:#10b981">
             <div class="text-xs muted mb-2">👷 Mão de Obra</div>
             <div class="text-2xl font-black">R$ ${dados.totais.mao_obra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            <div class="text-xs font-bold mt-1" style="color:#10b981">${percMO}% do total</div>
           </div>
-          <div class="card p-5">
+          <div class="card p-5 border-l-4" style="border-color:#f59e0b">
             <div class="text-xs muted mb-2">📌 Outros</div>
             <div class="text-2xl font-black">R$ ${dados.totais.outros.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            <div class="text-xs font-bold mt-1" style="color:#f59e0b">${percOutros}% do total</div>
           </div>
         `;
         $("dashboard-kpis").innerHTML = kpisHTML;
 
+        const maxEtapaVal = Math.max(...dados.porEtapa.map(e => e.total), 1);
         const tabelaHTML = `
-          <table class="table w-full">
+          <table class="table w-full text-sm">
             <thead>
               <tr>
-                <th class="text-left">Etapa</th>
-                <th class="text-left">Total</th>
-                <th class="text-left">Material</th>
-                <th class="text-left">Mão de Obra</th>
-                <th class="text-left">Outros</th>
-                <th class="text-left">%Material</th>
-                <th class="text-left">%MO</th>
+                <th class="text-left" style="min-width:160px">Etapa</th>
+                <th class="text-right" style="min-width:110px">Total</th>
+                <th class="text-left" style="min-width:120px">Composição</th>
+                <th class="text-right" style="min-width:100px">Material</th>
+                <th class="text-right" style="min-width:100px">Mão de Obra</th>
+                <th class="text-right" style="min-width:80px">Outros</th>
+                <th class="text-right">% Total</th>
               </tr>
             </thead>
             <tbody>
               ${dados.porEtapa.map(e => {
+                const percTotal = dados.totais.geral > 0 ? ((e.total / dados.totais.geral) * 100) : 0;
                 const percMat = e.total ? ((e.material / e.total) * 100) : 0;
                 const percMo = e.total ? ((e.mao_obra / e.total) * 100) : 0;
+                const percOutr = e.total ? ((e.outros / e.total) * 100) : 0;
+                const barWidth = maxEtapaVal > 0 ? ((e.total / maxEtapaVal) * 100) : 0;
                 return `
                   <tr>
-                    <td>${escapeHtml(e.etapaNome)}</td>
-                    <td class="font-bold">R$ ${e.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    <td>R$ ${e.material.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    <td>R$ ${e.mao_obra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    <td>R$ ${e.outros.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    <td>${percMat.toFixed(1)}%</td>
-                    <td>${percMo.toFixed(1)}%</td>
+                    <td class="font-semibold">${escapeHtml(e.etapaNome)}</td>
+                    <td class="text-right font-bold">R$ ${e.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>
+                      <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#f1f5f9">
+                        <div style="width:${percMat}%;background:#3b82f6" title="Material ${percMat.toFixed(1)}%"></div>
+                        <div style="width:${percMo}%;background:#10b981" title="MO ${percMo.toFixed(1)}%"></div>
+                        <div style="width:${percOutr}%;background:#f59e0b" title="Outros ${percOutr.toFixed(1)}%"></div>
+                      </div>
+                    </td>
+                    <td class="text-right">R$ ${e.material.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">R$ ${e.mao_obra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">R$ ${e.outros.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right font-bold">${percTotal.toFixed(1)}%</td>
                   </tr>
                 `;
               }).join('')}
             </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid #0f172a">
+                <td class="font-black">TOTAL</td>
+                <td class="text-right font-black">R$ ${dados.totais.geral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td></td>
+                <td class="text-right font-bold">R$ ${dados.totais.material.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td class="text-right font-bold">R$ ${dados.totais.mao_obra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td class="text-right font-bold">R$ ${dados.totais.outros.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td class="text-right font-black">100%</td>
+              </tr>
+            </tfoot>
           </table>
         `;
         $("dashboard-tabela").innerHTML = tabelaHTML;
@@ -7799,9 +7828,26 @@
       const vencimento = $("lanc-vencimento").value || null;
 
       if (!obraId || !competencia || !etapaId || !tipoCustoId || !fornecedorId || !pagador || !valor || !descricao) {
-        showToast('Preencha todos os campos obrigatórios', 'error');
+        const faltando = [];
+        if (!obraId) faltando.push('Obra');
+        if (!competencia) faltando.push('Data competência');
+        if (!etapaId) faltando.push('Etapa');
+        if (!tipoCustoId) faltando.push('Tipo de custo');
+        if (!fornecedorId) faltando.push('Fornecedor');
+        if (!pagador) faltando.push('Pagador');
+        if (!valor) faltando.push('Valor');
+        if (!descricao) faltando.push('Descrição');
+        showToast(`Campos obrigatórios faltando: ${faltando.join(', ')}`, 'error');
         return;
       }
+
+      if (valor <= 0 || !Number.isFinite(valor)) {
+        showToast('Valor deve ser um número positivo', 'error');
+        return;
+      }
+
+      // Auto-preencher dataPagamento se status=pago e não informado
+      const dataPagamentoFinal = dataPagamento || (statusPagamento === 'pago' ? competencia : null);
 
       if (!comprovante) {
         showToast('Informe o link do comprovante (Google Drive)', 'error');
@@ -7870,7 +7916,7 @@
             tipoCustoId,
             valor,
             dataCompetencia: competencia,
-            dataPagamento,
+            dataPagamento: dataPagamentoFinal,
             dataVencimento: vencimento,
             fornecedorId,
             pagador,
@@ -7898,7 +7944,7 @@
             tipoCustoId,
             valor,
             dataCompetencia: competencia,
-            dataPagamento,
+            dataPagamento: dataPagamentoFinal,
             dataVencimento: vencimento,
             fornecedorId,
             pagador,
@@ -9034,8 +9080,8 @@
 
   </script>
 
-  <footer class="text-center text-xs text-slate-400 py-4">
-    Build b4b6e32 | 2026-02-19 00:00
+  <footer id="build-footer" class="text-center text-xs text-slate-400 py-4">
+    Build enterprise-audit | 2026-02-20
   </footer>
 </body>
 </html>

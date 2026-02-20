@@ -6,6 +6,8 @@
   "scripts": {
     "migrate": "node scripts/migrate-qd61-to-new.mjs",
     "migrate:custos": "node scripts/migrate-custos-categoria.mjs",
+    "migrate:normalize": "node scripts/normalize-lancamentos.mjs",
+    "migrate:normalize:dry": "DRY_RUN=1 node scripts/normalize-lancamentos.mjs",
     "test:custos": "node scripts/test-custos.mjs",
     "test:catalogos": "node scripts/test-catalogos.mjs",
     "start": "node server.mjs",
