@@ -1,3 +1,5 @@
+import { FieldValue } from "firebase-admin/firestore";
+
 export const CATALOGO_ETAPAS_SEED = [
   { id: "terreno_regularizacao", nome: "Terreno & Regularização", ordem: 1, ativo: true, sistema: true },
   { id: "projetos_aprovacoes", nome: "Projetos & Aprovações", ordem: 2, ativo: true, sistema: true },
@@ -41,7 +43,7 @@ function normalizeSeedItem(item) {
   };
 }
 
-export async function seedCatalogos({ db, admin, logger = console, projectId = "unknown", env = "dev" }) {
+export async function seedCatalogos({ db, logger = console, projectId = "unknown", env = "dev" }) {
   logger.log(`🌱 Seed catálogos | project=${projectId} | env=${env}`);
 
   let createdEtapas = 0;
@@ -56,7 +58,7 @@ export async function seedCatalogos({ db, admin, logger = console, projectId = "
     if (snap.exists) updatedEtapas++; else createdEtapas++;
     await ref.set({
       ...etapa,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
   }
 
@@ -67,7 +69,7 @@ export async function seedCatalogos({ db, admin, logger = console, projectId = "
     if (snap.exists) updatedTipos++; else createdTipos++;
     await ref.set({
       ...tipo,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
   }
 

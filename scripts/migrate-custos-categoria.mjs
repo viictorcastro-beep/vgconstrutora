@@ -1,10 +1,11 @@
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
 const key = JSON.parse(fs.readFileSync("./serviceAccount-new.json", "utf8"));
 
-admin.initializeApp({ credential: admin.credential.cert(key) });
-const db = admin.firestore();
+const firebaseApp = initializeApp({ credential: cert(key) });
+const db = getFirestore(firebaseApp);
 
 const OBRA_ID = process.env.OBRA_ID || null;
 

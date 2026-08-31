@@ -1,21 +1,22 @@
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
 const oldKey = JSON.parse(fs.readFileSync("./serviceAccount-old.json", "utf8"));
 const newKey = JSON.parse(fs.readFileSync("./serviceAccount-new.json", "utf8"));
 
 // Inicializa 2 apps Admin (um pra cada projeto)
-const oldApp = admin.initializeApp(
-  { credential: admin.credential.cert(oldKey) },
+const oldApp = initializeApp(
+  { credential: cert(oldKey) },
   "old"
 );
-const newApp = admin.initializeApp(
-  { credential: admin.credential.cert(newKey) },
+const newApp = initializeApp(
+  { credential: cert(newKey) },
   "new"
 );
 
-const oldDb = oldApp.firestore();
-const newDb = newApp.firestore();
+const oldDb = getFirestore(oldApp);
+const newDb = getFirestore(newApp);
 
 const OBRA_ID = "QD61_LT32";
 const UNIDADE_ID = "GERAL";

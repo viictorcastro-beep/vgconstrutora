@@ -1,13 +1,14 @@
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { readFileSync } from "fs";
 
 // Conectar ao projeto novo
 const newServiceAccount = JSON.parse(readFileSync("./serviceAccount-new.json", "utf8"));
-const newApp = admin.initializeApp({
-  credential: admin.credential.cert(newServiceAccount),
+const newApp = initializeApp({
+  credential: cert(newServiceAccount),
 }, "new");
 
-const newDb = newApp.firestore();
+const newDb = getFirestore(newApp);
 
 async function createInitialObra() {
   try {
@@ -18,8 +19,8 @@ async function createInitialObra() {
     await obraRef.set({
       nome: "QD61 LT32 (Migrado)",
       endereco: "QD 61 LT 32",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     });
     
     console.log("✅ Obra criada com sucesso!");
@@ -30,7 +31,7 @@ async function createInitialObra() {
     await unidadeRef.set({
       nome: "GERAL",
       areaConstruida: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
     
     console.log("✅ Unidade GERAL criada!");

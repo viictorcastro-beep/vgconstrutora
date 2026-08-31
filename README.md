@@ -23,6 +23,8 @@ Sistema web para acompanhar obras, custos, recebimentos, contas a receber, ratei
 
 ## Desenvolvimento
 
+Requer Node.js 22 ou superior (a automação usa Node.js 24).
+
 ```bash
 npm install
 npm test
@@ -31,7 +33,7 @@ npm start
 
 ## Migrações
 
-As migrações são executadas em modo de simulação por padrão. Para mover lançamentos entre obras:
+A movimentação entre obras é executada em modo de simulação por padrão:
 
 ```bash
 node scripts/move-to-obra.mjs --source <obra-origem> --target <obra-destino>
@@ -39,6 +41,12 @@ node scripts/move-to-obra.mjs --source <obra-origem> --target <obra-destino> --a
 ```
 
 Use `--apply` somente depois de revisar a simulação e o backup gerado.
+
+Para auditar a normalização de lançamentos sem gravar dados:
+
+```bash
+npm run migrate:normalize:dry
+```
 
 ## Publicação
 

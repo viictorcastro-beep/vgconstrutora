@@ -1,4 +1,5 @@
-import admin from "firebase-admin";
+import { cert, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { existsSync, readFileSync } from "node:fs";
 
 const applyChanges = process.env.APPLY === "1";
@@ -12,8 +13,8 @@ if (!existsSync(serviceAccountPath)) {
 }
 
 const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf8"));
-const app = admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = app.firestore();
+const app = initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore(app);
 
 async function moveCollection(collectionName) {
   const source = await db.collection(collectionName).where("obraId", "==", obraId).get();
@@ -44,7 +45,7 @@ async function moveCollection(collectionName) {
       batch.set(backup, {
         ...item.sourceDoc.data(),
         sourcePath: item.sourceDoc.ref.path,
-        backedUpAt: admin.firestore.FieldValue.serverTimestamp()
+        backedUpAt: FieldValue.serverTimestamp()
       });
       batch.create(item.destination, item.data);
       batch.delete(item.sourceDoc.ref);
@@ -69,5 +70,5 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    await app.delete();
+    await deleteApp(app);
   });

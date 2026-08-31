@@ -1,5 +1,6 @@
 import "dotenv/config";
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 import { seedCatalogos, listCatalogo, CATALOGO_ETAPAS_SEED, CATALOGO_TIPOS_CUSTO_SEED } from "../catalogos.mjs";
 import http from "http";
@@ -16,19 +17,19 @@ if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
 }
 
 const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore();
+const firebaseApp = initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore(firebaseApp);
 
 const projectId = serviceAccount.project_id || process.env.GOOGLE_CLOUD_PROJECT || "unknown";
 const env = process.env.NODE_ENV || "dev";
 
 async function testSeedIdempotente() {
   console.log("🧪 Teste: seed idempotente");
-  await seedCatalogos({ db, admin, logger: console, projectId, env });
+  await seedCatalogos({ db, logger: console, projectId, env });
   const etapas1 = await listCatalogo({ db, collectionName: "catalogo_etapas" });
   const tipos1 = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
 
-  await seedCatalogos({ db, admin, logger: console, projectId, env });
+  await seedCatalogos({ db, logger: console, projectId, env });
   const etapas2 = await listCatalogo({ db, collectionName: "catalogo_etapas" });
   const tipos2 = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
 

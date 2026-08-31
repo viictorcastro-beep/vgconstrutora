@@ -1,5 +1,6 @@
 import "dotenv/config";
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 import { seedCatalogos } from "../catalogos.mjs";
 
@@ -14,13 +15,13 @@ if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
 }
 
 const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore();
+const firebaseApp = initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore(firebaseApp);
 
 const projectId = serviceAccount.project_id || process.env.GOOGLE_CLOUD_PROJECT || "unknown";
 const env = process.env.NODE_ENV || "dev";
 
-seedCatalogos({ db, admin, logger: console, projectId, env })
+seedCatalogos({ db, logger: console, projectId, env })
   .then(() => {
     console.log("✅ Seed concluído com sucesso");
     process.exit(0);

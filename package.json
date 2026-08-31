@@ -7,7 +7,7 @@
     "migrate": "node scripts/migrate-qd61-to-new.mjs",
     "migrate:custos": "node scripts/migrate-custos-categoria.mjs",
     "migrate:normalize": "node scripts/normalize-lancamentos.mjs",
-    "migrate:normalize:dry": "DRY_RUN=1 node scripts/normalize-lancamentos.mjs",
+    "migrate:normalize:dry": "node scripts/normalize-lancamentos.mjs --dry-run",
     "test:custos": "node scripts/test-custos.mjs",
     "test:catalogos": "node scripts/test-catalogos.mjs",
     "test:equalizacao": "node scripts/test-equalizacao-logic.mjs",
@@ -19,9 +19,12 @@
   "keywords": ["firebase", "migration"],
   "author": "VG Construtora",
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "firebase-admin": "^12.0.0"
+    "firebase-admin": "^14.3.0"
   }
 }

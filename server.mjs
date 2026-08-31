@@ -2,7 +2,9 @@ import "dotenv/config";
 import express from "express";
 import fs from "fs";
 import path from "path";
-import admin from "firebase-admin";
+import { applicationDefault, cert, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import { seedCatalogos, listCatalogo } from "./catalogos.mjs";
 
 const app = express();
@@ -30,6 +32,7 @@ app.use((req, res, next) => {
 const ENV_CREDENTIALS_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 const SERVICE_ACCOUNT_PATH = process.env.SERVICE_ACCOUNT_PATH || "./serviceAccount-new.json";
 
+let firebaseApp;
 if (ENV_CREDENTIALS_PATH) {
   if (!fs.existsSync(ENV_CREDENTIALS_PATH)) {
     console.error("❌ Service account não encontrado:", ENV_CREDENTIALS_PATH);
@@ -38,7 +41,7 @@ if (ENV_CREDENTIALS_PATH) {
     console.error("ℹ️ Se não tiver o arquivo, baixe o service account no Firebase e configure GOOGLE_APPLICATION_CREDENTIALS.");
     process.exit(1);
   }
-  admin.initializeApp({ credential: admin.credential.applicationDefault() });
+  firebaseApp = initializeApp({ credential: applicationDefault() });
 } else {
   if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
     console.error("❌ Service account não encontrado:", SERVICE_ACCOUNT_PATH);
@@ -48,10 +51,11 @@ if (ENV_CREDENTIALS_PATH) {
     process.exit(1);
   }
   const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  firebaseApp = initializeApp({ credential: cert(serviceAccount) });
 }
 
-const db = admin.firestore();
+const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 const allowedEmails = new Set([
   "viictor.castro@gmail.com",
   "gcm.conceicao@gmail.com"
@@ -68,7 +72,7 @@ app.use("/api", async (req, res, next) => {
     const authorization = String(req.headers.authorization || "");
     const match = authorization.match(/^Bearer\s+(.+)$/i);
     if (!match) return res.status(401).json({ error: "authentication_required" });
-    const decoded = await admin.auth().verifyIdToken(match[1]);
+    const decoded = await auth.verifyIdToken(match[1]);
     if (!decoded.email_verified || !allowedEmails.has(decoded.email)) {
       return res.status(403).json({ error: "forbidden" });
     }
@@ -169,7 +173,7 @@ app.get("/api/health/catalogos", async (req, res) => {
 app.post("/api/admin/catalogos/seed", async (req, res) => {
   if (!requireAdminToken(req, res)) return;
   try {
-    const counts = await seedCatalogos({ db, admin, logger: console, ...getSeedContext() });
+    const counts = await seedCatalogos({ db, logger: console, ...getSeedContext() });
     const etapas = await listCatalogo({ db, collectionName: "catalogo_etapas" });
     const tipos = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
     res.json({

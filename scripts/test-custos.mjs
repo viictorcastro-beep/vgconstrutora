@@ -1,5 +1,6 @@
 import "dotenv/config";
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
 const SERVICE_ACCOUNT_PATH = process.env.SERVICE_ACCOUNT_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS || "./serviceAccount-new.json";
@@ -12,8 +13,8 @@ if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
   process.exit(1);
 }
 const key = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
-admin.initializeApp({ credential: admin.credential.cert(key) });
-const db = admin.firestore();
+const firebaseApp = initializeApp({ credential: cert(key) });
+const db = getFirestore(firebaseApp);
 
 const OBRA_ID = process.env.OBRA_ID;
 if (!OBRA_ID) {

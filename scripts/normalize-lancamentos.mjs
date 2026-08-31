@@ -12,13 +12,14 @@
  * Uso:
  *   node scripts/normalize-lancamentos.mjs
  *   OBRA_ID=abc123 node scripts/normalize-lancamentos.mjs   # apenas uma obra
- *   DRY_RUN=1 node scripts/normalize-lancamentos.mjs        # só relatório
+ *   node scripts/normalize-lancamentos.mjs --dry-run       # só relatório
  * 
  * Idempotente: pode rodar múltiplas vezes sem efeitos colaterais.
  */
 
 import "dotenv/config";
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
 // --- Firebase init ---
@@ -33,12 +34,12 @@ if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
 }
 
 const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore();
+const firebaseApp = initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore(firebaseApp);
 
 // --- Config ---
 const OBRA_ID = process.env.OBRA_ID || null;
-const DRY_RUN = process.env.DRY_RUN === "1" || process.env.DRY_RUN === "true";
+const DRY_RUN = process.argv.includes("--dry-run") || process.env.DRY_RUN === "1" || process.env.DRY_RUN === "true";
 
 const FALLBACK_ETAPA = "administracao_financeiro";
 const FALLBACK_TIPO = "outros";
@@ -199,7 +200,7 @@ async function normalizeObra(obraId) {
 
     // Aplicar update se necessário
     if (Object.keys(update).length > 0) {
-      update._migNormAt = admin.firestore.FieldValue.serverTimestamp();
+      update._migNormAt = FieldValue.serverTimestamp();
       update._migNormVer = "normalize-v1";
 
       if (!DRY_RUN) {
@@ -271,7 +272,7 @@ async function run() {
   }
 
   if (DRY_RUN) {
-    console.log("\n  ℹ️  Nenhuma alteração foi feita (DRY_RUN). Para aplicar: remova DRY_RUN=1.");
+    console.log("\n  ℹ️  Nenhuma alteração foi feita (DRY_RUN). Para aplicar: execute sem --dry-run.");
   }
 
   console.log("\n═══════════════════════════════════════════════\n");
