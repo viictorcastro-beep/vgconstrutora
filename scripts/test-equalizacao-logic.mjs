@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import {
   aplicarAcertosNaPosicao,
   calcularTransferenciaEntreSocios,
-  numeroFinanceiro
+  numeroFinanceiro,
+  resolverSocioIdPorNomeUnico
 } from "../docs/equalizacao.mjs";
 
 const socios = (saldoA, saldoB) => [
@@ -13,6 +14,30 @@ const socios = (saldoA, saldoB) => [
 
 assert.equal(numeroFinanceiro("1.234,56"), 1234.56);
 assert.equal(numeroFinanceiro("1000.50"), 1000.5);
+
+const sociosLegados = [
+  { id: "gustavo-id", nome: "Gustavo Medeiros" },
+  { id: "victor-id", nome: "Victor Castro" }
+];
+assert.equal(resolverSocioIdPorNomeUnico("Victor", sociosLegados), "victor-id");
+assert.equal(resolverSocioIdPorNomeUnico("  gustavo  ", sociosLegados), "gustavo-id");
+assert.equal(
+  resolverSocioIdPorNomeUnico(
+    "Victor",
+    [...sociosLegados, { id: "victor-outra-obra", nome: "Victor Silva" }],
+    ["gustavo-id", "victor-id"]
+  ),
+  "victor-id",
+  "Homônimo de outra obra não pode invalidar o pagador legado."
+);
+assert.equal(
+  resolverSocioIdPorNomeUnico("Ana", [
+    { id: "ana-1", nome: "Ana Costa" },
+    { id: "ana-2", nome: "Ana Lima" }
+  ]),
+  null,
+  "Primeiros nomes ambíguos não podem ser resolvidos automaticamente."
+);
 
 assert.deepEqual(
   calcularTransferenciaEntreSocios(socios(500, -500)),

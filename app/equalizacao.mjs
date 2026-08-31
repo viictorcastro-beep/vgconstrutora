@@ -18,6 +18,31 @@ export function aplicarAcertosNaPosicao(posicaoBruta, acertosPago, acertosRecebi
     - numeroFinanceiro(acertosRecebido);
 }
 
+export function resolverSocioIdPorNomeUnico(valor, socios, idsPermitidos = null) {
+  if (valor == null || !Array.isArray(socios)) return null;
+  const busca = String(valor).trim().toLocaleLowerCase("pt-BR");
+  if (!busca) return null;
+  const permitidos = Array.isArray(idsPermitidos)
+    ? new Set(idsPermitidos.filter(Boolean).map(String))
+    : null;
+
+  const ids = new Set(
+    socios
+      .filter(socio => {
+        const id = socio?.firestoreId || socio?.firestoreID || socio?.uid || socio?.id;
+        if (!id || (permitidos && !permitidos.has(String(id)))) return false;
+        const nome = String(socio?.nome || "").trim().toLocaleLowerCase("pt-BR");
+        const primeiroNome = nome.split(/\s+/)[0];
+        return nome === busca || primeiroNome === busca;
+      })
+      .map(socio => socio.firestoreId || socio.firestoreID || socio.uid || socio.id)
+      .filter(Boolean)
+      .map(String)
+  );
+
+  return ids.size === 1 ? [...ids][0] : null;
+}
+
 export function calcularTransferenciaEntreSocios(socios, tolerancia = 0.01) {
   if (!Array.isArray(socios) || socios.length !== 2) {
     throw new Error("A equalização exige exatamente dois sócios.");

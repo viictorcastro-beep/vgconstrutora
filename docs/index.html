@@ -1,4 +1,4 @@
-<!-- BUILD: equalizacao-fix | 2026-08-31 -->
+<!-- BUILD: equalizacao-legacy-fix | 2026-08-31 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1163,7 +1163,7 @@
   </div>
 
   <script type="module">
-    import { aplicarAcertosNaPosicao, calcularTransferenciaEntreSocios, numeroFinanceiro } from "./equalizacao.mjs";
+    import { aplicarAcertosNaPosicao, calcularTransferenciaEntreSocios, numeroFinanceiro, resolverSocioIdPorNomeUnico } from "./equalizacao.mjs";
 
     // Firebase imports
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js");
@@ -1182,7 +1182,7 @@
 
     // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
     console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
-    console.log("%c🔨 BUILD: 2026-08-31 | equalizacao-fix", "color: #22c55e; font-weight: bold; font-size: 16px;");
+    console.log("%c🔨 BUILD: 2026-08-31 | equalizacao-legacy-fix", "color: #22c55e; font-weight: bold; font-size: 16px;");
     console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
     console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
     console.log("%c✓ FIXED: acertos assinados, pagador real e leituras seguras", "color: #10b981;");
@@ -2415,7 +2415,7 @@
               pagoPorFirestoreId = rawPagador;
             }
             if (!pagoPorFirestoreId && rawPagador) {
-              pagoPorFirestoreId = resolveSocioFirestoreId(rawPagador);
+              pagoPorFirestoreId = resolveSocioFirestoreIdNaObra(rawPagador, obra);
             }
 
             const pagoPorCanonical = resolvePagoPor(l, obra);
@@ -2740,7 +2740,11 @@
       if (socioStatePorId) return socioStatePorId.id;
 
       const socioStatePorNome = sociosState.find(s => String(s.nome).toLowerCase() === v.toLowerCase());
-      return socioStatePorNome ? socioStatePorNome.id : null;
+      if (socioStatePorNome) return socioStatePorNome.id;
+
+      // Compatibilidade com a base migrada, que salvou apenas "Victor" ou
+      // "Gustavo". O apelido só é aceito quando identifica um único sócio.
+      return resolverSocioIdPorNomeUnico(v, sociosState);
     }
 
     function getObraSocioFirestoreId(obra, campo) {
@@ -2760,6 +2764,15 @@
       const mapeado = resolveSocioFirestoreId(normalized);
 
       if (mapeado && (mapeado === socioAId || mapeado === socioBId)) return mapeado;
+
+      // Nomes abreviados legados devem ser únicos apenas entre os sócios da obra.
+      // Assim, um homônimo cadastrado em outra obra não invalida o lançamento.
+      const mapeadoNaObra = resolverSocioIdPorNomeUnico(
+        normalized,
+        state?.socios || [],
+        [socioAId, socioBId]
+      );
+      if (mapeadoNaObra) return mapeadoNaObra;
 
       // Compatibilidade com registros antigos que salvaram apenas A/B.
       const letra = String(normalized).toUpperCase();
@@ -10021,7 +10034,7 @@
   </script>
 
   <footer id="build-footer" class="text-center text-xs text-slate-400 py-4">
-    Build equalizacao-fix | 2026-08-31
+    Build equalizacao-legacy-fix | 2026-08-31
   </footer>
 </body>
 </html>
