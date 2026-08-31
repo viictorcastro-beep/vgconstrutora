@@ -3714,7 +3714,7 @@
           pos.acertosPago,
           pos.acertosRecebido
         );
-        pos.totalConsolidado = pos.posicaoLiquida + pos.contasReceber;
+        pos.totalConsolidado = arredondarMoeda(pos.posicaoLiquida + pos.contasReceber);
 
         console.log(`  ${pos.nome}:`);
         console.log(`    - Recebido (Caixa): R$ ${pos.detalheCaixa.recebidoFisico.toFixed(2)}`);
