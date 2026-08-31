@@ -1,4 +1,4 @@
-<!-- BUILD: auto | 2026-02-20 -->
+<!-- BUILD: equalizacao-fix | 2026-08-31 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1163,6 +1163,8 @@
   </div>
 
   <script type="module">
+    import { aplicarAcertosNaPosicao, calcularTransferenciaEntreSocios, numeroFinanceiro } from "./equalizacao.mjs";
+
     // Firebase imports
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js");
     const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js");
@@ -1180,10 +1182,10 @@
 
     // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
     console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
-    console.log("%c🔨 BUILD: 2026-02-20 | enterprise-audit", "color: #22c55e; font-weight: bold; font-size: 16px;");
+    console.log("%c🔨 BUILD: 2026-08-31 | equalizacao-fix", "color: #22c55e; font-weight: bold; font-size: 16px;");
     console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
     console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
-    console.log("%c✓ FIXED: acertos automáticos com netting", "color: #10b981;");
+    console.log("%c✓ FIXED: acertos assinados, pagador real e leituras seguras", "color: #10b981;");
     console.log("%c✓ FIXED: vendors via CDN (sem 404s)", "color: #10b981;");
     console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
 
@@ -1363,6 +1365,7 @@
       recebimentos: [],
       acertos: [],
       contasReceber: [],  // Nova: Contas a Receber (vendas confirmadas não recebidas)
+      collectionErrors: {},
       config: {
         socios: []  // Inicializar como array vazio
       },
@@ -1751,7 +1754,9 @@
         try {
           showToast('⏳ Calculando equalização global...', 'info');
           const resultado = await calcularEqualizacaoGlobal();
-          if (resultado?.modoA?.transferencia && resultado.modoA.transferencia.valor >= 0.01) {
+          if (resultado?.incompleto) {
+            showToast('⚠️ Cálculo incompleto. Corrija os avisos antes de criar um acerto.', 'warning');
+          } else if (resultado?.modoA?.transferencia && resultado.modoA.transferencia.valor >= 0.01) {
             const t = resultado.modoA.transferencia;
             showToast(`${t.deNome} deve transferir R$ ${t.valor.toFixed(2)} para ${t.paraNome}`, 'info');
           } else {
@@ -2196,50 +2201,42 @@
         }, 100);
       };
 
-      obraListeners.push(onSnapshot(r.unidadesCol, (snap) => {
-        state.unidades = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
+      state.collectionErrors = {};
+      const subscribeList = (ref, stateKey, label, { markReady = false } = {}) => {
+        obraListeners.push(onSnapshot(ref, (snap) => {
+          state[stateKey] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          delete state.collectionErrors[stateKey];
+          if (markReady) state.ready.obra = true;
+          scheduleRerender();
+        }, (err) => {
+          state[stateKey] = [];
+          state.collectionErrors[stateKey] = `${label}: ${err?.code || err?.message || "erro de leitura"}`;
+          console.error(`❌ Erro ao carregar ${label}:`, err);
+          scheduleRerender();
+        }));
+      };
 
-      obraListeners.push(onSnapshot(r.categoriasCol, (snap) => {
-        state.categorias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
-
-      obraListeners.push(onSnapshot(r.deducoesCol, (snap) => {
-        state.deducoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
-
-      obraListeners.push(onSnapshot(r.lancamentosCol, (snap) => {
-        state.lancamentos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        state.ready.obra = true;
-        scheduleRerender();
-      }));
-
-      obraListeners.push(onSnapshot(r.rateiosCol, (snap) => {
-        state.rateios = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
-
-      obraListeners.push(onSnapshot(r.recebimentosCol, (snap) => {
-        state.recebimentos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
-
-      obraListeners.push(onSnapshot(r.acertosCol, (snap) => {
-        state.acertos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
-
-      // 📊 Contas a Receber subscriber
-      obraListeners.push(onSnapshot(r.contasReceberCol, (snap) => {
-        state.contasReceber = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        scheduleRerender();
-      }));
+      subscribeList(r.unidadesCol, "unidades", "unidades");
+      subscribeList(r.categoriasCol, "categorias", "categorias");
+      subscribeList(r.deducoesCol, "deducoes", "deduções");
+      subscribeList(r.lancamentosCol, "lancamentos", "lançamentos", { markReady: true });
+      subscribeList(r.rateiosCol, "rateios", "rateios");
+      subscribeList(r.recebimentosCol, "recebimentos", "recebimentos");
+      subscribeList(r.acertosCol, "acertos", "acertos");
+      subscribeList(r.contasReceberCol, "contasReceber", "contas a receber");
 
       obraListeners.push(onSnapshot(r.configDoc, (snap) => {
-        state.config = snap.exists() ? snap.data() : {};
+        const sociosMapeados = Array.isArray(state.config?.socios) ? state.config.socios : [];
+        state.config = {
+          ...(snap.exists() ? snap.data() : {}),
+          socios: sociosMapeados
+        };
+        garantirSociosMapeados();
+        atualizarTodosSelectsDeSocio();
+        scheduleRerender();
+      }, (err) => {
+        state.collectionErrors.config = `configuração: ${err?.code || err?.message || "erro de leitura"}`;
+        console.error("❌ Erro ao carregar configuração:", err);
         scheduleRerender();
       }));
 
@@ -2383,7 +2380,7 @@
         </div>
       `;
 
-      const posicoes = await calcularPosicaoGlobalConsolidada();
+      const { posicoes } = await calcularPosicaoGlobalConsolidada();
       const pagosPorObra = {};
       Object.values(posicoes).forEach(pos => {
         (pos.detalhesObras || []).forEach(d => {
@@ -2745,6 +2742,31 @@
       const socioStatePorNome = sociosState.find(s => String(s.nome).toLowerCase() === v.toLowerCase());
       return socioStatePorNome ? socioStatePorNome.id : null;
     }
+
+    function getObraSocioFirestoreId(obra, campo) {
+      const valor = obra?.[campo];
+      if (!valor) return null;
+      return resolveSocioFirestoreId(valor)
+        || (state.socios.some(s => String(s.id) === String(valor)) ? String(valor) : null);
+    }
+
+    function resolveSocioFirestoreIdNaObra(valor, obra) {
+      if (!valor) return null;
+      if (String(valor).toUpperCase() === "AMBOS") return "AMBOS";
+
+      const socioAId = getObraSocioFirestoreId(obra, "socioAId");
+      const socioBId = getObraSocioFirestoreId(obra, "socioBId");
+      const normalized = normalizarSocioValor(valor, obra);
+      const mapeado = resolveSocioFirestoreId(normalized);
+
+      if (mapeado && (mapeado === socioAId || mapeado === socioBId)) return mapeado;
+
+      // Compatibilidade com registros antigos que salvaram apenas A/B.
+      const letra = String(normalized).toUpperCase();
+      if (letra === "A") return socioAId;
+      if (letra === "B") return socioBId;
+      return null;
+    }
     
     // Infere alocações de um recebimento (rateio 50/50 ou custom)
     function inferirAlocacoesRecebimento(recebimento, obra) {
@@ -2866,9 +2888,17 @@
      * Resolve quem pagou o lançamento com robustez
      * Tenta múltiplos campos e fallback para socioAId da obra
      */
+    function resolvePagoPorFirestoreId(lanc, obra) {
+      const valor = lanc.pagadorId ?? lanc.pagador ?? lanc.pagoPor ?? lanc.socioPagou ?? lanc.pagoPorId ?? lanc.quemPagou ?? null;
+      return resolveSocioFirestoreIdNaObra(valor, obra);
+    }
+
     function resolvePagoPor(lanc, obra) {
-      const valor = lanc.pagoPor ?? lanc.pagador ?? lanc.socioPagou ?? lanc.pagoPorId ?? lanc.quemPagou ?? obra?.socioAId ?? 'A';
-      return resolveSocioCanonicalId(valor);
+      const pagadorId = resolvePagoPorFirestoreId(lanc, obra);
+      if (pagadorId === "AMBOS") return "AMBOS";
+      if (pagadorId && pagadorId === getObraSocioFirestoreId(obra, "socioAId")) return "A";
+      if (pagadorId && pagadorId === getObraSocioFirestoreId(obra, "socioBId")) return "B";
+      return null;
     }
 
     // Garante que state.config.socios está válido antes de renderizar
@@ -3053,6 +3083,20 @@
       
       // 🔥 CRÍTICO: Garantir que os sócios estão mapeados antes de processar!
       garantirSociosMapeados();
+      const avisos = [];
+
+      const carregarColecao = async (ref, label, { obrigatoria = false } = {}) => {
+        try {
+          const snap = await getDocs(ref);
+          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (err) {
+          const aviso = `${label}: ${err?.code || err?.message || "erro de leitura"}`;
+          avisos.push(aviso);
+          console.error(`❌ ${aviso}`, err);
+          if (obrigatoria) throw err;
+          return [];
+        }
+      };
       
       const posicoes = {};
 
@@ -3091,11 +3135,13 @@
         console.log(`\n  📊 Processando obra: ${obra.nome} (ID: ${obraId})`);
         console.log(`     socioAId: "${obra.socioAId}", socioBId: "${obra.socioBId}"`);
         console.log(`     posicoes keys: [${Object.keys(posicoes).join(', ')}]`);
-        const socioAFirestoreId = resolveSocioFirestoreId(obra.socioAId);
-        const socioBFirestoreId = resolveSocioFirestoreId(obra.socioBId);
-        const fallbackSocios = (state.socios || []).map(s => s.id).filter(Boolean);
-        const socioAAllocId = socioAFirestoreId || fallbackSocios[0] || null;
-        const socioBAllocId = socioBFirestoreId || (fallbackSocios.find(id => id !== socioAAllocId) || null);
+        const socioAFirestoreId = getObraSocioFirestoreId(obra, "socioAId");
+        const socioBFirestoreId = getObraSocioFirestoreId(obra, "socioBId");
+        const socioAAllocId = socioAFirestoreId;
+        const socioBAllocId = socioBFirestoreId;
+        if (!socioAAllocId || !socioBAllocId) {
+          avisos.push(`Sócios não identificados na obra ${obra.nome || obraId}`);
+        }
         console.log(`     socioAId (firestore): "${socioAFirestoreId}" | socioBId (firestore): "${socioBFirestoreId}"`);
         console.log(`     socioA (alloc): "${socioAAllocId}" | socioB (alloc): "${socioBAllocId}"`);
         console.log(`     Obra tem socioAId em posicoes? ${!!posicoes[socioAFirestoreId]}`);
@@ -3123,14 +3169,23 @@
 
         try {
           // Carregar dados da obra
-          const unidadesSnap = await getDocs(collection(db, "obras", obraId, "unidades"));
-          const unidades = unidadesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          
-          const lancamentosSnap = await getDocs(collection(db, "obras", obraId, "lancamentos"));
-          const lancamentos = lancamentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          
-          const recebimentosSnap = await getDocs(collection(db, "obras", obraId, "recebimentos"));
-          const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const unidades = await carregarColecao(
+            collection(db, "obras", obraId, "unidades"),
+            `Unidades de ${obra.nome || obraId}`
+          );
+          const lancamentos = await carregarColecao(
+            collection(db, "obras", obraId, "lancamentos"),
+            `Lançamentos de ${obra.nome || obraId}`,
+            { obrigatoria: true }
+          );
+          const recebimentos = await carregarColecao(
+            collection(db, "obras", obraId, "recebimentos"),
+            `Recebimentos de ${obra.nome || obraId}`
+          );
+          const rateios = await carregarColecao(
+            collection(db, "obras", obraId, "rateios"),
+            `Rateios de ${obra.nome || obraId}`
+          );
 
           // 0️⃣ PROCESSAR INVESTIMENTOS DA OBRA (CRÍTICO!)
           const invA = Number(obra.investimentoA || 0);
@@ -3176,7 +3231,7 @@
           // 1️⃣ PROCESSAR LANÇAMENTOS (CUSTOS)
           console.log(`     💳 ${lancamentos.length} lançamentos encontrados`);
           lancamentos.forEach(l => {
-            const valor = l.valor || 0;
+            const valor = numeroFinanceiro(l.valor);
             
             // 🔥 CORREÇÃO CRÍTICA: pago = true por padrão, a menos que seja explicitamente false
             const pago = (l.pago !== false);
@@ -3188,23 +3243,22 @@
             
             console.log(`       💳 Lançamento R$ ${valor.toFixed(2)} (pago: ${l.pago ?? 'undefined->true'})`);
             
-            const percentA = l.victorPercent || l.percentualA || 50;
-            const percentB = l.gustavoPercent || l.percentualB || 50;
+            const percentA = numeroFinanceiro(l.victorPercent ?? l.percentualA ?? 50);
+            const percentB = numeroFinanceiro(l.gustavoPercent ?? l.percentualB ?? 50);
             
             const valorA = (percentA / 100) * valor;
             const valorB = (percentB / 100) * valor;
             
             // 💵 CAIXA: Quem pagou fisicamente
-            const pagoPorCanonical = resolvePagoPor(l, obra);
-            const pagoPorFirestoreId = (state?.config?.socios || []).find(s => s.id === pagoPorCanonical)?.firestoreId;
+            const pagoPorFirestoreId = resolvePagoPorFirestoreId(l, obra);
             
             if (pagoPorFirestoreId && posicoes[pagoPorFirestoreId]) {
               posicoes[pagoPorFirestoreId].detalheCaixa.pagoFisico += valor;
               posicoes[pagoPorFirestoreId].detalheCaixaSemAcerto.pagoFisico += valor;
               addDetalheObra(pagoPorFirestoreId, 'pagoFisicoSemAcerto', valor);
               addDetalheObra(pagoPorFirestoreId, 'pagoFisico', valor);
-            } else {
-              // Fallback: dividir 50/50 se não souber quem pagou
+            } else if (pagoPorFirestoreId === "AMBOS") {
+              // Dividir somente quando o lançamento disser explicitamente AMBOS.
               if (socioAAllocId && posicoes[socioAAllocId]) {
                 posicoes[socioAAllocId].detalheCaixa.pagoFisico += valorA;
                 posicoes[socioAAllocId].detalheCaixaSemAcerto.pagoFisico += valorA;
@@ -3217,6 +3271,10 @@
                 addDetalheObra(socioBAllocId, 'pagoFisicoSemAcerto', valorB);
                 addDetalheObra(socioBAllocId, 'pagoFisico', valorB);
               }
+            } else {
+              avisos.push(
+                `Pagador não identificado no lançamento ${l.id || "sem ID"} de ${obra.nome || obraId}`
+              );
             }
             
             // 📋 COMPETÊNCIA: Custo alocado por percentual
@@ -3236,20 +3294,69 @@
           });
           console.log(`     ✅ Lançamentos processados`);
 
+          // Rateios legados não possuem pagador. Sem essa informação, o custo
+          // fica neutro (50/50); quando o pagador existe, ele afeta o caixa.
+          rateios.forEach(r => {
+            const totalRateio = Array.isArray(r.distribuicao)
+              ? r.distribuicao.reduce((soma, item) => soma + numeroFinanceiro(item.valor), 0)
+              : numeroFinanceiro(r.valorTotal);
+            if (!totalRateio) return;
+
+            const metade = totalRateio / 2;
+            const temPagadorExplicito = [r.pagadorId, r.pagador, r.pagoPor, r.socioPagou, r.pagoPorId, r.quemPagou]
+              .some(valor => valor != null && String(valor).trim() !== "");
+            const pagadorId = resolvePagoPorFirestoreId(r, obra);
+            if (temPagadorExplicito && !pagadorId) {
+              avisos.push(`Pagador inválido no rateio ${r.id || "sem ID"} de ${obra.nome || obraId}`);
+            }
+            if (pagadorId && pagadorId !== "AMBOS" && posicoes[pagadorId]) {
+              posicoes[pagadorId].detalheCaixa.pagoFisico += totalRateio;
+              posicoes[pagadorId].detalheCaixaSemAcerto.pagoFisico += totalRateio;
+              addDetalheObra(pagadorId, 'pagoFisicoSemAcerto', totalRateio);
+              addDetalheObra(pagadorId, 'pagoFisico', totalRateio);
+            } else {
+              [socioAAllocId, socioBAllocId].forEach(socioId => {
+                if (!socioId || !posicoes[socioId]) return;
+                posicoes[socioId].detalheCaixa.pagoFisico += metade;
+                posicoes[socioId].detalheCaixaSemAcerto.pagoFisico += metade;
+                addDetalheObra(socioId, 'pagoFisicoSemAcerto', metade);
+                addDetalheObra(socioId, 'pagoFisico', metade);
+              });
+            }
+
+            [socioAAllocId, socioBAllocId].forEach(socioId => {
+              if (!socioId || !posicoes[socioId]) return;
+              posicoes[socioId].detalheDireito.custoPorAlocacao += metade;
+              addDetalheObra(socioId, 'custoPorAlocacao', metade);
+            });
+          });
+
           // 2️⃣ PROCESSAR RECEBIMENTOS
           console.log(`     💰 ${recebimentos.length} recebimentos encontrados`);
           recebimentos.forEach(rec => {
-            const valor = rec.valor || 0;
+            const valor = numeroFinanceiro(rec.valor);
             
             // 💵 CAIXA: Quem recebeu fisicamente
-            const recebidoPorRaw = rec.recebidoPor === "AMBOS" ? "AMBOS" : (resolveSocioCanonicalId(rec.recebidoPor) || rec.recebidoPor);
-            const recebidoPorFirestoreId = resolveSocioFirestoreId(recebidoPorRaw);
+            const recebidoPorFirestoreId = resolveSocioFirestoreIdNaObra(rec.recebidoPor, obra);
             
             if (recebidoPorFirestoreId && posicoes[recebidoPorFirestoreId]) {
               posicoes[recebidoPorFirestoreId].detalheCaixa.recebidoFisico += valor;
               posicoes[recebidoPorFirestoreId].detalheCaixaSemAcerto.recebidoFisico += valor;
               addDetalheObra(recebidoPorFirestoreId, 'recebidoFisicoSemAcerto', valor);
               addDetalheObra(recebidoPorFirestoreId, 'recebidoFisico', valor);
+            } else if (recebidoPorFirestoreId === "AMBOS") {
+              const metade = valor / 2;
+              [socioAAllocId, socioBAllocId].forEach(socioId => {
+                if (!socioId || !posicoes[socioId]) return;
+                posicoes[socioId].detalheCaixa.recebidoFisico += metade;
+                posicoes[socioId].detalheCaixaSemAcerto.recebidoFisico += metade;
+                addDetalheObra(socioId, 'recebidoFisicoSemAcerto', metade);
+                addDetalheObra(socioId, 'recebidoFisico', metade);
+              });
+            } else {
+              avisos.push(
+                `Recebedor não identificado no recebimento ${rec.id || "sem ID"} de ${obra.nome || obraId}`
+              );
             }
             
             // 📋 DIREITO: Alocações 50/50 ou percentual customizado
@@ -3257,7 +3364,7 @@
             alocacoes.forEach(aloc => {
               const canonicalId = resolveSocioCanonicalId(aloc.socioId);
               if (canonicalId) {
-                const socioFirestoreId = resolveSocioFirestoreId(canonicalId);
+                const socioFirestoreId = resolveSocioFirestoreIdNaObra(canonicalId, obra);
                 if (socioFirestoreId && posicoes[socioFirestoreId]) {
                   posicoes[socioFirestoreId].detalheDireito.receitaPorAlocacao += aloc.valor;
                   addDetalheObra(socioFirestoreId, 'receitaPorAlocacao', aloc.valor);
@@ -3267,20 +3374,25 @@
           });
 
           // 2.5️⃣ PROCESSAR ACERTOS (transferências entre sócios)
-          const acertosSnap = await getDocs(collection(db, "obras", obraId, "acertos"));
-          acertosSnap.forEach(doc => {
-            const a = doc.data();
+          const acertos = await carregarColecao(
+            collection(db, "obras", obraId, "acertos"),
+            `Acertos de ${obra.nome || obraId}`
+          );
+          acertos.forEach(a => {
             const valorRaw = a.valor;
-            const valor = typeof valorRaw === 'string'
-              ? Number(valorRaw.replace(/\./g, '').replace(',', '.'))
-              : Number(valorRaw || 0);
+            const valor = numeroFinanceiro(valorRaw);
             if (!valor) return;
 
             const shouldConsider = a.considerarNaEqualizacao === true;
             if (!shouldConsider) return;
 
-            const deId = resolveSocioFirestoreId(a.de) || resolveSocioFirestoreId(normalizarSocioValor(a.de, obra));
-            const paraId = resolveSocioFirestoreId(a.para) || resolveSocioFirestoreId(normalizarSocioValor(a.para, obra));
+            const deId = resolveSocioFirestoreIdNaObra(a.de, obra);
+            const paraId = resolveSocioFirestoreIdNaObra(a.para, obra);
+
+            if (!deId || !paraId || deId === paraId) {
+              avisos.push(`Sócios inválidos no acerto ${a.id || "sem ID"} de ${obra.nome || obraId}`);
+              return;
+            }
 
             if (deId && posicoes[deId]) {
               posicoes[deId].acertosPago += valor;
@@ -3293,18 +3405,20 @@
           });
 
           // 3️⃣ CONTAS A RECEBER (opcional, para modo estratégico)
-          const crSnap = await getDocs(collection(db, "obras", obraId, "contasReceber"));
-          crSnap.forEach(doc => {
-            const cr = doc.data();
+          const contasReceber = await carregarColecao(
+            collection(db, "obras", obraId, "contasReceber"),
+            `Contas a receber de ${obra.nome || obraId}`
+          );
+          contasReceber.forEach(cr => {
             if (cr.status !== 'recebido') {
-              const valor = cr.valor || 0;
+              const valor = numeroFinanceiro(cr.valor);
               const alocacoes = cr.alocacoes || [];
               
               if (alocacoes.length > 0) {
                 alocacoes.forEach(aloc => {
                   const canonicalId = resolveSocioCanonicalId(aloc.socioId);
                   if (canonicalId) {
-                    const socioFirestoreId = resolveSocioFirestoreId(canonicalId);
+                    const socioFirestoreId = resolveSocioFirestoreIdNaObra(canonicalId, obra);
                     if (socioFirestoreId && posicoes[socioFirestoreId]) {
                       posicoes[socioFirestoreId].contasReceber += aloc.valor;
                       addDetalheObra(socioFirestoreId, 'contasReceber', aloc.valor);
@@ -3344,7 +3458,12 @@
           Object.entries(detalhesObra).forEach(([socioId, d]) => {
             const excessoRecebe = d.recebidoFisicoSemAcerto - d.receitaPorAlocacao;
             const excessoPaga = d.pagoFisicoSemAcerto - d.custoPorAlocacao;
-            const posicaoLiquida = excessoPaga - excessoRecebe;
+            const posicaoLiquidaBruta = excessoPaga - excessoRecebe;
+            const posicaoLiquida = aplicarAcertosNaPosicao(
+              posicaoLiquidaBruta,
+              d.acertosPago,
+              d.acertosRecebido
+            );
             if (posicoes[socioId]) {
               posicoes[socioId].detalhesObras.push({
                 obraId,
@@ -3356,8 +3475,11 @@
                 receitaPorAlocacao: d.receitaPorAlocacao,
                 custoPorAlocacao: d.custoPorAlocacao,
                 contasReceber: d.contasReceber,
+                acertosPago: d.acertosPago,
+                acertosRecebido: d.acertosRecebido,
                 excessoRecebe,
                 excessoPaga,
+                posicaoLiquidaBruta,
                 posicaoLiquida
               });
             }
@@ -3376,7 +3498,12 @@
         pos.direitoPorCompetencia = pos.detalheDireito.receitaPorAlocacao - pos.detalheDireito.custoPorAlocacao;
         const excessoRecebe = pos.detalheCaixaSemAcerto.recebidoFisico - pos.detalheDireito.receitaPorAlocacao;
         const excessoPaga = pos.detalheCaixaSemAcerto.pagoFisico - pos.detalheDireito.custoPorAlocacao;
-        pos.posicaoLiquida = excessoPaga - excessoRecebe;
+        pos.posicaoLiquidaBruta = excessoPaga - excessoRecebe;
+        pos.posicaoLiquida = aplicarAcertosNaPosicao(
+          pos.posicaoLiquidaBruta,
+          pos.acertosPago,
+          pos.acertosRecebido
+        );
         pos.totalConsolidado = pos.posicaoLiquida + pos.contasReceber;
 
         console.log(`  ${pos.nome}:`);
@@ -3393,7 +3520,7 @@
       // 🔍 LOG DE VALIDAÇÃO (remover depois)
       console.log('\n[EQG] posicoes completas:', JSON.stringify(posicoes, null, 2));
 
-      return posicoes;
+      return { posicoes, avisos: [...new Set(avisos)] };
     }
 
     /**
@@ -3401,13 +3528,15 @@
     * Retorna o modo A (Caixa): Equalizar apenas posição de caixa físico (curto prazo)
      */
     async function calcularEqualizacaoGlobal() {
-      const posicoes = await calcularPosicaoGlobalConsolidada();
+      const { posicoes, avisos } = await calcularPosicaoGlobalConsolidada();
       const socioIds = Object.keys(posicoes);
 
       if (socioIds.length !== 2) {
         return {
           erro: 'Sistema suporta apenas 2 sócios no momento',
-          posicoes
+          posicoes,
+          avisos,
+          incompleto: true
         };
       }
 
@@ -3427,45 +3556,23 @@
         tipo: 'Netting (Pago vs Deveria / Recebido vs Direito)',
         descricao: 'Equalização por posição líquida (50/50 real)',
         saldoIdeal: 0,
-        transferencia: null
+        transferencia: calcularTransferenciaEntreSocios([
+          { id: socioA, nome: posA.nome, saldo: posicaoLiquidaA },
+          { id: socioB, nome: posB.nome, saldo: posicaoLiquidaB }
+        ])
       };
 
-      if (Math.abs(posicaoLiquidaA) > 0.01) {
-        if (posicaoLiquidaA > 0) {
-          // A tem a receber, B paga
-          modoA.transferencia = {
-            de: socioB,
-            deNome: posB.nome,
-            para: socioA,
-            paraNome: posA.nome,
-            valor: Math.abs(posicaoLiquidaA)
-          };
-          console.log(`  ✅ Acerto: ${posB.nome} → ${posA.nome} = R$ ${Math.abs(posicaoLiquidaA).toFixed(2)}`);
-        } else {
-          // A tem a pagar, B recebe
-          modoA.transferencia = {
-            de: socioA,
-            deNome: posA.nome,
-            para: socioB,
-            paraNome: posB.nome,
-            valor: Math.abs(posicaoLiquidaA)
-          };
-          console.log(`  ✅ Acerto: ${posA.nome} → ${posB.nome} = R$ ${Math.abs(posicaoLiquidaA).toFixed(2)}`);
-        }
-      }
-
       if (modoA.transferencia) {
-        const dePos = posicoes[modoA.transferencia.de];
-        const paraPos = posicoes[modoA.transferencia.para];
-        // Abatimento = pagamentos já feitos pelo devedor + contra-créditos recebidos
-        const abatimento = (dePos?.acertosPago || 0) + (dePos?.acertosRecebido || 0);
-        const valorAjustado = Math.max(0, (modoA.transferencia.valor || 0) - abatimento);
-        modoA.transferencia.valor = valorAjustado;
+        console.log(
+          `  ✅ Acerto: ${modoA.transferencia.deNome} → ${modoA.transferencia.paraNome} = R$ ${modoA.transferencia.valor.toFixed(2)}`
+        );
       }
 
       return {
         posicoes,
-        modoA
+        modoA,
+        avisos,
+        incompleto: avisos.length > 0
       };
     }
 
@@ -4222,13 +4329,22 @@
         return;
       }
       
-      const { posicoes, modoA, modoB, diferenca } = resultado;
+      const { posicoes, modoA, modoB, diferenca, avisos = [], incompleto = false } = resultado;
       
       // Converter posicoes object para array
       const posArray = Object.values(posicoes);
       const formatCurrency = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
       const formatSigned = (v) => `${v >= 0 ? '+' : '-'}R$ ${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
       const transferencia = modoA?.transferencia || null;
+      const resumoAvisos = incompleto ? `
+        <div class="bg-amber-50 border-2 border-amber-400 rounded-lg p-4 mb-6">
+          <div class="font-black text-amber-900 mb-2">⚠️ Resultado incompleto</div>
+          <p class="text-sm text-amber-800 mb-2">Os lançamentos disponíveis foram processados, mas existem dados que não puderam ser lidos. Não registre um acerto com base neste resultado até resolver os avisos.</p>
+          <ul class="list-disc list-inside text-xs text-amber-800 space-y-1">
+            ${[...new Set(avisos)].map(aviso => `<li>${escapeHtml(aviso)}</li>`).join("")}
+          </ul>
+        </div>
+      ` : '';
       const detalhesAcerto = transferencia ? (posicoes[transferencia.para]?.detalhesObras || []) : [];
       const detalhesFiltrados = detalhesAcerto.filter(d => Math.abs(d.posicaoLiquida) > 0.01);
       const resumoModoB = modoB?.transferencia ? `
@@ -4261,6 +4377,7 @@
       };
       
       let html = `
+        ${resumoAvisos}
         ${resumoModoB}
         <!-- Resumo de Posições Consolidadas -->
         <div class="bg-white rounded-lg border-2 border-purple-400 p-6 mb-6">
@@ -4328,7 +4445,7 @@
           </div>
         </div>
 
-        ${transferencia && detalhesFiltrados.length ? `
+        ${!incompleto && transferencia && detalhesFiltrados.length ? `
           <div class="bg-white rounded-lg border-2 border-orange-400 p-6 mb-6">
             <h3 class="font-black text-xl mb-2 text-orange-900">🧩 Detalhamento do Acerto</h3>
             <p class="text-sm text-gray-600 mb-4">
@@ -4360,11 +4477,9 @@
                   ${(Math.abs(d.acertosPago || 0) > 0.01 || Math.abs(d.acertosRecebido || 0) > 0.01) ? `
                     <div class="mt-2 text-sm text-gray-700">
                       <div>
-                        Acerto pendente (obra):
+                        Acertos já considerados nesta obra:
                         <span class="font-bold text-indigo-700">
-                          ${d.acertosPago > 0
-                            ? `${transferencia.paraNome} paga ${transferencia.deNome} R$ ${formatCurrency(d.acertosPago)}`
-                            : `${transferencia.deNome} paga ${transferencia.paraNome} R$ ${formatCurrency(d.acertosRecebido)}`}
+                          pagos R$ ${formatCurrency(d.acertosPago || 0)} · recebidos R$ ${formatCurrency(d.acertosRecebido || 0)}
                         </span>
                       </div>
                     </div>
@@ -4389,7 +4504,13 @@
             <span class="badge bg-green-100 text-green-800 text-lg px-4 py-2">Curto Prazo</span>
           </div>
           
-          ${modoA.transferencia ? `
+          ${incompleto ? `
+            <div class="bg-amber-50 border border-amber-400 rounded-lg p-6 text-center">
+              <div class="text-4xl mb-3">⚠️</div>
+              <div class="font-bold text-amber-900 text-xl">Cálculo incompleto</div>
+              <p class="text-amber-800 mt-2">Não foi possível confirmar um valor de transferência com segurança.</p>
+            </div>
+          ` : modoA.transferencia ? `
             <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-500 rounded-lg p-6">
               <div class="flex items-center justify-between mb-4">
                 <div class="text-2xl font-black text-gray-800">
@@ -6491,6 +6612,23 @@
         return;
       }
 
+      const errosRelevantes = ["unidades", "lancamentos", "recebimentos", "acertos", "rateios"]
+        .map(key => state.collectionErrors[key])
+        .filter(Boolean);
+      const avisos = [...new Set([...errosRelevantes, ...(eq.avisos || [])])];
+      if (avisos.length > 0) {
+        $("equalizacao-section").innerHTML = `
+          <div class="bg-amber-50 border-2 border-amber-400 rounded-lg p-5">
+            <div class="font-black text-amber-900 mb-2">⚠️ Equalização temporariamente incompleta</div>
+            <p class="text-sm text-amber-800 mb-3">Alguns dados necessários não puderam ser lidos com segurança. O sistema não exibirá saldo zero enquanto o cálculo estiver incompleto.</p>
+            <ul class="list-disc list-inside text-xs text-amber-800 space-y-1">
+              ${avisos.map(aviso => `<li>${escapeHtml(aviso)}</li>`).join("")}
+            </ul>
+          </div>
+        `;
+        return;
+      }
+
       // Verificar permissões: sócio vê apenas seus próprios dados
       const meuSocioId = getSocioIdForUser(OBRA_ID);
       const somenteMinhaVisao = !isAdmin() && meuSocioId;
@@ -6907,10 +7045,10 @@
               const dataBase = l.dataCompetencia || l.data;
               const obra = state.obras.find(o => o.id === (l.obraId || OBRA_ID)) || null;
               const pagadorRaw = l.pagador ?? l.pagoPor ?? l.pagoPorId ?? l.quemPagou ?? l.socioPagou ?? l.pagadorId ?? null;
-              const pagoPorCanonical = pagadorRaw === "AMBOS" ? "AMBOS" : resolvePagoPor(l, obra);
-              const pagadorLabel = pagoPorCanonical === "AMBOS"
+              const pagadorFirestoreId = resolvePagoPorFirestoreId(l, obra);
+              const pagadorLabel = pagadorFirestoreId === "AMBOS"
                 ? "Ambos (50/50)"
-                : socioNomePorQualquerId(pagoPorCanonical || pagadorRaw) || "-";
+                : socioNomePorQualquerId(pagadorFirestoreId || pagadorRaw) || "-";
               
               return `
                 <tr>
@@ -8479,6 +8617,15 @@
         return;
       }
 
+      const obraLancamento = state.obras.find(o => o.id === obraId);
+      const pagadorId = String(pagador).toUpperCase() === "AMBOS"
+        ? "AMBOS"
+        : resolveSocioFirestoreIdNaObra(pagador, obraLancamento);
+      if (!pagadorId) {
+        showToast('Não foi possível identificar o pagador. Selecione o sócio novamente.', 'error');
+        return;
+      }
+
       if (valor <= 0 || !Number.isFinite(valor)) {
         showToast('Valor deve ser um número positivo', 'error');
         return;
@@ -8558,7 +8705,7 @@
             dataVencimento: vencimento,
             fornecedorId,
             pagador,
-            pagadorId: pagador,
+            pagadorId,
             statusPagamento,
             status: statusPagamento,
             pago: statusPagamento === "pago",
@@ -8586,7 +8733,7 @@
             dataVencimento: vencimento,
             fornecedorId,
             pagador,
-            pagadorId: pagador,
+            pagadorId,
             statusPagamento,
             status: statusPagamento,
             pago: statusPagamento === "pago",
@@ -9035,9 +9182,11 @@
       $("lanc-tipo-custo").value = lanc.tipoCustoId || "";
       $("lanc-fornecedor").value = lanc.fornecedorId || "";
       const pagadorRaw = lanc.pagador ?? lanc.pagoPor ?? lanc.pagoPorId ?? lanc.quemPagou ?? lanc.socioPagou ?? lanc.pagadorId ?? "";
-      $("lanc-pagador").value = String(pagadorRaw).toUpperCase() === "AMBOS"
+      const obraLancamento = state.obras.find(o => o.id === (lanc.obraId || OBRA_ID));
+      const pagadorFirestoreId = resolvePagoPorFirestoreId(lanc, obraLancamento);
+      $("lanc-pagador").value = pagadorFirestoreId === "AMBOS"
         ? "AMBOS"
-        : (resolvePagoPor(lanc, state.obras.find(o => o.id === (lanc.obraId || OBRA_ID))) || pagadorRaw || "");
+        : (resolveSocioCanonicalId(pagadorFirestoreId) || pagadorRaw || "");
       $("lanc-valor").value = lanc.valor ?? "";
       $("lanc-status").value = lanc.statusPagamento || lanc.status || "pendente";
       $("lanc-descricao").value = lanc.descricao || "";
@@ -9124,6 +9273,11 @@
       try {
         showToast('⏳ Calculando equalização global...', 'info');
         const resultado = await calcularEqualizacaoGlobal();
+
+        if (resultado?.incompleto) {
+          showToast('⚠️ Cálculo incompleto. Corrija os avisos antes de criar um acerto.', 'warning');
+          return;
+        }
         
         if (!resultado || !resultado.modoA || !resultado.modoA.transferencia || resultado.modoA.transferencia.valor < 0.01) {
           showToast('✅ Saldos equalizados! Não há acertos pendentes.', 'success');
@@ -9458,6 +9612,7 @@
     function computeEqualizacao() {
       // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
       const obra = state.obras.find(o => o.id === OBRA_ID);
+      const avisos = [];
       const canonicalA = resolveSocioCanonicalId(obra?.socioAId) || "A";
       const canonicalB = resolveSocioCanonicalId(obra?.socioBId) || "B";
       const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
@@ -9483,28 +9638,31 @@
       let temDireitoB = 0; // Quanto B tem direito (baseado no proprietário)
 
       state.recebimentos.forEach(r => {
-        const recebidoPor = resolveCanonical(r.recebidoPor) || "AMBOS";
+        const valor = numeroFinanceiro(r.valor);
+        const recebidoPor = resolveCanonical(r.recebidoPor);
         const unidade = state.unidades.find(u => u.id === r.unidadeId);
         const proprietario = resolveCanonical(unidade?.proprietario) || "AMBOS";
 
         // Quem recebeu fisicamente
         if (recebidoPor === canonicalA) {
-          recebeuFisicamenteA += r.valor;
+          recebeuFisicamenteA += valor;
         } else if (recebidoPor === canonicalB) {
-          recebeuFisicamenteB += r.valor;
+          recebeuFisicamenteB += valor;
+        } else if (recebidoPor === "AMBOS") {
+          recebeuFisicamenteA += valor / 2;
+          recebeuFisicamenteB += valor / 2;
         } else {
-          recebeuFisicamenteA += r.valor / 2;
-          recebeuFisicamenteB += r.valor / 2;
+          avisos.push(`Recebedor não identificado no recebimento ${r.id || "sem ID"}`);
         }
 
         // Quem tem direito (baseado no proprietário da unidade)
         if (proprietario === canonicalA) {
-          temDireitoA += r.valor;
+          temDireitoA += valor;
         } else if (proprietario === canonicalB) {
-          temDireitoB += r.valor;
+          temDireitoB += valor;
         } else {
-          temDireitoA += r.valor / 2;
-          temDireitoB += r.valor / 2;
+          temDireitoA += valor / 2;
+          temDireitoB += valor / 2;
         }
       });
 
@@ -9520,25 +9678,41 @@
       let pagouB = 0;
 
       state.lancamentos.forEach(l => {
-        const pagadorCanon = resolveCanonical(l.pagador || l.pagadorId);
-        if (pagadorCanon === canonicalA) {
-          pagouA += l.valor;
-        } else if (pagadorCanon === canonicalB) {
-          pagouB += l.valor;
+        if (l.pago === false) return;
+        const valor = numeroFinanceiro(l.valor);
+        const pagadorSlot = resolvePagoPor(l, obra);
+        if (pagadorSlot === "A") {
+          pagouA += valor;
+        } else if (pagadorSlot === "B") {
+          pagouB += valor;
+        } else if (pagadorSlot === "AMBOS") {
+          const percentA = numeroFinanceiro(l.victorPercent ?? l.percentualA ?? 50);
+          const percentB = numeroFinanceiro(l.gustavoPercent ?? l.percentualB ?? 50);
+          pagouA += valor * (percentA / 100);
+          pagouB += valor * (percentB / 100);
         } else {
-          pagouA += l.valor / 2;
-          pagouB += l.valor / 2;
+          avisos.push(`Pagador não identificado no lançamento ${l.id || "sem ID"}`);
         }
       });
 
       state.rateios.forEach(r => {
-        const totalRateio = r.distribuicao?.reduce((sum, d) => sum + d.valor, 0) || 0;
-        const pagadorCanon = resolveCanonical(r.pagador || r.pagadorId);
-        if (pagadorCanon === canonicalA) {
+        const totalRateio = r.distribuicao?.reduce((sum, d) => sum + numeroFinanceiro(d.valor), 0) || 0;
+        const temPagadorExplicito = [r.pagadorId, r.pagador, r.pagoPor, r.socioPagou, r.pagoPorId, r.quemPagou]
+          .some(valor => valor != null && String(valor).trim() !== "");
+        const pagadorSlot = resolvePagoPor(r, obra);
+        if (pagadorSlot === "A") {
           pagouA += totalRateio;
-        } else if (pagadorCanon === canonicalB) {
+        } else if (pagadorSlot === "B") {
           pagouB += totalRateio;
+        } else if (pagadorSlot === "AMBOS") {
+          pagouA += totalRateio / 2;
+          pagouB += totalRateio / 2;
         } else {
+          // O formulário legado de rateio não registra pagador. Nesse caso, o
+          // rateio é neutro para a equalização entre os sócios.
+          if (temPagadorExplicito) {
+            avisos.push(`Pagador inválido no rateio ${r.id || "sem ID"}`);
+          }
           pagouA += totalRateio / 2;
           pagouB += totalRateio / 2;
         }
@@ -9565,7 +9739,7 @@
 
       // 5.1 ADICIONAR INVESTIMENTOS INICIAIS
       // Se A investiu mais no início (ex: sinal do terreno), B deve compensar
-      const diferencaInvestimento = investimentoA - investimentoB;
+      const diferencaInvestimento = (numeroFinanceiro(investimentoA) - numeroFinanceiro(investimentoB)) / 2;
       saldoBrutoA += diferencaInvestimento;  // Se A investiu mais, aumenta seu saldo
       saldoBrutoB -= diferencaInvestimento;  // Se A investiu mais, diminui saldo de B
 
@@ -9574,16 +9748,24 @@
       let saldoFinalB = saldoBrutoB;
 
       state.acertos.forEach(a => {
-        const deCanon = resolveCanonical(a.de);
-        const paraCanon = resolveCanonical(a.para);
-        if (deCanon === canonicalA && paraCanon === canonicalB) {
+        if (a.considerarNaEqualizacao !== true) return;
+        const valor = numeroFinanceiro(a.valor);
+        const deId = resolveSocioFirestoreIdNaObra(a.de, obra);
+        const paraId = resolveSocioFirestoreIdNaObra(a.para, obra);
+        const socioAId = getObraSocioFirestoreId(obra, "socioAId");
+        const socioBId = getObraSocioFirestoreId(obra, "socioBId");
+        if (!deId || !paraId || deId === paraId) {
+          avisos.push(`Sócios inválidos no acerto ${a.id || "sem ID"}`);
+          return;
+        }
+        if (deId === socioAId && paraId === socioBId) {
           // A transferiu dinheiro para B
-          saldoFinalA -= a.valor;  // A diminui saldo (deu dinheiro)
-          saldoFinalB += a.valor;  // B aumenta saldo (recebeu dinheiro)
-        } else if (deCanon === canonicalB && paraCanon === canonicalA) {
+          saldoFinalA += valor;
+          saldoFinalB -= valor;
+        } else if (deId === socioBId && paraId === socioAId) {
           // B transferiu dinheiro para A
-          saldoFinalB -= a.valor;
-          saldoFinalA += a.valor;
+          saldoFinalB += valor;
+          saldoFinalA -= valor;
         }
       });
 
@@ -9617,6 +9799,7 @@
         saldoFinalB,
         totalRecebido,
         totalGasto,
+        avisos: [...new Set(avisos)],
         mensagem: getSugestaoEqualizacao(saldoFinalA, saldoFinalB, socioA, socioB)
       };
     }
@@ -9838,7 +10021,7 @@
   </script>
 
   <footer id="build-footer" class="text-center text-xs text-slate-400 py-4">
-    Build enterprise-audit | 2026-02-20
+    Build equalizacao-fix | 2026-08-31
   </footer>
 </body>
 </html>

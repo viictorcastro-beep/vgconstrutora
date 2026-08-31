@@ -10,6 +10,7 @@
     "migrate:normalize:dry": "DRY_RUN=1 node scripts/normalize-lancamentos.mjs",
     "test:custos": "node scripts/test-custos.mjs",
     "test:catalogos": "node scripts/test-catalogos.mjs",
+    "test:equalizacao": "node scripts/test-equalizacao-logic.mjs",
     "start": "node server.mjs",
     "seed:catalogos": "node scripts/seed-catalogos.mjs"
   },

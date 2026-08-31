@@ -5,53 +5,128 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAllowedUser() {
+      return isSignedIn()
+        && request.auth.token.email in [
+          'viictor.castro@gmail.com',
+          'gcm.conceicao@gmail.com'
+        ];
+    }
+
     function isAdmin() {
       return isSignedIn() && request.auth.token.email == 'viictor.castro@gmail.com';
     }
 
+    function isValidLancamento(obraId) {
+      return request.resource.data.obraId == obraId
+        && request.resource.data.etapaId is string
+        && request.resource.data.tipoCustoId is string
+        && (
+          (
+            request.resource.data.escopo == 'GERAL'
+            && (
+              !('unidadeId' in request.resource.data)
+              || request.resource.data.unidadeId == null
+            )
+          )
+          || (
+            request.resource.data.escopo == 'UNIDADE'
+            && request.resource.data.unidadeId is string
+            && exists(/databases/$(database)/documents/obras/$(obraId)/unidades/$(request.resource.data.unidadeId))
+          )
+        );
+    }
+
+    function changesLancamentoClassification() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'obraId',
+        'etapaId',
+        'tipoCustoId',
+        'unidadeId',
+        'escopo'
+      ]);
+    }
+
     match /catalogo_etapas/{etapaId} {
-      allow read: if isSignedIn();
+      allow read: if isAllowedUser();
       allow create, update, delete: if isAdmin();
     }
 
     match /catalogo_tipos_custo/{tipoId} {
-      allow read: if isSignedIn();
+      allow read: if isAllowedUser();
       allow create, update, delete: if isAdmin();
     }
 
     match /fornecedores/{fornId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read: if isAllowedUser();
+      allow create, update: if isAllowedUser();
+      allow delete: if isAdmin();
     }
 
     match /socios/{socioId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read: if isAllowedUser();
+      allow create, update, delete: if isAdmin();
     }
 
     match /obras/{obraId} {
-      allow read: if isSignedIn();
+      allow read: if isAllowedUser();
       allow create, update, delete: if isAdmin();
 
       match /unidades/{unidadeId} {
-        allow read: if isSignedIn();
+        allow read: if isAllowedUser();
         allow create, update, delete: if isAdmin();
       }
 
       match /lancamentos/{lancId} {
-        allow read: if isSignedIn();
-        allow create, update: if isSignedIn()
-          && request.resource.data.obraId == obraId
-          && request.resource.data.etapaId is string
-          && request.resource.data.tipoCustoId is string
-          && get(/databases/$(database)/documents/catalogo_etapas/$(request.resource.data.etapaId)).data.ativo == true
-          && get(/databases/$(database)/documents/catalogo_tipos_custo/$(request.resource.data.tipoCustoId)).data.ativo == true
-          && (
-            !('unidadeId' in request.resource.data) || request.resource.data.unidadeId == null ||
-            exists(/databases/$(database)/documents/obras/$(obraId)/unidades/$(request.resource.data.unidadeId))
-          )
-          && request.resource.data.escopo in ['GERAL','UNIDADE'];
+        allow read: if isAllowedUser();
+        allow create: if isAllowedUser() && isValidLancamento(obraId);
+        allow update: if isAllowedUser()
+          && (!changesLancamentoClassification() || isValidLancamento(obraId));
         allow delete: if isAdmin();
+      }
+
+      match /categorias/{categoriaId} {
+        allow read: if isAllowedUser();
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /fornecedores/{fornecedorId} {
+        allow read: if isAllowedUser();
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /deducoes/{deducaoId} {
+        allow read: if isAllowedUser();
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /rateios/{rateioId} {
+        allow read: if isAllowedUser();
+        allow create, update: if isAllowedUser();
+        allow delete: if isAdmin();
+      }
+
+      match /recebimentos/{recebimentoId} {
+        allow read: if isAllowedUser();
+        allow create, update: if isAllowedUser();
+        allow delete: if isAdmin();
+      }
+
+      match /acertos/{acertoId} {
+        allow read: if isAllowedUser();
+        allow create, update: if isAllowedUser();
+        allow delete: if isAdmin();
+      }
+
+      match /contasReceber/{contaId} {
+        allow read: if isAllowedUser();
+        allow create, update: if isAllowedUser();
+        allow delete: if isAdmin();
+      }
+
+      match /config/{configId} {
+        allow read: if isAllowedUser();
+        allow create, update, delete: if isAdmin();
       }
     }
   }
