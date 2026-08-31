@@ -11,6 +11,8 @@
     "test:custos": "node scripts/test-custos.mjs",
     "test:catalogos": "node scripts/test-catalogos.mjs",
     "test:equalizacao": "node scripts/test-equalizacao-logic.mjs",
+    "test:ui": "node scripts/test-ui-structure.mjs",
+    "test": "node scripts/test-equalizacao-logic.mjs && node scripts/test-ui-structure.mjs",
     "start": "node server.mjs",
     "seed:catalogos": "node scripts/seed-catalogos.mjs"
   },

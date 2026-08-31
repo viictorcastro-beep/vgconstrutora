@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
   aplicarAcertosNaPosicao,
+  arredondarMoeda,
+  calcularCenario50a50,
   calcularTransferenciaEntreSocios,
+  criarAlocacoesRecebimento,
+  distribuirValor,
   MARCO_EQUALIZACAO_ISO,
   numeroFinanceiro,
   registroCriadoDesdeMarco,
-  resolverSocioIdPorNomeUnico
+  resolverPercentuaisSocios,
+  resolverSocioIdPorNomeUnico,
+  valorRateioPago
 } from "../docs/equalizacao.mjs";
 
 const socios = (saldoA, saldoB) => [
@@ -16,6 +22,62 @@ const socios = (saldoA, saldoB) => [
 
 assert.equal(numeroFinanceiro("1.234,56"), 1234.56);
 assert.equal(numeroFinanceiro("1000.50"), 1000.5);
+assert.equal(arredondarMoeda(2072.925), 2072.93);
+assert.deepEqual(distribuirValor(100, [
+  { id: "u1", peso: 1 },
+  { id: "u2", peso: 1 },
+  { id: "u3", peso: 1 }
+]), [
+  { id: "u1", valor: 33.34 },
+  { id: "u2", valor: 33.33 },
+  { id: "u3", valor: 33.33 }
+]);
+assert.deepEqual(criarAlocacoesRecebimento({
+  valor: 15000,
+  socioAId: "gustavo",
+  socioBId: "victor"
+}), [
+  { socioId: "gustavo", valor: 7500 },
+  { socioId: "victor", valor: 7500 }
+]);
+assert.deepEqual(criarAlocacoesRecebimento({
+  valor: 100,
+  socioAId: "gustavo",
+  socioBId: "victor",
+  percentualA: 100,
+  percentualB: 0
+}), [{ socioId: "gustavo", valor: 100 }]);
+assert.deepEqual(criarAlocacoesRecebimento({
+  valor: 100,
+  socioAId: "gustavo",
+  socioBId: "victor",
+  alocacoes: [
+    { socioId: "gustavo", valor: "80,00" },
+    { socioId: "victor", valor: "20,00" }
+  ]
+}), [
+  { socioId: "gustavo", valor: 80 },
+  { socioId: "victor", valor: 20 }
+]);
+assert.deepEqual(criarAlocacoesRecebimento({
+  valor: 100,
+  socioAId: "victor",
+  socioBId: "gustavo",
+  victorPercent: 80,
+  gustavoPercent: 20
+}), [
+  { socioId: "victor", valor: 80 },
+  { socioId: "gustavo", valor: 20 }
+], "Percentuais nominais legados precisam continuar compatíveis.");
+assert.deepEqual(resolverPercentuaisSocios({
+  victorPercent: 80,
+  gustavoPercent: 20,
+  socioANome: "Gustavo Medeiros",
+  socioBNome: "Vítor Castro"
+}), { percentualA: 20, percentualB: 80 }, "Percentuais legados por nome não podem inverter quando os slots mudam.");
+assert.equal(valorRateioPago({ status: "pendente", valorTotal: 1000 }), 0);
+assert.equal(valorRateioPago({ status: "pago", valorTotal: 100, distribuicao: [{ valor: 33.33 }, { valor: 33.33 }, { valor: 33.33 }] }), 100);
+assert.equal(valorRateioPago({ valorTotal: 250 }), 250, "Rateio legado sem status continua compatível.");
 
 assert.equal(
   registroCriadoDesdeMarco({
@@ -74,6 +136,71 @@ assert.equal(transferenciaComprasHoje.de, "gustavo-id");
 assert.equal(transferenciaComprasHoje.para, "victor-id");
 assert.equal(transferenciaComprasHoje.valor, 2427.08);
 
+const cenarioConfirmado = calcularCenario50a50({
+  socioAId: "gustavo",
+  socioBId: "victor",
+  custos: comprasCriadasHoje.map(item => ({ valor: item.valor, pagadorId: "victor", pago: true })),
+  recebimentos: [{ valor: 15000, recebidoPor: "gustavo" }],
+  acertos: [{ valor: 12000, de: "gustavo", para: "victor", considerarNaEqualizacao: true }]
+});
+assert.equal(cenarioConfirmado.transferencia.de, "victor");
+assert.equal(cenarioConfirmado.transferencia.para, "gustavo");
+assert.equal(cenarioConfirmado.transferencia.valor, 2072.93);
+
+const cenarioComCoberturaEVaso = calcularCenario50a50({
+  socioAId: "gustavo",
+  socioBId: "victor",
+  custos: [
+    ...comprasCriadasHoje.map(item => ({ valor: item.valor, pagadorId: "victor", pago: true })),
+    { valor: 8000, pagadorId: "victor", pago: true },
+    { valor: 2000, pagadorId: "victor", pago: true }
+  ],
+  recebimentos: [{ valor: 15000, recebidoPor: "gustavo" }],
+  acertos: [{ valor: 12000, de: "gustavo", para: "victor", considerarNaEqualizacao: true }]
+});
+assert.equal(cenarioComCoberturaEVaso.transferencia.de, "gustavo");
+assert.equal(cenarioComCoberturaEVaso.transferencia.para, "victor");
+assert.equal(cenarioComCoberturaEVaso.transferencia.valor, 2927.08);
+
+const custoOitentaVinte = calcularCenario50a50({
+  socioAId: "gustavo",
+  socioBId: "victor",
+  custos: [{
+    valor: 100,
+    pagadorId: "gustavo",
+    percentualA: 80,
+    percentualB: 20,
+    pago: true
+  }]
+});
+assert.deepEqual(custoOitentaVinte.transferencia, {
+  de: "victor",
+  deNome: "victor",
+  para: "gustavo",
+  paraNome: "gustavo",
+  valor: 20
+});
+
+const recebimentoOitentaVinte = calcularCenario50a50({
+  socioAId: "gustavo",
+  socioBId: "victor",
+  recebimentos: [{
+    valor: 100,
+    recebidoPor: "gustavo",
+    alocacoes: [
+      { socioId: "gustavo", valor: 80 },
+      { socioId: "victor", valor: 20 }
+    ]
+  }]
+});
+assert.deepEqual(recebimentoOitentaVinte.transferencia, {
+  de: "gustavo",
+  deNome: "gustavo",
+  para: "victor",
+  paraNome: "victor",
+  valor: 20
+});
+
 const sociosLegados = [
   { id: "gustavo-id", nome: "Gustavo Medeiros" },
   { id: "victor-id", nome: "Victor Castro" }
@@ -130,6 +257,7 @@ assert.deepEqual(
 
 // Um componente comum não altera a diferença entre os dois sócios.
 assert.equal(calcularTransferenciaEntreSocios(socios(100, 100)), null);
+assert.equal(calcularTransferenciaEntreSocios(socios(0.01, -0.01))?.valor, 0.01);
 
 const [docsHelper, appHelper, docsIndex, appIndex] = await Promise.all([
   readFile(new URL("../docs/equalizacao.mjs", import.meta.url), "utf8"),
@@ -157,7 +285,7 @@ assert.match(docsIndex, /Pagador inválido no rateio/);
 for (const colecao of ["lancamentos", "recebimentos", "rateios", "acertos", "contasReceber"]) {
   assert.match(
     calculoGlobalFonte,
-    new RegExp(`const ${colecao} = \\(await carregarColecao\\([\\s\\S]*?\\)\\)\\.filter\\(registro => registroCriadoDesdeMarco\\(registro\\)\\)`),
+    new RegExp(`const ${colecao} = filtrarDesdeMarco\\(await carregarColecao\\(`),
     `${colecao} precisa respeitar o marco no cálculo global.`
   );
 }
@@ -171,7 +299,23 @@ assert.match(calculoGlobalFonte, /const obraCriadaDesdeMarco = registroCriadoDes
 assert.match(calculoLocalFonte, /const obraCriadaDesdeMarco = registroCriadoDesdeMarco\(obra\)/);
 assert.doesNotMatch(docsIndex, /garantirAcertoPendenteQd61Lt32\(\)\.catch/);
 assert.doesNotMatch(docsIndex, /migrarEntradaTerrenoQd20Lt2\(\)\.catch/);
-assert.match(docsIndex, /const acertosInversos = state\.acertos\.filter\(a =>\s*registroCriadoDesdeMarco\(a\) &&/);
+assert.doesNotMatch(docsIndex, /function gerarAcertoAutomatico\(/);
+assert.match(docsIndex, /criarAlocacoesRecebimento\(\{/);
+assert.match(docsIndex, /const totalRateio = valorRateioPago\(r\)/);
+assert.match(docsIndex, /const batch = writeBatch\(db\)/);
+assert.match(docsIndex, /const unidadeId = overlay\.querySelector\('#baixa-unidade'\)\.value \|\| null/);
+assert.match(calculoGlobalFonte, /inferirAlocacoesCusto\(l, obra\)/, "O cálculo global precisa respeitar percentuais personalizados de custo.");
+assert.match(calculoLocalFonte, /inferirAlocacoesCusto\(l, obra\)/, "O cálculo local precisa respeitar percentuais personalizados de custo.");
+assert.match(calculoGlobalFonte, /!a\.recebimentoOrigemId/, "Acertos automáticos legados não podem duplicar recebimentos.");
+assert.match(calculoLocalFonte, /a\.recebimentoOrigemId/, "O cálculo local também precisa ignorar acertos automáticos legados.");
+assert.match(docsIndex, /alocacoes:\s*alocacoesCr/, "A baixa de conta a receber precisa persistir a divisão societária.");
+assert.match(docsIndex, /alocacoes:\s*alocacoesRecebimento/, "A conciliação automática precisa atualizar a divisão do recebimento.");
+assert.match(docsIndex, /pagadorId,\s*\n\s*statusPagamento/, "Rateios pagos precisam registrar quem desembolsou.");
+assert.match(docsIndex, /function lancamentoFoiPago\(/, "Registros legados e status explícitos precisam usar a mesma regra de pagamento.");
+assert.doesNotMatch(docsIndex, /\bdeCanonical\b/, "Identificadores canônicos obsoletos não podem reaparecer.");
+assert.match(docsIndex, /window\.navigateTo\s*=\s*navigateTo/, "Navegação disparada pelo HTML precisa estar exposta no escopo global.");
+assert.match(docsIndex, /event\.key === 'Escape'/);
+assert.match(docsIndex, /max-height:calc\(100dvh - 2rem\)/);
 assert.match(docsIndex, /Visão histórica completa/);
 assert.match(docsIndex, /dívida entre os sócios é calculada separadamente/);
 assert.match(docsIndex, /Equalização a partir de \$\{MARCO_EQUALIZACAO_LABEL\}/);
@@ -185,7 +329,29 @@ assert.match(finalizadorFonte, /const acertosExistentes = acertosSnap\.docs[\s\S
 const balancoHistoricoInicio = docsIndex.indexOf("async function renderBalancoGlobal()");
 const balancoHistoricoFim = docsIndex.indexOf("async function finalizeMigracaoEqualizacao()", balancoHistoricoInicio);
 const balancoHistoricoFonte = docsIndex.slice(balancoHistoricoInicio, balancoHistoricoFim);
-assert.match(balancoHistoricoFonte, /const recebimentos = recebimentosSnap\.docs\.map\(d => \(\{ id: d\.id, \.\.\.d\.data\(\) \}\)\);/);
+assert.match(balancoHistoricoFonte, /const recebimentos = recebimentosSnap\.docs[\s\S]{0,180}\.filter\(registroDentroDoPeriodo\);/);
+assert.match(balancoHistoricoFonte, /\.filter\(registroDentroDoPeriodo\)[\s\S]{0,80}\.filter\(lancamentoFoiPago\)/, "O balanço histórico só deve tratar custos efetivamente pagos como caixa.");
+assert.match(balancoHistoricoFonte, /const registrarCustoPago = /, "O balanço histórico precisa atribuir custos ao pagador real.");
+assert.match(balancoHistoricoFonte, /recebidoPorId === "AMBOS"[\s\S]{0,220}distribuirValor\(valor/, "Caixa recebido por ambos deve ser dividido fisicamente em 50\/50.");
+assert.match(balancoHistoricoFonte, /const obraSocioAId = getObraSocioFirestoreId/, "O balanço histórico precisa normalizar vínculos legados de sócios.");
+assert.match(balancoHistoricoFonte, /!unidadesIds\.has\(String\(l\.unidadeId\)\)/, "Lançamentos de unidade removida não podem desaparecer do balanço.");
+assert.match(balancoHistoricoFonte, /destinosOrfaos/, "Destinos de rateio órfãos não podem desaparecer do balanço.");
+assert.match(balancoHistoricoFonte, /const investimentoInicialNoPeriodo = registroDentroDoPeriodo/, "O filtro do balanço também precisa alcançar aportes iniciais.");
+assert.match(balancoHistoricoFonte, /const valorDistribuido = numeroFinanceiro\(dist\.valor\)/, "O balanço histórico deve ler o valor monetário atual do rateio.");
+assert.match(balancoHistoricoFonte, /const percentualLegado = numeroFinanceiro\(dist\.percentual\)/, "O balanço histórico deve manter fallback para percentuais legados.");
+assert.doesNotMatch(balancoHistoricoFonte, /\(dist\.percentual \/ 100\) \* \(r\.valorTotal \|\| 0\)/);
+const analiseDetalhadaInicio = docsIndex.indexOf("function renderAnaliseDetalhada(");
+const analiseDetalhadaFim = docsIndex.indexOf("function renderLucroSection", analiseDetalhadaInicio);
+const analiseDetalhadaFonte = docsIndex.slice(analiseDetalhadaInicio, analiseDetalhadaFim);
+assert.match(analiseDetalhadaFonte, /const pagadorSlot = resolvePagoPor\(r, obra\)/, "A análise detalhada deve resolver o pagador real do rateio.");
+assert.match(analiseDetalhadaFonte, /const valorDistribuido = numeroFinanceiro\(d\.valor\)/, "A análise detalhada deve ler o valor monetário atual do rateio.");
+assert.match(analiseDetalhadaFonte, /const percentualLegado = numeroFinanceiro\(d\.percentual\)/, "A análise detalhada deve manter fallback para percentuais legados.");
+assert.match(analiseDetalhadaFonte, /const recebidoPorSlot = resolveSocioSlotNaObra\(rec\.recebidoPor, obra\)/, "A análise detalhada deve aceitar IDs reais nos recebimentos.");
+assert.doesNotMatch(analiseDetalhadaFonte, /r\.pagoPor === ["']A["']/);
+assert.doesNotMatch(analiseDetalhadaFonte, /rec\.recebidoPor === ["']A["']/);
+assert.match(docsIndex, /function inferirAlocacoesRecebimento\(recebimento, obra\) \{[\s\S]{0,220}const socioAId = /, "A inferência de recebimentos precisa declarar os IDs usados nos nomes dos sócios.");
+assert.match(docsIndex, /const diaMesAno = texto\.match/, "Datas legadas em DD\/MM\/AAAA precisam ser interpretadas como datas civis.");
+assert.match(docsIndex, /Esta unidade possui \$\{dependencias\.length\} registro\(s\) financeiro\(s\)/, "A exclusão de unidade precisa proteger dependências financeiras.");
 assert.doesNotMatch(calculoLocalFonte, /\], 0\.99\)/);
 
 console.log("✓ Lógica de equalização validada");

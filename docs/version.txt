@@ -1,3 +1,3 @@
-VERSION: EQUALIZACAO-MARCO-FIX
+VERSION: AUDITORIA-GERAL-V2
 TIMESTAMP: 2026-08-31
-FEATURE: Saldo histórico encerrado e equalização por data real de criação
+FEATURE: Cálculos 50/50 validados, relatórios compatíveis, baixa atômica, modais acessíveis e layout responsivo

@@ -7,6 +7,7 @@ service cloud.firestore {
 
     function isAllowedUser() {
       return isSignedIn()
+        && request.auth.token.email_verified == true
         && request.auth.token.email in [
           'viictor.castro@gmail.com',
           'gcm.conceicao@gmail.com'
@@ -14,11 +15,58 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email == 'viictor.castro@gmail.com';
+      return isAllowedUser() && request.auth.token.email == 'viictor.castro@gmail.com';
+    }
+
+    function hasValidAuditFields() {
+      return request.resource.data.createdAt is timestamp
+        && request.resource.data.createdBy == request.auth.token.email;
+    }
+
+    function preservesAuditFields() {
+      return (
+          !('createdAt' in resource.data)
+          || request.resource.data.createdAt == resource.data.createdAt
+        )
+        && (
+          !('createdBy' in resource.data)
+          || request.resource.data.createdBy == resource.data.createdBy
+        );
+    }
+
+    function isValidRecebimento() {
+      return request.resource.data.valor is number
+        && request.resource.data.valor > 0
+        && request.resource.data.recebidoPor is string
+        && request.resource.data.data is string;
+    }
+
+    function isValidAcerto() {
+      return request.resource.data.valor is number
+        && request.resource.data.valor > 0
+        && request.resource.data.de is string
+        && request.resource.data.para is string
+        && request.resource.data.de != request.resource.data.para
+        && request.resource.data.data is string;
+    }
+
+    function isValidRateio() {
+      return request.resource.data.valorTotal is number
+        && request.resource.data.valorTotal > 0
+        && request.resource.data.data is string;
+    }
+
+    function isValidContaReceber() {
+      return request.resource.data.valor is number
+        && request.resource.data.valor > 0
+        && request.resource.data.status is string
+        && request.resource.data.data is string;
     }
 
     function isValidLancamento(obraId) {
       return request.resource.data.obraId == obraId
+        && request.resource.data.valor is number
+        && request.resource.data.valor > 0
         && request.resource.data.etapaId is string
         && request.resource.data.tipoCustoId is string
         && (
@@ -79,9 +127,17 @@ service cloud.firestore {
 
       match /lancamentos/{lancId} {
         allow read: if isAllowedUser();
-        allow create: if isAllowedUser() && isValidLancamento(obraId);
+        allow create: if isAllowedUser() && isValidLancamento(obraId) && hasValidAuditFields();
         allow update: if isAllowedUser()
-          && (!changesLancamentoClassification() || isValidLancamento(obraId));
+          && (!changesLancamentoClassification() || isValidLancamento(obraId))
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['valor'])
+            || (
+              request.resource.data.valor is number
+              && request.resource.data.valor > 0
+            )
+          )
+          && preservesAuditFields();
         allow delete: if isAdmin();
       }
 
@@ -102,25 +158,93 @@ service cloud.firestore {
 
       match /rateios/{rateioId} {
         allow read: if isAllowedUser();
-        allow create, update: if isAllowedUser();
+        allow create: if isAllowedUser() && isValidRateio() && hasValidAuditFields();
+        allow update: if isAllowedUser()
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['valorTotal'])
+            || (
+              request.resource.data.valorTotal is number
+              && request.resource.data.valorTotal > 0
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['data'])
+            || request.resource.data.data is string
+          )
+          && preservesAuditFields();
         allow delete: if isAdmin();
       }
 
       match /recebimentos/{recebimentoId} {
         allow read: if isAllowedUser();
-        allow create, update: if isAllowedUser();
+        allow create: if isAllowedUser() && isValidRecebimento() && hasValidAuditFields();
+        allow update: if isAllowedUser()
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['valor'])
+            || (
+              request.resource.data.valor is number
+              && request.resource.data.valor > 0
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['recebidoPor'])
+            || request.resource.data.recebidoPor is string
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['data'])
+            || request.resource.data.data is string
+          )
+          && preservesAuditFields();
         allow delete: if isAdmin();
       }
 
       match /acertos/{acertoId} {
         allow read: if isAllowedUser();
-        allow create, update: if isAllowedUser();
+        allow create: if isAllowedUser() && isValidAcerto() && hasValidAuditFields();
+        allow update: if isAllowedUser()
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['valor'])
+            || (
+              request.resource.data.valor is number
+              && request.resource.data.valor > 0
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['de', 'para'])
+            || (
+              request.resource.data.de is string
+              && request.resource.data.para is string
+              && request.resource.data.de != request.resource.data.para
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['data'])
+            || request.resource.data.data is string
+          )
+          && preservesAuditFields();
         allow delete: if isAdmin();
       }
 
       match /contasReceber/{contaId} {
         allow read: if isAllowedUser();
-        allow create, update: if isAllowedUser();
+        allow create: if isAllowedUser() && isValidContaReceber() && hasValidAuditFields();
+        allow update: if isAllowedUser()
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['valor'])
+            || (
+              request.resource.data.valor is number
+              && request.resource.data.valor > 0
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+            || request.resource.data.status is string
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['data'])
+            || request.resource.data.data is string
+          )
+          && preservesAuditFields();
         allow delete: if isAdmin();
       }
 

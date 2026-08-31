@@ -7,11 +7,23 @@ import { seedCatalogos, listCatalogo } from "./catalogos.mjs";
 
 const app = express();
 app.use(express.json());
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS || "https://viictorcastro-beep.github.io,http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001")
+    .split(",")
+    .map(value => value.trim())
+    .filter(Boolean)
+);
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Admin-Token");
+  if (req.method === "OPTIONS") {
+    return !origin || allowedOrigins.has(origin) ? res.sendStatus(204) : res.sendStatus(403);
+  }
   next();
 });
 
@@ -40,6 +52,33 @@ if (ENV_CREDENTIALS_PATH) {
 }
 
 const db = admin.firestore();
+const allowedEmails = new Set([
+  "viictor.castro@gmail.com",
+  "gcm.conceicao@gmail.com"
+]);
+
+function canAccessObra(user, obra) {
+  if (user?.email === "viictor.castro@gmail.com") return true;
+  const usuarios = Array.isArray(obra?.usuarios) ? obra.usuarios : [];
+  return usuarios.some(item => item?.email === user?.email);
+}
+
+app.use("/api", async (req, res, next) => {
+  try {
+    const authorization = String(req.headers.authorization || "");
+    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    if (!match) return res.status(401).json({ error: "authentication_required" });
+    const decoded = await admin.auth().verifyIdToken(match[1]);
+    if (!decoded.email_verified || !allowedEmails.has(decoded.email)) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.warn("Token Firebase inválido:", err?.code || err?.message || "unknown");
+    res.status(401).json({ error: "invalid_token" });
+  }
+});
 
 function getSeedContext() {
   return {
@@ -68,6 +107,18 @@ function parseDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function numeroFinanceiro(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value !== "string") return 0;
+  const text = value.trim();
+  if (!text) return 0;
+  const normalized = text.includes(",")
+    ? text.replace(/\./g, "").replace(",", ".")
+    : text;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function getLancamentoDate(l, modoData) {
   if (modoData === "pagamento") return l.dataPagamento || null;
   return l.dataCompetencia || l.data || null;
@@ -75,15 +126,9 @@ function getLancamentoDate(l, modoData) {
 
 app.get("/api/catalogos/etapas", async (req, res) => {
   try {
-    let etapas = await listCatalogo({ db, collectionName: "catalogo_etapas" });
+    const etapas = await listCatalogo({ db, collectionName: "catalogo_etapas" });
     if (etapas.length === 0) {
-      console.warn("⚠️ Catálogo de etapas vazio. Rodando seed...");
-      await seedCatalogos({ db, admin, logger: console, ...getSeedContext() });
-      etapas = await listCatalogo({ db, collectionName: "catalogo_etapas" });
-    }
-    if (etapas.length === 0) {
-      console.error("❌ Catálogo de etapas segue vazio após seed");
-      return res.status(500).json({ error: "catalogo_etapas_empty" });
+      return res.status(503).json({ error: "catalogo_etapas_empty" });
     }
     res.json({ items: etapas });
   } catch (err) {
@@ -94,15 +139,9 @@ app.get("/api/catalogos/etapas", async (req, res) => {
 
 app.get("/api/catalogos/tipos-custo", async (req, res) => {
   try {
-    let tipos = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
+    const tipos = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
     if (tipos.length === 0) {
-      console.warn("⚠️ Catálogo de tipos vazio. Rodando seed...");
-      await seedCatalogos({ db, admin, logger: console, ...getSeedContext() });
-      tipos = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
-    }
-    if (tipos.length === 0) {
-      console.error("❌ Catálogo de tipos segue vazio após seed");
-      return res.status(500).json({ error: "catalogo_tipos_custo_empty" });
+      return res.status(503).json({ error: "catalogo_tipos_custo_empty" });
     }
     res.json({ items: tipos });
   } catch (err) {
@@ -161,6 +200,9 @@ app.get("/api/dashboard/custos", async (req, res) => {
     if (!obraSnap.exists) {
       return res.status(404).json({ error: "obra_not_found" });
     }
+    if (!canAccessObra(req.user, obraSnap.data())) {
+      return res.status(403).json({ error: "obra_forbidden" });
+    }
 
     if (unidadeId !== "all") {
       const unidSnap = await obraRef.collection("unidades").doc(String(unidadeId)).get();
@@ -197,12 +239,11 @@ app.get("/api/dashboard/custos", async (req, res) => {
     const tiposCatalogo = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
 
     if (etapasCatalogo.length === 0 || tiposCatalogo.length === 0) {
-      console.warn("⚠️ Catálogos vazios no dashboard. Rodando seed...");
-      await seedCatalogos({ db, admin, logger: console, ...getSeedContext() });
+      return res.status(503).json({ error: "catalogos_empty" });
     }
 
-    const etapas = etapasCatalogo.length ? etapasCatalogo : await listCatalogo({ db, collectionName: "catalogo_etapas" });
-    const tipos = tiposCatalogo.length ? tiposCatalogo : await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
+    const etapas = etapasCatalogo;
+    const tipos = tiposCatalogo;
 
     const tiposIds = tipos.map(t => t.id);
     const totaisPorTipo = {};
@@ -227,7 +268,7 @@ app.get("/api/dashboard/custos", async (req, res) => {
     lancs.forEach(l => {
       const etapaId = etapasMap[l.etapaId] ? l.etapaId : fallbackEtapaId;
       const tipoId = tiposIds.includes(l.tipoCustoId) ? l.tipoCustoId : fallbackTipoId;
-      const valor = Number(l.valor || 0);
+      const valor = numeroFinanceiro(l.valor);
 
       if (!etapasMap[etapaId]) {
         etapasMap[etapaId] = {
@@ -253,7 +294,7 @@ app.get("/api/dashboard/custos", async (req, res) => {
       e.outros = e.total - e.material - e.mao_obra;
     });
 
-    const geral = lancs.reduce((sum, l) => sum + Number(l.valor || 0), 0);
+    const geral = lancs.reduce((sum, l) => sum + numeroFinanceiro(l.valor), 0);
     const material = totaisPorTipo.material || 0;
     const mao_obra = totaisPorTipo.mao_obra || 0;
     const outros = geral - material - mao_obra;
@@ -291,18 +332,6 @@ app.get("/api/dashboard/custos", async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 
-(async () => {
-  try {
-    await seedCatalogos({ db, admin, logger: console, ...getSeedContext() });
-    const etapas = await listCatalogo({ db, collectionName: "catalogo_etapas" });
-    const tipos = await listCatalogo({ db, collectionName: "catalogo_tipos_custo" });
-    console.log(`✅ catalogos ok: etapas=${etapas.length} tipos=${tipos.length}`);
-
-    app.listen(PORT, () => {
-      console.log(`🚀 API VG Construtora rodando na porta ${PORT}`);
-    });
-  } catch (err) {
-    console.error("❌ Seed falhou. Encerrando.", err);
-    process.exit(1);
-  }
-})();
+app.listen(PORT, () => {
+  console.log(`🚀 API VG Construtora rodando na porta ${PORT}`);
+});

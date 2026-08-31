@@ -1,60 +1,52 @@
-﻿# VG Construtora  ERP de Obras
+# VG Construtora — ERP de Obras
+
+Sistema web para acompanhar obras, custos, recebimentos, contas a receber, rateios e acertos entre sócios.
 
 ## Arquitetura
 
-| Componente | Caminho | Funcao |
+| Componente | Caminho | Função |
 |---|---|---|
-| **UI oficial (Pages)** | `docs/index.html` | SPA publicada no GitHub Pages |
-| **Mirror local** | `app/index.html` | Espelho de docs/ para dev local (sempre sincronizar) |
-| **Redirect legacy** | `index.html` (raiz) | Redireciona para /vgconstrutora/ |
-| **API (opcional)** | `server.mjs` | Express API para catalogos e dashboard |
-| **Catalogos** | `catalogos.mjs` | Seed/list de etapas e tipos de custo |
-| **Scripts** | `scripts/` | Migracao, seed, testes |
-| **Firestore Rules** | `firestore.rules` | Regras de seguranca do banco |
+| Interface publicada | `docs/index.html` | SPA servida pelo GitHub Pages |
+| Espelho local | `app/index.html` | Fonte de desenvolvimento, mantida idêntica a `docs/` |
+| Motor financeiro testável | `app/equalizacao.mjs` | Regras puras de moeda e equalização |
+| Redirecionamento legado | `index.html` | Redireciona para `/vgconstrutora/` |
+| API opcional | `server.mjs` | Catálogos e dashboard com autenticação Firebase |
+| Regras de acesso | `firestore.rules` | Validação e autorização no Firestore |
 
-## GitHub Pages (UI oficial)
+## Regras financeiras principais
 
-- **Branch**: main
-- **Pasta**: /docs
-- **URL**: https://victorcastro-beep.github.io/vgconstrutora/
-- **Arquivo**: `docs/index.html`
-- **Validacao**: Ctrl+U no site e buscar `BUILD:`
-
-## Catalogos (Etapas e Tipos de Custo)
-
-### Seed via API
-`ash
-npm install
-# Configurar GOOGLE_APPLICATION_CREDENTIALS no .env
-npm run seed:catalogos
-`
-
-### Seed automatico
-O front-end faz merge local com Firestore ao carregar. Se a API estiver indisponivel, usa seeds locais como fallback.
-
-### Catalogos oficiais
-- 18 etapas de obra (Terreno, Fundacao, Estrutura, ..., Comercializacao)
-- 8 tipos de custo (Material, Mao de Obra, Frete, ..., Aquisicao do Terreno)
-
-## Migracao de dados legados
-
-`ash
-# Migrar custos (inferir etapaId e tipoCustoId por keywords)
-OBRA_ID=<id> npm run migrate:custos
-
-# Normalizar dataPagamento e descricao faltantes
-OBRA_ID=<id> npm run migrate:normalize
-
-# Testar integridade
-OBRA_ID=<id> npm run test:custos
-`
+- O período de equalização atual começa em **31/08/2026** e usa a data de criação do registro, mesmo que a competência seja retroativa.
+- Custos e receitas são divididos em 50/50 por padrão; percentuais explícitos são respeitados.
+- O valor físico é atribuído a quem pagou ou recebeu.
+- Acertos confirmados abatem o saldo sem duplicar recebimentos antigos vinculados automaticamente.
+- Todos os cálculos monetários apresentados ao usuário são arredondados para centavos.
 
 ## Desenvolvimento
 
-`ash
+```bash
 npm install
-npm start  # API na porta 3001
-`
+npm test
+npm start
+```
 
-## Regras do Firestore
-Veja `firestore.rules`. Lancamentos exigem etapaId e tipoCustoId validos (blindagem server-side).
+## Migrações
+
+As migrações são executadas em modo de simulação por padrão. Para mover lançamentos entre obras:
+
+```bash
+node scripts/move-to-obra.mjs --source <obra-origem> --target <obra-destino>
+node scripts/move-to-obra.mjs --source <obra-origem> --target <obra-destino> --apply
+```
+
+Use `--apply` somente depois de revisar a simulação e o backup gerado.
+
+## Publicação
+
+- Branch: `main`
+- Pasta publicada: `/docs`
+- Site: https://viictorcastro-beep.github.io/vgconstrutora/
+- A automação de CI executa os testes de cálculo e estrutura da interface em cada atualização.
+
+## Segurança
+
+A API exige token de identidade do Firebase. As regras do Firestore restringem o sistema aos dois usuários autorizados e reservam operações administrativas ao proprietário.
