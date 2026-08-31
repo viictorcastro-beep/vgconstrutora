@@ -1,3 +1,6 @@
+export const MARCO_EQUALIZACAO_ISO = "2026-08-31T03:00:00.000Z";
+export const MARCO_EQUALIZACAO_LABEL = "31/08/2026";
+
 export function numeroFinanceiro(valor) {
   if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;
   if (typeof valor !== "string") return 0;
@@ -10,6 +13,24 @@ export function numeroFinanceiro(valor) {
     : texto;
   const numero = Number(normalizado);
   return Number.isFinite(numero) ? numero : 0;
+}
+
+function instanteEmMilissegundos(valor) {
+  if (valor == null) return Number.NaN;
+  if (typeof valor?.toMillis === "function") return valor.toMillis();
+  if (typeof valor?.toDate === "function") return valor.toDate().getTime();
+  if (valor instanceof Date) return valor.getTime();
+  if (typeof valor === "object" && Number.isFinite(Number(valor.seconds))) {
+    return (Number(valor.seconds) * 1000) + (Number(valor.nanoseconds || 0) / 1e6);
+  }
+  const data = new Date(valor);
+  return data.getTime();
+}
+
+export function registroCriadoDesdeMarco(registro, marcoIso = MARCO_EQUALIZACAO_ISO) {
+  const criadoEm = instanteEmMilissegundos(registro?.createdAt);
+  const marco = instanteEmMilissegundos(marcoIso);
+  return Number.isFinite(criadoEm) && Number.isFinite(marco) && criadoEm >= marco;
 }
 
 export function aplicarAcertosNaPosicao(posicaoBruta, acertosPago, acertosRecebido) {
@@ -56,6 +77,7 @@ export function calcularTransferenciaEntreSocios(socios, tolerancia = 0.01) {
   // dois sócios. Em um conjunto perfeitamente fechado, isso equivale ao saldo A.
   const saldoRelativoA = (saldoA - saldoB) / 2;
   if (Math.abs(saldoRelativoA) <= tolerancia) return null;
+  const valorTransferencia = Math.round((Math.abs(saldoRelativoA) + 1e-9) * 100) / 100;
 
   if (saldoRelativoA > 0) {
     return {
@@ -63,7 +85,7 @@ export function calcularTransferenciaEntreSocios(socios, tolerancia = 0.01) {
       deNome: socioB.nome,
       para: socioA.id,
       paraNome: socioA.nome,
-      valor: Math.abs(saldoRelativoA)
+      valor: valorTransferencia
     };
   }
 
@@ -72,6 +94,6 @@ export function calcularTransferenciaEntreSocios(socios, tolerancia = 0.01) {
     deNome: socioA.nome,
     para: socioB.id,
     paraNome: socioB.nome,
-    valor: Math.abs(saldoRelativoA)
+    valor: valorTransferencia
   };
 }

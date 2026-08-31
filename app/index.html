@@ -1,4 +1,4 @@
-<!-- BUILD: equalizacao-legacy-fix | 2026-08-31 -->
+<!-- BUILD: equalizacao-marco-fix | 2026-08-31 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -222,7 +222,6 @@
               <h2 class="font-black text-3xl mb-2">💼 Balanço Global por Sócio</h2>
               <p class="text-gray-600">Consolidação de investimentos, custos e receitas de todas as obras</p>
             </div>
-            <button onclick="migrarProprietariosParaIDs()" class="btn btn-blue">🔄 Migrar Sistema Antigo</button>
           </div>
           
           <!-- Filtros de Período -->
@@ -1163,7 +1162,7 @@
   </div>
 
   <script type="module">
-    import { aplicarAcertosNaPosicao, calcularTransferenciaEntreSocios, numeroFinanceiro, resolverSocioIdPorNomeUnico } from "./equalizacao.mjs";
+    import { aplicarAcertosNaPosicao, calcularTransferenciaEntreSocios, MARCO_EQUALIZACAO_LABEL, numeroFinanceiro, registroCriadoDesdeMarco, resolverSocioIdPorNomeUnico } from "./equalizacao.mjs";
 
     // Firebase imports
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js");
@@ -1182,7 +1181,7 @@
 
     // BUILD STAMP - SEGUNDO CHECK (no início do Firebase init)
     console.log("%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "color: #22c55e;");
-    console.log("%c🔨 BUILD: 2026-08-31 | equalizacao-legacy-fix", "color: #22c55e; font-weight: bold; font-size: 16px;");
+    console.log("%c🔨 BUILD: 2026-08-31 | equalizacao-marco-fix", "color: #22c55e; font-weight: bold; font-size: 16px;");
     console.log("%c✓ FIXED: socio names display (nunca IDs)", "color: #10b981;");
     console.log("%c✓ FIXED: recebimentos 50/50 logic", "color: #10b981;");
     console.log("%c✓ FIXED: acertos assinados, pagador real e leituras seguras", "color: #10b981;");
@@ -2022,7 +2021,6 @@
         hydrateSociosObraSelect();
         hydrateProprietarioSelect();
         renderListaSocios();
-        garantirAcertoPendenteQd61Lt32().catch(err => console.error('Erro ao garantir acerto QD61 LT32:', err));
       }, (err) => {
         console.error("❌ Erro ao carregar sócios:", err);
       }));
@@ -2152,8 +2150,8 @@
         }
         
         hydrateObrasSelect();
-        migrarEntradaTerrenoQd20Lt2().catch(err => console.error('Erro ao migrar entrada do terreno QD20 LT2:', err));
-        garantirAcertoPendenteQd61Lt32().catch(err => console.error('Erro ao garantir acerto QD61 LT32:', err));
+        // Migrações históricas não rodam durante a abertura do sistema: depois
+        // do marco, uma recriação automática pareceria um movimento financeiro novo.
       }, (err) => {
         console.error("❌ Erro ao carregar obras:", err);
         showToast("Erro ao carregar obras", "error");
@@ -3186,23 +3184,25 @@
             collection(db, "obras", obraId, "unidades"),
             `Unidades de ${obra.nome || obraId}`
           );
-          const lancamentos = await carregarColecao(
+          const lancamentos = (await carregarColecao(
             collection(db, "obras", obraId, "lancamentos"),
             `Lançamentos de ${obra.nome || obraId}`,
             { obrigatoria: true }
-          );
-          const recebimentos = await carregarColecao(
+          )).filter(registro => registroCriadoDesdeMarco(registro));
+          const recebimentos = (await carregarColecao(
             collection(db, "obras", obraId, "recebimentos"),
             `Recebimentos de ${obra.nome || obraId}`
-          );
-          const rateios = await carregarColecao(
+          )).filter(registro => registroCriadoDesdeMarco(registro));
+          const rateios = (await carregarColecao(
             collection(db, "obras", obraId, "rateios"),
             `Rateios de ${obra.nome || obraId}`
-          );
+          )).filter(registro => registroCriadoDesdeMarco(registro));
 
-          // 0️⃣ PROCESSAR INVESTIMENTOS DA OBRA (CRÍTICO!)
-          const invA = Number(obra.investimentoA || 0);
-          const invB = Number(obra.investimentoB || 0);
+          // O histórico anterior ao marco já foi encerrado entre os sócios.
+          // Investimentos só entram para obras realmente criadas após o marco.
+          const obraCriadaDesdeMarco = registroCriadoDesdeMarco(obra);
+          const invA = obraCriadaDesdeMarco ? Number(obra.investimentoA || 0) : 0;
+          const invB = obraCriadaDesdeMarco ? Number(obra.investimentoB || 0) : 0;
           const invTotal = invA + invB;
           
           console.log(`     💰 Investimentos: A R$ ${invA.toFixed(2)} | B R$ ${invB.toFixed(2)} | Total R$ ${invTotal.toFixed(2)}`);
@@ -3387,10 +3387,10 @@
           });
 
           // 2.5️⃣ PROCESSAR ACERTOS (transferências entre sócios)
-          const acertos = await carregarColecao(
+          const acertos = (await carregarColecao(
             collection(db, "obras", obraId, "acertos"),
             `Acertos de ${obra.nome || obraId}`
-          );
+          )).filter(registro => registroCriadoDesdeMarco(registro));
           acertos.forEach(a => {
             const valorRaw = a.valor;
             const valor = numeroFinanceiro(valorRaw);
@@ -3418,10 +3418,10 @@
           });
 
           // 3️⃣ CONTAS A RECEBER (opcional, para modo estratégico)
-          const contasReceber = await carregarColecao(
+          const contasReceber = (await carregarColecao(
             collection(db, "obras", obraId, "contasReceber"),
             `Contas a receber de ${obra.nome || obraId}`
-          );
+          )).filter(registro => registroCriadoDesdeMarco(registro));
           contasReceber.forEach(cr => {
             if (cr.status !== 'recebido') {
               const valor = numeroFinanceiro(cr.valor);
@@ -3978,6 +3978,10 @@
       // Renderizar HTML
 
       const html = `
+        <div class="bg-slate-50 border border-slate-300 rounded-lg p-4 mb-6 text-slate-700">
+          <div class="font-bold">📚 Visão histórica completa</div>
+          <div class="text-sm mt-1">Os cartões abaixo continuam mostrando custos, receitas e retorno de toda a obra. A dívida entre os sócios é calculada separadamente na seção de equalização, somente a partir de ${MARCO_EQUALIZACAO_LABEL}.</div>
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           ${state.socios.map(socio => {
             const dados = balancoPorSocio[socio.id];
@@ -4138,7 +4142,7 @@
         <div class="mt-8" id="equalizacao-global-section">
           <div class="card p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-300">
             <h2 class="font-black text-3xl mb-2 text-purple-900">🌍 Equalização Global Consolidada</h2>
-            <p class="text-sm text-gray-700 mb-6">Análise consolidada de TODAS as obras com diferentes modos de equalização</p>
+            <p class="text-sm text-gray-700 mb-6">Todas as obras, considerando na dívida somente movimentos criados a partir de ${MARCO_EQUALIZACAO_LABEL}</p>
             
             <div class="bg-white rounded-lg border border-purple-200 p-4 mb-6">
               <button id="calcular-equalizacao-global" class="btn btn-dark w-full">
@@ -4346,9 +4350,15 @@
       
       // Converter posicoes object para array
       const posArray = Object.values(posicoes);
-      const formatCurrency = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-      const formatSigned = (v) => `${v >= 0 ? '+' : '-'}R$ ${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      const formatCurrency = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formatSigned = (v) => `${v >= 0 ? '+' : '-'}R$ ${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       const transferencia = modoA?.transferencia || null;
+      const resumoMarco = `
+        <div class="bg-sky-50 border-2 border-sky-300 rounded-lg p-4 mb-6 text-sky-900">
+          <div class="font-black mb-1">📅 Novo período de equalização: ${MARCO_EQUALIZACAO_LABEL}</div>
+          <p class="text-sm">O saldo anterior foi considerado quitado. A equalização usa o momento em que o registro foi criado no sistema; uma compra lançada desde essa data entra no saldo mesmo quando sua competência é retroativa.</p>
+        </div>
+      `;
       const resumoAvisos = incompleto ? `
         <div class="bg-amber-50 border-2 border-amber-400 rounded-lg p-4 mb-6">
           <div class="font-black text-amber-900 mb-2">⚠️ Resultado incompleto</div>
@@ -4366,7 +4376,7 @@
           <div class="text-xs text-blue-700 mb-2">Equalização estratégica considerando valores a receber futuros</div>
           <div class="font-black text-blue-900">
             ${escapeHtml(modoB.transferencia.deNome)} → ${escapeHtml(modoB.transferencia.paraNome)}
-            <span class="text-blue-700">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+            <span class="text-blue-700">R$ ${modoB.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
           </div>
         </div>
       ` : '';
@@ -4391,6 +4401,7 @@
       
       let html = `
         ${resumoAvisos}
+        ${resumoMarco}
         ${resumoModoB}
         <!-- Resumo de Posições Consolidadas -->
         <div class="bg-white rounded-lg border-2 border-purple-400 p-6 mb-6">
@@ -4530,17 +4541,17 @@
                   ${escapeHtml(modoA.transferencia.deNome)} → ${escapeHtml(modoA.transferencia.paraNome)}
                 </div>
                 <div class="text-4xl font-black text-green-600">
-                  R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                  R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </div>
               </div>
               
               <div class="bg-white rounded p-4 text-sm">
                 <div class="font-bold text-green-900 mb-2">📊 Explicação:</div>
                 <p class="text-gray-700">
-                  <strong>${escapeHtml(modoA.transferencia.deNome)}</strong> recebeu mais dinheiro fisicamente do que 
-                  <strong>${escapeHtml(modoA.transferencia.paraNome)}</strong>. Para equalizar o caixa entre os sócios, 
-                  é necessário transferir <strong class="text-green-600">R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> 
-                  AGORA.
+                  Considerando somente os movimentos criados desde ${MARCO_EQUALIZACAO_LABEL},
+                  <strong>${escapeHtml(modoA.transferencia.paraNome)}</strong> ficou com valor a receber de
+                  <strong>${escapeHtml(modoA.transferencia.deNome)}</strong>. Para dividir o caixa igualmente, é necessário
+                  transferir <strong class="text-green-600">R$ ${modoA.transferencia.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> agora.
                 </p>
               </div>
             </div>
@@ -4658,11 +4669,15 @@
           
           // Carregar recebimentos
           const recebimentosSnap = await getDocs(collection(db, "obras", obra.id, "recebimentos"));
-          const recebimentos = recebimentosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const recebimentos = recebimentosSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(registro => registroCriadoDesdeMarco(registro));
           
           // Carregar acertos existentes para evitar duplicação
           const acertosSnap = await getDocs(collection(db, "obras", obra.id, "acertos"));
-          const acertosExistentes = acertosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const acertosExistentes = acertosSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(registro => registroCriadoDesdeMarco(registro));
           
           // Para cada recebimento, verificar se precisa de acerto
           for (const recebimento of recebimentos) {
@@ -6645,6 +6660,12 @@
       // Verificar permissões: sócio vê apenas seus próprios dados
       const meuSocioId = getSocioIdForUser(OBRA_ID);
       const somenteMinhaVisao = !isAdmin() && meuSocioId;
+      const avisoMarcoLocal = `
+        <div class="bg-sky-50 border border-sky-300 rounded-lg p-4 mb-4 text-sky-900">
+          <div class="font-bold">📅 Equalização a partir de ${MARCO_EQUALIZACAO_LABEL}</div>
+          <div class="text-sm mt-1">O saldo anterior foi considerado quitado; a competência retroativa não retira uma compra criada neste novo período.</div>
+        </div>
+      `;
 
       // Se é sócio, mostrar apenas seu card
       if (somenteMinhaVisao) {
@@ -6673,6 +6694,7 @@
         };
 
         const html = `
+          ${avisoMarcoLocal}
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <div class="text-sm text-blue-800">
               👤 Você está visualizando apenas seus próprios dados como <strong>${meusDados.nome}</strong>
@@ -6762,6 +6784,7 @@
 
       // ADMIN: Visualização completa (código original)
       const html = `
+        ${avisoMarcoLocal}
         <!-- Análise Detalhada de Fluxo de Caixa por Sócio -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <!-- Sócio A -->
@@ -8935,7 +8958,8 @@
           if (socioComDireito && socioComDireito !== recebidoPorCanonical && aloc.valor > 0) {
             
             // Buscar acertos pendentes existentes no sentido INVERSO (netting)
-            const acertosInversos = state.acertos.filter(a => 
+            const acertosInversos = state.acertos.filter(a =>
+              registroCriadoDesdeMarco(a) &&
               resolveSocioCanonicalId(a.de) === socioComDireito &&
               resolveSocioCanonicalId(a.para) === recebidoPorCanonical &&
               (!a.status || a.status === 'pendente')
@@ -9626,21 +9650,24 @@
       // 0. INVESTIMENTOS INICIAIS (sinal do terreno, etc)
       const obra = state.obras.find(o => o.id === OBRA_ID);
       const avisos = [];
-      const canonicalA = resolveSocioCanonicalId(obra?.socioAId) || "A";
-      const canonicalB = resolveSocioCanonicalId(obra?.socioBId) || "B";
+      const canonicalA = "A";
+      const canonicalB = "B";
       const socioA = obra?.socioAId ? socioNomePorQualquerId(obra.socioAId) : "Sócio A";
       const socioB = obra?.socioBId ? socioNomePorQualquerId(obra.socioBId) : "Sócio B";
-      const investimentoA = obra?.investimentoA || 0;
-      const investimentoB = obra?.investimentoB || 0;
+      const obraCriadaDesdeMarco = registroCriadoDesdeMarco(obra);
+      const investimentoA = obraCriadaDesdeMarco ? (obra?.investimentoA || 0) : 0;
+      const investimentoB = obraCriadaDesdeMarco ? (obra?.investimentoB || 0) : 0;
+      const incluirNoPeriodo = registro => registroCriadoDesdeMarco(registro);
+      const socioAFirestoreId = getObraSocioFirestoreId(obra, "socioAId");
+      const socioBFirestoreId = getObraSocioFirestoreId(obra, "socioBId");
 
       const resolveCanonical = (valor) => {
         if (!valor) return null;
         const normalized = normalizarSocioValor(valor, obra);
         if (String(normalized).toUpperCase() === "AMBOS") return "AMBOS";
-        const canonical = resolveSocioCanonicalId(normalized);
-        if (canonical) return canonical;
-        const v = String(normalized).toUpperCase();
-        if (v.length === 1 && v >= 'A' && v <= 'Z') return v;
+        const socioId = resolveSocioFirestoreIdNaObra(normalized, obra);
+        if (socioId === socioAFirestoreId) return "A";
+        if (socioId === socioBFirestoreId) return "B";
         return null;
       };
 
@@ -9650,7 +9677,7 @@
       let temDireitoA = 0; // Quanto A tem direito (baseado no proprietário)
       let temDireitoB = 0; // Quanto B tem direito (baseado no proprietário)
 
-      state.recebimentos.forEach(r => {
+      state.recebimentos.filter(incluirNoPeriodo).forEach(r => {
         const valor = numeroFinanceiro(r.valor);
         const recebidoPor = resolveCanonical(r.recebidoPor);
         const unidade = state.unidades.find(u => u.id === r.unidadeId);
@@ -9690,7 +9717,7 @@
       let pagouA = 0;
       let pagouB = 0;
 
-      state.lancamentos.forEach(l => {
+      state.lancamentos.filter(incluirNoPeriodo).forEach(l => {
         if (l.pago === false) return;
         const valor = numeroFinanceiro(l.valor);
         const pagadorSlot = resolvePagoPor(l, obra);
@@ -9708,7 +9735,7 @@
         }
       });
 
-      state.rateios.forEach(r => {
+      state.rateios.filter(incluirNoPeriodo).forEach(r => {
         const totalRateio = r.distribuicao?.reduce((sum, d) => sum + numeroFinanceiro(d.valor), 0) || 0;
         const temPagadorExplicito = [r.pagadorId, r.pagador, r.pagoPor, r.socioPagou, r.pagoPorId, r.quemPagou]
           .some(valor => valor != null && String(valor).trim() !== "");
@@ -9760,7 +9787,7 @@
       let saldoFinalA = saldoBrutoA;
       let saldoFinalB = saldoBrutoB;
 
-      state.acertos.forEach(a => {
+      state.acertos.filter(incluirNoPeriodo).forEach(a => {
         if (a.considerarNaEqualizacao !== true) return;
         const valor = numeroFinanceiro(a.valor);
         const deId = resolveSocioFirestoreIdNaObra(a.de, obra);
@@ -9818,17 +9845,16 @@
     }
 
     function getSugestaoEqualizacao(saldoA, saldoB, nomeA, nomeB) {
-      if (Math.abs(saldoA) < 1 && Math.abs(saldoB) < 1) {
-        return null;
-      }
-
-      if (saldoA > 0) {
-        // A pagou a mais, então B deve para A
-        return `${nomeB} deve transferir R$ ${Math.abs(saldoA).toFixed(2)} para ${nomeA}`;
-      } else {
-        // A pagou a menos, então A deve para B
-        return `${nomeA} deve transferir R$ ${Math.abs(saldoA).toFixed(2)} para ${nomeB}`;
-      }
+      const transferencia = calcularTransferenciaEntreSocios([
+        { id: "A", nome: nomeA, saldo: saldoA },
+        { id: "B", nome: nomeB, saldo: saldoB }
+      ]);
+      if (!transferencia) return null;
+      const valor = transferencia.valor.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      return `${transferencia.deNome} deve transferir R$ ${valor} para ${transferencia.paraNome}`;
     }
 
     // PDF EXPORT
@@ -10034,7 +10060,7 @@
   </script>
 
   <footer id="build-footer" class="text-center text-xs text-slate-400 py-4">
-    Build equalizacao-legacy-fix | 2026-08-31
+    Build equalizacao-marco-fix | 2026-08-31
   </footer>
 </body>
 </html>
